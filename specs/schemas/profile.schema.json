@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enclave.local/schemas/profile.schema.json",
+  "title": "Profile",
+  "type": "object",
+  "required": ["id", "name", "createdAt", "proxy", "fingerprint", "runtime", "status"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "notes": { "type": "string" },
+    "proxy": {
+      "type": "object",
+      "required": ["type", "host", "port"],
+      "properties": {
+        "type": { "enum": ["socks5", "http", "https"] },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "username": { "type": "string" },
+        "secretRef": { "type": "string" },
+        "lastCheck": { "type": "object" }
+      }
+    },
+    "fingerprint": {
+      "type": "object",
+      "required": ["os", "userAgent", "screen", "locale", "timezone", "canvasSeed", "audioSeed"],
+      "properties": {
+        "os": { "const": "windows" },
+        "camoufoxVersion": { "type": "string" },
+        "generatorVersion": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "screen": { "type": "object" },
+        "hardware": { "type": "object" },
+        "webgl": { "type": "object" },
+        "canvasSeed": { "type": "string" },
+        "audioSeed": { "type": "string" },
+        "fonts": { "type": "array", "items": { "type": "string" } },
+        "locale": { "type": "string" },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "timezone": { "type": "string" },
+        "geolocation": { "type": "object" },
+        "mediaDevices": { "type": "array" },
+        "webrtc": { "enum": ["proxy-only", "disabled"] },
+        "raw": { "type": "object" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "idleStopMinutes": { "type": "integer", "minimum": 1 },
+        "screenMatchesFingerprint": { "type": "boolean" }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "state": { "enum": ["stopped", "starting", "running", "error"] },
+        "containerId": { "type": ["string", "null"] },
+        "streamPort": { "type": ["integer", "null"] },
+        "lastError": { "type": ["string", "null"] },
+        "lastStartedAt": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

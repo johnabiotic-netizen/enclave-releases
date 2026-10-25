@@ -1,0 +1,73 @@
+# Profile schema
+
+Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json`, a `data/` directory (the browser's persistent data, mounted to `/data` in the container), `baselines/` (fingerprint baselines), and `logs/`.
+
+`profile.json` shape (authoritative JSON Schema in `specs/schemas/profile.schema.json`):
+
+```jsonc
+{
+  "id": "uuid-v4",
+  "name": "Client A - Instagram",
+  "createdAt": "2026-10-25T10:00:00Z",
+  "updatedAt": "2026-10-25T10:00:00Z",
+  "notes": "optional free text",
+
+  "proxy": {
+    "type": "socks5",            // socks5 | http | https
+    "host": "198.51.100.10",
+    "port": 1080,
+    "username": "user",
+    "secretRef": "keyring:profile-<id>-proxy", // reference, not the password
+    "lastCheck": {
+      "at": "2026-10-25T10:00:00Z",
+      "ok": true,
+      "exitIp": "198.51.100.10",
+      "country": "US", "city": "New York",
+      "timezone": "America/New_York",
+      "latencyMs": 180
+    }
+  },
+
+  "fingerprint": {
+    "os": "windows",
+    "camoufoxVersion": "x.y.z",
+    "generatorVersion": "x.y.z",
+    "userAgent": "...",
+    "screen": { "width": 1920, "height": 1080, "availHeight": 1040, "colorDepth": 24, "devicePixelRatio": 1 },
+    "hardware": { "cores": 8, "memoryGb": 8 },
+    "webgl": { "vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (...)", "...": "..." },
+    "canvasSeed": "hex",
+    "audioSeed": "hex",
+    "fonts": ["Arial", "Calibri", "..."],
+    "locale": "en-US",
+    "languages": ["en-US", "en"],
+    "timezone": "America/New_York",
+    "geolocation": { "lat": 40.71, "lon": -74.0, "accuracy": 50 },
+    "mediaDevices": [
+      { "kind": "videoinput", "label": "Integrated Camera" },
+      { "kind": "audioinput", "label": "Microphone" },
+      { "kind": "audiooutput", "label": "Speakers" }
+    ],
+    "webrtc": "proxy-only",      // proxy-only | disabled
+    "raw": { "...": "exact object Camoufox needs to reproduce this" }
+  },
+
+  "runtime": {
+    "idleStopMinutes": 20,
+    "screenMatchesFingerprint": true
+  },
+
+  "status": {
+    "state": "stopped",          // stopped | starting | running | error
+    "containerId": null,
+    "streamPort": null,
+    "lastError": null,
+    "lastStartedAt": null
+  }
+}
+```
+
+## Rules
+- `fingerprint` is written once at creation. Only `timezone`, `locale`, `languages`, `geolocation` may change later, and only via the explicit "Update location" action when the proxy's country changes. All other fields are immutable for the life of the profile.
+- The proxy password is never stored in `profile.json`. Only `secretRef` is.
+- `status` is runtime only and may be rewritten freely.

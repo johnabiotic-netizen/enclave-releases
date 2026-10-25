@@ -1,0 +1,5 @@
+packages:
+  - packages/*
+
+# Exact versions only (CLAUDE.md: pin every dependency).
+saveExact: true

@@ -1,0 +1,1 @@
+I will describe a decision. Append it to progress/DECISIONS.md at the top of the list, using the file's format (date, short title, Context, Decision, Reason). Keep it to a few lines. Then confirm it is recorded.
