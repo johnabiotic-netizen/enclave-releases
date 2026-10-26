@@ -32,6 +32,9 @@ Notes / evidence:
 - For the owner: acceptance test 3 says profiles show different canvas values, but Camoufox no longer adds canvas noise, so canvas is the same across profiles on one image (see DECISIONS.md). Stage 3 decides.
 
 ## Notes for upcoming tasks
+- Viewer (Stages 4/5): neko's client guesses touch vs mouse from media queries (`client/core/src/client.ts` `isTouchDevice`). The owner's touchscreen PC reports `pointer:fine` false and `hover:hover` false, so the stock web page never focuses its key input: clicks work, typing doesn't. The image now patches the stock page to check `any-pointer`/`any-hover` (Dockerfile); our own viewer should pass `inputMode` to `NekoClient` the same way.
+- Task D: WSL shuts down by itself when nothing on Windows uses it (seen 2026-10-26), stopping every container. The agent must keep WSL alive while profiles run (e.g. hold a long-running `wsl.exe` process) and not keep anything in WSL's `/tmp`, which a restart wipes. Also give the owner the non-admin login: with the admin one, the viewer changed the screen to 1920x1200, which breaks the fingerprint.
+- Browser image: Camoufox has no default search engine ("Search with None"); typed addresses work, searches don't. Set one in the image.
 - Task C: firewall goes in `entrypoint.sh` at the marked spot. Allow only uid 1100 (`egress`, the gost forwarder) to reach the proxy host and port; resolve the proxy hostname before locking (or require an IP).
 - Task D: stop containers with `docker stop` (graceful) so Firefox saves the session. Use a Docker volume per profile for `/data` (Firefox's SQLite on a Windows folder is slow and has locking issues). The agent must start the WSL distro (`wsl -d Ubuntu-24.04 true`) before using Docker on the owner's PC.
 

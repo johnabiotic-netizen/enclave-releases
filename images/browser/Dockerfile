@@ -112,6 +112,15 @@ RUN --mount=type=bind,from=gost-dist,target=/dist/gost \
     chmod 0755 /usr/local/bin/gost; \
     gost -V
 
+# neko's web client takes a PC with a touchscreen for a tablet (it asks whether the *primary*
+# pointer is fine) and then never focuses its key input: clicks work, typing doesn't. Ask
+# whether *any* pointer is fine instead. The build fails if the code no longer matches.
+RUN set -eux; \
+    f="$(grep -rlF 'matchMedia("(pointer:fine)")' /var/www/assets)"; \
+    test "$(echo "$f" | wc -l)" = 1; \
+    sed -i 's/matchMedia("(pointer:fine)")/matchMedia("(any-pointer:fine)")/; s/matchMedia("(hover:hover)")/matchMedia("(any-hover:hover)")/' "$f"; \
+    grep -qF 'matchMedia("(any-pointer:fine)")' "$f"
+
 COPY openbox.xml /etc/neko/openbox.xml
 COPY supervisord.conf /etc/neko/supervisord/enclave.conf
 COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py /opt/enclave/
