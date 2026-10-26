@@ -27,7 +27,8 @@ Notes / evidence:
 ## Stage 7: Launch  [ ]
 
 ## Blockers
-- Docker Desktop is not installed on the owner's PC (no `docker` on PATH). Needed for task B onward. Install steps: `docs/setup/windows-setup.md`.
+- (none). Docker resolved 2026-10-26: Docker Desktop can't run on this PC (Windows 11 21H2, which can't be upgraded), so Docker Engine 29.9.2 now runs inside WSL `Ubuntu-24.04` (see DECISIONS.md). Verified: `wsl docker run --rm hello-world` works, and the distro stays running with no terminal open. After a PC restart, run any `wsl` command (e.g. `wsl docker ps`) once to start it.
+- Watch disk space: C: had about 21 GB free on 2026-10-26, and the WSL disk grows on C:.
 
 ## Next action
-Stage 1, task B: browser image. First do the "Verify first" checks for neko v3 and Camoufox. Needs Docker Desktop installed.
+Stage 1, task B: browser image. First do the "Verify first" checks for neko v3 and Camoufox. Build and run images with `wsl docker ...` from Windows (or `docker` inside the distro).

@@ -27,7 +27,7 @@ Read other docs only when the current task needs them (UI work needs `ui/`, prof
 
 ## The owner's environment
 
-- Windows 10 or 11, 64 bit, Docker Desktop with the WSL 2 backend.
+- Windows 10 or 11, 64 bit, Docker Desktop with the WSL 2 backend. **Exception, the owner's own PC:** it runs Windows 11 21H2, which is too old for Docker Desktop and can't be upgraded. It runs Docker Engine inside the WSL distro `Ubuntu-24.04` instead (see `progress/DECISIONS.md`). From Windows, use `wsl docker <args>`; there is no `docker.exe` on PATH. In Git Bash, set `MSYS_NO_PATHCONV=1` when passing `/mnt/c/...` paths to `wsl.exe`. The agent must support both Docker Desktop and Docker Engine in WSL.
 - Commands you give the owner must work in **PowerShell** unless you say otherwise. Inside containers, bash is fine.
 - The owner is technical but not a systems engineer. When something needs a manual step on Windows (BIOS, Docker settings, installing Tailscale), write exact click by click instructions.
 
@@ -67,7 +67,7 @@ pnpm workspace (`packages/*`) on Node 24 LTS. pnpm is pinned in `package.json` (
 - `pnpm test`: Vitest over `packages/*/src/**/*.test.ts`. One file: `pnpm exec vitest run packages/shared/src/contract.test.ts`. One test by name: add `-t "<name>"`.
 - Add dependencies with exact versions (`saveExact` is set in `pnpm-workspace.yaml`).
 
-- Browser image: `docker build` in `images/browser/` (a `scripts/build-image.ps1` helper is planned).
+- Browser image: `docker build` in `images/browser/` (on the owner's PC: `wsl docker build ...`; a `scripts/build-image.ps1` helper is planned).
 - Stage 1 CLI (in `packages/agent`): `enclave create | list | start <id> | stop <id> | open <id> | delete <id>`.
 - Config comes from `.env` (copy `.env.example`): `AGENT_TOKEN`, `AGENT_PORT` (default 8787), `TEST_PROXY`. On Windows, dockerode uses Docker Desktop's named pipe, so `DOCKER_HOST` is normally unset.
 

@@ -12,6 +12,13 @@ Reason: ...
 
 ---
 
+## 2026-10-26  Docker Engine inside WSL instead of Docker Desktop (owner's PC)
+Context: The owner's PC runs Windows 11 21H2 (build 22000). Docker Desktop 4.96.3 needs 23H2 (build 22631) or newer, and the Windows 11 Installation Assistant reports the hardware as not compatible, so Windows cannot be upgraded.
+Decision: Install WSL 2.7.14 plus an Ubuntu 24.04 distro, and run Docker Engine (pinned versions) inside it. The agent reaches Docker through that engine instead of Docker Desktop's named pipe. Product users on supported Windows may still use Docker Desktop, so the agent must support both connection methods.
+Reason: The only supported way to get Docker on this PC. Stage 7 already plans a bundled WSL distro running Docker Engine, so this keeps the product path open.
+Installed: WSL 2.7.14 (kernel 6.18.33.2-2), distro `Ubuntu-24.04` (default distro, default user root, systemd on), docker-ce/cli 5:29.9.2, containerd.io 2.4.2, buildx 0.38.1, compose 5.6.1, all held with `apt-mark hold`. `%UserProfile%\.wslconfig` sets `[general] instanceIdleTimeout=-1` so WSL doesn't shut the distro down (and with it all running profiles) after 15 s without a terminal attached. From Windows: `wsl docker <args>`.
+Open for task D: how dockerode reaches this engine (the options are a TCP socket on 127.0.0.1 forwarded from WSL, or running `wsl docker` commands), and starting the distro after a reboot (the agent can run `wsl -d Ubuntu-24.04 true` before talking to Docker).
+
 ## 2026-10-25  Node 24 LTS instead of Node 20
 Context: Docs say Node 20 LTS. Node 20 reached end of life in April 2026; the owner's PC has Node 24.14.1.
 Decision: Target Node 24 LTS (`engines: >=24 <25`). Agent and relay use it; Electron (Stage 5) brings its own Node.
