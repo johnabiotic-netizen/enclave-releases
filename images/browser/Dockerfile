@@ -105,6 +105,15 @@ RUN XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -c \
       'from camoufox.utils import get_env_vars; print(get_env_vars({}, "win")["FONTCONFIG_FILE"])' \
     && chmod -R a+rX "${ENCLAVE_CAMOUFOX_CACHE}/camoufox/fontconfig"
 
+# Camoufox ships with no search engine ("None"); make Google the default.
+COPY set_search_engine.py /tmp/set_search_engine.py
+RUN set -eux; \
+    p="$(echo "${ENCLAVE_CAMOUFOX_CACHE}"/camoufox/browsers/official/*/distribution/policies.json)"; \
+    test -f "$p"; \
+    python3 /tmp/set_search_engine.py "$p"; \
+    chmod 0644 "$p"; \
+    rm /tmp/set_search_engine.py
+
 RUN --mount=type=bind,from=gost-dist,target=/dist/gost \
     set -eux; \
     echo "${GOST_SHA256}  /dist/gost/gost.tar.gz" | sha256sum -c -; \
@@ -128,7 +137,17 @@ RUN set -eux; \
 
 COPY openbox.xml /etc/neko/openbox.xml
 COPY supervisord.conf /etc/neko/supervisord/enclave.conf
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py /opt/enclave/
-RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py
+# Firewall for the egress lock (apply_egress_lock.sh). capsh (libcap2-bin) is in the base.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends iptables=1.8.11-2; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*; \
+    command -v capsh
+
+COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py apply_egress_lock.sh /opt/enclave/
+# Windows line endings break the shebang ("required file not found"): refuse them.
+RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
+    && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf
 
 ENTRYPOINT ["/opt/enclave/entrypoint.sh"]

@@ -12,6 +12,16 @@ Reason: ...
 
 ---
 
+## 2026-10-26  Egress lock: iptables inside the profile container
+Context: docs/04-security.md offers an in-container firewall or a sidecar container. Both have to work on Docker Engine in WSL and on Docker Desktop.
+Decision: In-container iptables, applied by the entrypoint as root before anything else starts (`apply_egress_lock.sh`). Outbound policy DROP; allowed: loopback, replies to inbound connections (the viewer's stream), and new TCP from uid 1100 (`egress`, the gost forwarder) to the proxy's IP and port only. Docker's embedded DNS (127.0.0.11) is refused; all IPv6 out is refused. The proxy hostname is resolved once before the lock and gost dials the IP. The container needs `--cap-add NET_ADMIN`; the entrypoint then drops NET_ADMIN and NET_RAW from the bounding set (capsh) before exec'ing supervisord, so no process in the container can lift the lock. If the lock fails, the container exits and the browser never starts.
+Reason: One container per profile stays simple for the agent, and the rules are verified on the owner's PC. A sidecar would double the containers and networks per profile for no extra protection here.
+
+## 2026-10-26  Google as default search engine
+Context: Camoufox's policies.json removes all search engines and sets a dummy "None", so searches typed in the address bar go nowhere.
+Decision: A build step rewrites that policy to add Google as the default (Firefox's own default). Search engines are not visible to websites, so the fingerprint is unaffected.
+Reason: Usability; the owner expects address-bar search to work.
+
 ## 2026-10-26  No canvas seed; fixed 1920x1080 screen for Stage 1
 Context: Camoufox 156.0.1-beta.32 removed canvas noise on purpose (Camoufox issue #528; its config marks `canvas:seed` as removed). neko's virtual display only supports a fixed list of sizes (1920x1080, 2560x1440, 1600x900, ...; not 1366x768 or 1536x864).
 Decision: `canvasSeed` is now optional in the schema, spec and types, and new fingerprints have none. Canvas output is therefore stable per profile (acceptance test 5) but the same for all profiles on one image (acceptance test 3 asks for different canvas values; flagged for the owner, Stage 3 decides). All Stage 1 fingerprints use a 1920x1080 screen (Camoufox `Screen` bound), and the window is reported maximized in the available area. `hardware.memoryGb` and `geolocation.accuracy` are optional too, because Camoufox doesn't produce them.

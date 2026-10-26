@@ -6,13 +6,19 @@ Writes into /run/enclave:
   openbox.xml  window manager config whose screen margins leave the fingerprint's
                taskbar area free, so the maximized window matches the claimed geometry
   neko.env     NEKO_DESKTOP_SCREEN sized to the fingerprint's screen
+  egress.env   PROXY_IP and PROXY_PORT for the egress lock (apply_egress_lock.sh)
+
+The proxy host is resolved here, once, before the lock: afterwards nothing in the
+container can do DNS, so gost connects to the IP.
 
 /config/proxy.json: {"type": "socks5" | "http" | "https", "host": str, "port": int,
                      "username": str (optional), "password": str (optional)}
 """
 
+import ipaddress
 import json
 import re
+import socket
 import sys
 
 import yaml
@@ -32,18 +38,35 @@ CONNECTORS = {
 }
 
 
-def gost_config(proxy: dict) -> dict:
-    kind = proxy.get("type")
-    if kind not in CONNECTORS:
-        raise ValueError(f"unsupported proxy type: {kind!r}")
+def proxy_address(proxy: dict) -> tuple[str, int]:
+    """The proxy's IPv4 address and port. IPv6-only proxies are not supported yet."""
     host, port = proxy.get("host"), proxy.get("port")
     if not host or not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError("proxy host and port are required")
+    try:
+        return str(ipaddress.IPv4Address(host)), port
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+    except socket.gaierror as e:
+        raise ValueError(f"cannot resolve proxy host {host!r}: {e}") from None
+    return infos[0][4][0], port
+
+
+def gost_config(proxy: dict, ip: str, port: int) -> dict:
+    kind = proxy.get("type")
+    if kind not in CONNECTORS:
+        raise ValueError(f"unsupported proxy type: {kind!r}")
 
     connector_type, dialer_type = CONNECTORS[kind]
     connector: dict = {"type": connector_type}
     if proxy.get("username"):
         connector["auth"] = {"username": proxy["username"], "password": proxy.get("password", "")}
+    dialer: dict = {"type": dialer_type}
+    if dialer_type == "tls":
+        # gost dials the IP; the certificate is still checked against the proxy's name.
+        dialer["tls"] = {"serverName": proxy["host"], "secure": True}
 
     return {
         "log": {"level": "warn"},
@@ -64,9 +87,9 @@ def gost_config(proxy: dict) -> dict:
                         "nodes": [
                             {
                                 "name": "proxy",
-                                "addr": f"{host}:{port}",
+                                "addr": f"{ip}:{port}",
                                 "connector": connector,
-                                "dialer": {"type": dialer_type},
+                                "dialer": dialer,
                             }
                         ],
                     }
@@ -106,7 +129,9 @@ def main() -> None:
     with open(PROFILE_JSON, encoding="utf-8") as f:
         screen = screen_of(json.load(f))
     with open(PROXY_JSON, encoding="utf-8") as f:
-        proxy = gost_config(json.load(f))
+        settings = json.load(f)
+    ip, port = proxy_address(settings)
+    proxy = gost_config(settings, ip, port)
     with open(OPENBOX_TEMPLATE, encoding="utf-8") as f:
         openbox = openbox_config(f.read(), screen)
 
@@ -116,6 +141,8 @@ def main() -> None:
         f.write(openbox)
     with open(f"{OUT}/neko.env", "w", encoding="utf-8") as f:
         f.write(f"NEKO_DESKTOP_SCREEN={screen['width']}x{screen['height']}@30\n")
+    with open(f"{OUT}/egress.env", "w", encoding="utf-8") as f:
+        f.write(f"PROXY_IP={ip}\nPROXY_PORT={port}\n")
 
 
 if __name__ == "__main__":

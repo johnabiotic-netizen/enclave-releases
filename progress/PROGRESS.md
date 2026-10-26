@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 1, Local core. In progress (tasks A and B done).
+**Current stage:** Stage 1, Local core. In progress (tasks A, B and C done).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -12,7 +12,7 @@ Update this at the end of every work session. Keep it short and current.
 Spec: `stages/stage-1-local-core.md`
 - [x] A. Monorepo skeleton. Verified 2026-10-25: `pnpm install`, `pnpm build` (shared compiles to `dist/`), `pnpm lint`, `pnpm format:check` and `pnpm test` (3/3 schema contract tests) all pass on Node 24.14.1, pnpm 12.15.0. `.gitignore` and `.env.example` were already correct. Git repo initialised.
 - [x] B. Browser image. Verified 2026-10-26 on Docker Engine 29.9.2 in WSL. `scripts/build-image.sh` builds `enclave-browser:dev`, with every download pinned and checksummed. `gen_fingerprint.py` runs with `--network none`, gives 1920x1080 Windows fingerprints, gives two profiles different WebGL and audio seeds, and rejects an IP from the wrong country. A test container behind a password-protected SOCKS5 test proxy runs openbox, the gost forwarder, Camoufox and neko. Through the stream API, the browser loaded api.ipify.org via the proxy, and a test page showed exactly the saved UA, timezone, languages, screen, cores and WebGL, with webdriver=false. With the proxy stopped, pages fail ("Unable to connect"), with no direct fallback. After deleting the container and starting a new one on the same volume, the open tab came back. From Windows, 127.0.0.1:8080 (HTTP 200) and the WebRTC TCP port 52000 are reachable. Still to check by the owner: the live stream in a PC browser.
-- [ ] C. Egress lock
+- [x] C. Egress lock. Verified 2026-10-26 in WSL: in-container iptables (`apply_egress_lock.sh`) allows only uid 1100 (gost) to the proxy IP:port; Docker's DNS (127.0.0.11), all other IPv4 and all IPv6 are refused. Without `--cap-add NET_ADMIN` the container refuses to start. After setup, supervisord's capability bounding set has no NET_ADMIN/NET_RAW. Tests: direct HTTPS as the browser user, the forwarder user and root all blocked; DNS via Docker and UDP 53 to 8.8.8.8 blocked; through the proxy works; the browser loads pages through the proxy and, with the proxy stopped, loads nothing (no direct fallback); stream ports 8080 and 52000 still reachable from Windows. Owner to confirm the live stream still works.
 - [ ] D. Agent
 - [ ] E. CLI
 - [ ] Acceptance tests 1 to 7
@@ -34,9 +34,8 @@ Notes / evidence:
 ## Notes for upcoming tasks
 - Viewer (Stages 4/5): neko's client guesses touch vs mouse from media queries (`client/core/src/client.ts` `isTouchDevice`). The owner's touchscreen PC reports `pointer:fine` false and `hover:hover` false, so the stock web page never focuses its key input: clicks work, typing doesn't. `any-pointer`/`any-hover` are false there too, so the image patches the stock page to always use mouse/keyboard mode (Dockerfile; owner confirmed typing works 2026-10-26). Our own viewer should pass `inputMode` to `NekoClient` from real pointer events, not media queries.
 - Task D: WSL shuts down by itself when nothing on Windows uses it (seen 2026-10-26), stopping every container. The agent must keep WSL alive while profiles run (e.g. hold a long-running `wsl.exe` process) and not keep anything in WSL's `/tmp`, which a restart wipes. Also give the owner the non-admin login: with the admin one, the viewer changed the screen to 1920x1200, which breaks the fingerprint.
-- Browser image: Camoufox has no default search engine ("Search with None"); typed addresses work, searches don't. Set one in the image.
-- Task C: firewall goes in `entrypoint.sh` at the marked spot. Allow only uid 1100 (`egress`, the gost forwarder) to reach the proxy host and port; resolve the proxy hostname before locking (or require an IP).
+- Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 - Task D: stop containers with `docker stop` (graceful) so Firefox saves the session. Use a Docker volume per profile for `/data` (Firefox's SQLite on a Windows folder is slow and has locking issues). The agent must start the WSL distro (`wsl -d Ubuntu-24.04 true`) before using Docker on the owner's PC.
 
 ## Next action
-Owner: open the test stream (see the end-of-session summary) to confirm task B visually. Then Stage 1, task C: egress lock (fail closed).
+Stage 1, task D: the agent (`packages/agent/`). It must start containers with `--cap-add NET_ADMIN`, one Docker network per profile, and keep WSL alive.
