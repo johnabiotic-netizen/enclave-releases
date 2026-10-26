@@ -6,7 +6,7 @@
 2. **Real device templates.** Use Camoufox's built in generator (BrowserForge) which samples from real device distributions. Do not hand mix values.
 3. **Windows only (for now).** Every profile presents as a Windows 10 or 11 desktop or laptop running Firefox. Do not present as Chrome; the engine is Firefox and mismatches are detectable.
 4. **Location consistency.** Timezone, locale, `Accept-Language`, and geolocation come from the proxy's exit IP location, determined at creation and rechecked at start. If the proxy's location changes, warn the user; never silently change the fingerprint.
-5. **Uniqueness across profiles.** No two profiles share canvas, WebGL, or audio noise seeds.
+5. **Uniqueness across profiles.** No two profiles share WebGL values or audio noise seeds. Canvas: Camoufox 156.0.1-beta.32 and later adds no canvas noise (Camoufox issue #528), so canvas output is whatever the image renders. It is stable for a profile, but the same for all profiles on one image. Stage 3 decides whether that is acceptable (see `progress/DECISIONS.md`).
 
 ## What a fingerprint covers
 
@@ -17,7 +17,7 @@
 | Window outer and inner size | Generator; neko screen size matches |
 | Hardware concurrency, device memory where exposed | Generator |
 | WebGL vendor, renderer, parameters, extensions | Generator; must be a real Windows GPU combo |
-| Canvas noise seed | Generated, unique per profile |
+| Canvas | No noise (Camoufox removed it); rendered by the image, stable per image |
 | Audio context noise seed | Generated, unique per profile |
 | Fonts | Windows font set installed in image; Camoufox font list restricted to Windows fonts |
 | Timezone, locale, languages | From proxy IP geolocation |
@@ -35,7 +35,7 @@ When Camoufox is upgraded, existing profiles must keep presenting the same finge
 
 ## Generation flow
 
-1. Agent runs: `docker run --rm <browser-image> python /opt/enclave/gen_fingerprint.py --os windows --country XX --timezone Area/City --locale xx-XX`.
+1. Agent runs: `docker run --rm --network none <browser-image> /opt/enclave/gen_fingerprint.py --os windows --country XX --timezone Area/City --locale xx-XX --ip <proxy exit IP>`. No network: the generator must never look up the PC's real IP. `--ip` is looked up in the GeoIP database bundled in the image.
 2. Script prints JSON to stdout.
 3. Agent validates against `specs/schemas/profile.schema.json` and saves.
 

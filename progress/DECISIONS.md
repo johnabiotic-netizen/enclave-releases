@@ -12,6 +12,26 @@ Reason: ...
 
 ---
 
+## 2026-10-26  No canvas seed; fixed 1920x1080 screen for Stage 1
+Context: Camoufox 156.0.1-beta.32 removed canvas noise on purpose (Camoufox issue #528; its config marks `canvas:seed` as removed). neko's virtual display only supports a fixed list of sizes (1920x1080, 2560x1440, 1600x900, ...; not 1366x768 or 1536x864).
+Decision: `canvasSeed` is now optional in the schema, spec and types, and new fingerprints have none. Canvas output is therefore stable per profile (acceptance test 5) but the same for all profiles on one image (acceptance test 3 asks for different canvas values; flagged for the owner, Stage 3 decides). All Stage 1 fingerprints use a 1920x1080 screen (Camoufox `Screen` bound), and the window is reported maximized in the available area. `hardware.memoryGb` and `geolocation.accuracy` are optional too, because Camoufox doesn't produce them.
+Reason: Follow Camoufox's current design rather than re-add a noise layer its authors removed. Stage 3 can add display modes and revisit canvas.
+
+## 2026-10-26  Browser image: verified versions and pins
+Context: Stage 1 "Verify first" for neko and Camoufox.
+Decision: Base `ghcr.io/m1k1o/neko/base:3.2.0` pinned by digest (Debian 13, Python 3.13, supervisord as root, user `neko` uid 1000, `DISPLAY=:99.0`). Custom programs go in `/etc/neko/supervisord/*.conf` with openbox, as in neko's Firefox app. camoufox Python package 0.5.8 (plus a full `requirements.lock` installed with `--no-deps`), which pins browser build 156.0.1-beta.36. The browser zip, the GeoIP AIO database (release 2026.10.21), uBlock Origin 1.75.0 and gost 3.3.1 are downloaded by exact URL with `ADD --checksum` and laid out the way `camoufox fetch` would, because `fetch` takes "latest" for the add-on and GeoIP. The fpgen model is pinned and checksummed by camoufox itself (`ensure_fpgen_model`). Debian packages are pinned to exact versions; when Debian drops an old version, bump the pin.
+Reason: CLAUDE.md requires exact pins, and `camoufox fetch` alone isn't reproducible.
+
+## 2026-10-26  Fingerprint saved as Camoufox's full config; browser launched directly
+Context: The fingerprint must never be regenerated (hard rule 2). Camoufox's Python launcher generates a fingerprint and passes it to the browser as `CAMOU_CONFIG_<n>` environment variables, with Firefox prefs in `CAMOU_PREFS_<n>`.
+Decision: `gen_fingerprint.py` runs `launch_options()` once at creation and saves the decoded config and prefs as `fingerprint.raw`. `launch_browser.py` rebuilds those environment variables from the saved data and execs `camoufox-bin` directly, with `--profile /data/profile`. Playwright is not used at runtime.
+Reason: Replays exactly what was saved, with no generation at launch. A browser for a person doesn't need an automation channel, and normal Firefox session restore keeps working.
+
+## 2026-10-26  Local proxy forwarder (gost) inside each profile container
+Context: Firefox can't authenticate to SOCKS5 proxies, and HTTP proxy authentication shows a login dialog.
+Decision: gost 3.3.1 runs as a separate `egress` user (uid 1100) and listens on 127.0.0.1:1080 as plain SOCKS5. It forwards to the profile's proxy (socks5, http or https) with the credentials from `/config/proxy.json`. Camoufox uses only that local port, with remote DNS. The gost config holding the password is written to `/run/enclave` and readable only by `egress`.
+Reason: Works for every proxy type without dialogs. It also gives task C's firewall one simple rule: only uid 1100 may reach the proxy host and port.
+
 ## 2026-10-26  Docker Engine inside WSL instead of Docker Desktop (owner's PC)
 Context: The owner's PC runs Windows 11 21H2 (build 22000). Docker Desktop 4.96.3 needs 23H2 (build 22631) or newer, and the Windows 11 Installation Assistant reports the hardware as not compatible, so Windows cannot be upgraded.
 Decision: Install WSL 2.7.14 plus an Ubuntu 24.04 distro, and run Docker Engine (pinned versions) inside it. The agent reaches Docker through that engine instead of Docker Desktop's named pipe. Product users on supported Windows may still use Docker Desktop, so the agent must support both connection methods.

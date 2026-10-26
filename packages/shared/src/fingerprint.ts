@@ -10,7 +10,8 @@ export interface ScreenInfo {
 
 export interface HardwareInfo {
   cores: number;
-  memoryGb: number;
+  /** Firefox does not expose device memory, so Camoufox fingerprints usually omit it. */
+  memoryGb?: number;
 }
 
 export interface WebGlInfo {
@@ -22,7 +23,7 @@ export interface WebGlInfo {
 export interface Geolocation {
   lat: number;
   lon: number;
-  accuracy: number;
+  accuracy?: number;
 }
 
 export type MediaDeviceKind = 'videoinput' | 'audioinput' | 'audiooutput';
@@ -35,6 +36,14 @@ export interface MediaDeviceInfo {
 export const WEBRTC_POLICIES = ['proxy-only', 'disabled'] as const;
 export type WebRtcPolicy = (typeof WEBRTC_POLICIES)[number];
 
+/** Output of Camoufox's generator, saved once (images/browser/gen_fingerprint.py). */
+export interface FingerprintRaw {
+  /** Camoufox config, passed to the browser as CAMOU_CONFIG. */
+  config: Record<string, unknown>;
+  /** Firefox prefs that belong to the fingerprint, passed as CAMOU_PREFS. */
+  prefs: Record<string, unknown>;
+}
+
 export interface Fingerprint {
   os: 'windows';
   camoufoxVersion?: string;
@@ -43,7 +52,8 @@ export interface Fingerprint {
   screen: ScreenInfo;
   hardware?: HardwareInfo;
   webgl?: WebGlInfo;
-  canvasSeed: string;
+  /** Camoufox >= 156.0.1-beta.32 adds no canvas noise, so new fingerprints have no canvas seed. */
+  canvasSeed?: string;
   audioSeed: string;
   fonts?: string[];
   locale: string;
@@ -52,8 +62,8 @@ export interface Fingerprint {
   geolocation?: Geolocation;
   mediaDevices?: MediaDeviceInfo[];
   webrtc?: WebRtcPolicy;
-  /** Exact object Camoufox needs to reproduce this fingerprint. */
-  raw?: Record<string, unknown>;
+  /** What the browser actually uses; the fields above summarize it. Replayed on every launch. */
+  raw?: FingerprintRaw;
 }
 
 /** The only fingerprint fields that may change after creation, via "Update location". */

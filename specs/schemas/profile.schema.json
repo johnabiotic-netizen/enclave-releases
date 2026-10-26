@@ -24,7 +24,7 @@
     },
     "fingerprint": {
       "type": "object",
-      "required": ["os", "userAgent", "screen", "locale", "timezone", "canvasSeed", "audioSeed"],
+      "required": ["os", "userAgent", "screen", "locale", "timezone", "audioSeed"],
       "properties": {
         "os": { "const": "windows" },
         "camoufoxVersion": { "type": "string" },

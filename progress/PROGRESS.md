@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 1, Local core. In progress (task A done).
+**Current stage:** Stage 1, Local core. In progress (tasks A and B done).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -11,7 +11,7 @@ Update this at the end of every work session. Keep it short and current.
 ## Stage 1: Local core  [~]
 Spec: `stages/stage-1-local-core.md`
 - [x] A. Monorepo skeleton. Verified 2026-10-25: `pnpm install`, `pnpm build` (shared compiles to `dist/`), `pnpm lint`, `pnpm format:check` and `pnpm test` (3/3 schema contract tests) all pass on Node 24.14.1, pnpm 12.15.0. `.gitignore` and `.env.example` were already correct. Git repo initialised.
-- [ ] B. Browser image
+- [x] B. Browser image. Verified 2026-10-26 on Docker Engine 29.9.2 in WSL. `scripts/build-image.sh` builds `enclave-browser:dev`, with every download pinned and checksummed. `gen_fingerprint.py` runs with `--network none`, gives 1920x1080 Windows fingerprints, gives two profiles different WebGL and audio seeds, and rejects an IP from the wrong country. A test container behind a password-protected SOCKS5 test proxy runs openbox, the gost forwarder, Camoufox and neko. Through the stream API, the browser loaded api.ipify.org via the proxy, and a test page showed exactly the saved UA, timezone, languages, screen, cores and WebGL, with webdriver=false. With the proxy stopped, pages fail ("Unable to connect"), with no direct fallback. After deleting the container and starting a new one on the same volume, the open tab came back. From Windows, 127.0.0.1:8080 (HTTP 200) and the WebRTC TCP port 52000 are reachable. Still to check by the owner: the live stream in a PC browser.
 - [ ] C. Egress lock
 - [ ] D. Agent
 - [ ] E. CLI
@@ -28,7 +28,12 @@ Notes / evidence:
 
 ## Blockers
 - (none). Docker resolved 2026-10-26: Docker Desktop can't run on this PC (Windows 11 21H2, which can't be upgraded), so Docker Engine 29.9.2 now runs inside WSL `Ubuntu-24.04` (see DECISIONS.md). Verified: `wsl docker run --rm hello-world` works, and the distro stays running with no terminal open. After a PC restart, run any `wsl` command (e.g. `wsl docker ps`) once to start it.
-- Watch disk space: C: had about 21 GB free on 2026-10-26, and the WSL disk grows on C:.
+- Disk space is tight. C: hit 0 GB on 2026-10-26 during an image build, which crashed WSL; clearing the npm cache (6.5 GB) recovered it. WSL's disk (`ext4.vhdx`, about 16 GB) never shrinks by itself. Keep about 8 GB free inside Docker for rebuilds, run `docker builder prune` after builds, and plan to compact the disk (owner step, admin) or free more space on C:.
+- For the owner: acceptance test 3 says profiles show different canvas values, but Camoufox no longer adds canvas noise, so canvas is the same across profiles on one image (see DECISIONS.md). Stage 3 decides.
+
+## Notes for upcoming tasks
+- Task C: firewall goes in `entrypoint.sh` at the marked spot. Allow only uid 1100 (`egress`, the gost forwarder) to reach the proxy host and port; resolve the proxy hostname before locking (or require an IP).
+- Task D: stop containers with `docker stop` (graceful) so Firefox saves the session. Use a Docker volume per profile for `/data` (Firefox's SQLite on a Windows folder is slow and has locking issues). The agent must start the WSL distro (`wsl -d Ubuntu-24.04 true`) before using Docker on the owner's PC.
 
 ## Next action
-Stage 1, task B: browser image. First do the "Verify first" checks for neko v3 and Camoufox. Build and run images with `wsl docker ...` from Windows (or `docker` inside the distro).
+Owner: open the test stream (see the end-of-session summary) to confirm task B visually. Then Stage 1, task C: egress lock (fail closed).

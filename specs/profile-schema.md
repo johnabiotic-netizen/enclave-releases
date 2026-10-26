@@ -34,22 +34,23 @@ Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json
     "generatorVersion": "x.y.z",
     "userAgent": "...",
     "screen": { "width": 1920, "height": 1080, "availHeight": 1040, "colorDepth": 24, "devicePixelRatio": 1 },
-    "hardware": { "cores": 8, "memoryGb": 8 },
+    "hardware": { "cores": 8 },     // memoryGb optional: Firefox does not expose device memory
     "webgl": { "vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (...)", "...": "..." },
-    "canvasSeed": "hex",
+    "canvasSeed": "hex",           // optional: Camoufox >= 156.0.1-beta.32 adds no canvas noise, so none is generated
     "audioSeed": "hex",
     "fonts": ["Arial", "Calibri", "..."],
     "locale": "en-US",
     "languages": ["en-US", "en"],
     "timezone": "America/New_York",
-    "geolocation": { "lat": 40.71, "lon": -74.0, "accuracy": 50 },
+    "geolocation": { "lat": 40.71, "lon": -74.0, "accuracy": 50 },  // accuracy optional
     "mediaDevices": [
       { "kind": "videoinput", "label": "Integrated Camera" },
       { "kind": "audioinput", "label": "Microphone" },
       { "kind": "audiooutput", "label": "Speakers" }
     ],
     "webrtc": "proxy-only",      // proxy-only | disabled
-    "raw": { "...": "exact object Camoufox needs to reproduce this" }
+    "raw": { "config": { "...": "Camoufox config (CAMOU_CONFIG)" }, "prefs": { "...": "Firefox prefs" } }
+    // raw is what the browser actually uses; the fields above are a readable summary of it
   },
 
   "runtime": {
