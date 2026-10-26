@@ -1,0 +1,99 @@
+#!/opt/enclave/venv/bin/python
+"""Proxy safety check (docs/06-proxies.md). Run by the agent in a one-off container.
+
+Reads the proxy as JSON on stdin ({type, host, port, username?, password?}) so the
+password never appears in arguments or the environment, and prints one JSON object:
+
+  {"tcpOk", "latencyMs", "exitIps", "exitIp", "realIp", "country", "timezone",
+   "locale", "lat", "lon", "error"}
+
+The agent decides what passes: this only measures. Exit IPs come from two independent
+echo services through the proxy; the real IP from one of them without it. Location comes
+from the GeoIP database bundled in the image.
+"""
+
+import json
+import os
+import socket
+import subprocess
+import sys
+import time
+
+os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("ENCLAVE_CAMOUFOX_CACHE", "/opt/camoufox-cache"))
+
+from camoufox.geolocation import get_geolocation  # noqa: E402
+
+ECHO_SERVICES = ["https://api.ipify.org", "https://icanhazip.com"]
+SCHEMES = {"socks5": "socks5h", "http": "http", "https": "https"}
+
+
+def curl_config_value(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def fetch_ip(url: str, proxy: dict | None) -> str:
+    config = [f"url = {curl_config_value(url)}", "silent", "show-error", "fail", "max-time = 20"]
+    if proxy:
+        scheme = SCHEMES[proxy["type"]]
+        config.append(f"proxy = {curl_config_value(f'{scheme}://{proxy['host']}:{proxy['port']}')}")
+        if proxy.get("username"):
+            user = f"{proxy['username']}:{proxy.get('password', '')}"
+            config.append(f"proxy-user = {curl_config_value(user)}")
+    out = subprocess.run(
+        ["curl", "-K", "-"], input="\n".join(config) + "\n", capture_output=True, text=True, timeout=30
+    )
+    if out.returncode != 0:
+        raise RuntimeError(f"{url}: {out.stderr.strip() or f'curl exit {out.returncode}'}")
+    return out.stdout.strip()
+
+
+def main() -> dict:
+    proxy = json.load(sys.stdin)
+    if proxy.get("type") not in SCHEMES:
+        return {"error": f"unsupported proxy type: {proxy.get('type')!r}"}
+    result: dict = {"tcpOk": False}
+
+    started = time.monotonic()
+    try:
+        with socket.create_connection((proxy["host"], int(proxy["port"])), timeout=5):
+            pass
+    except OSError as e:
+        result["error"] = f"cannot reach the proxy at {proxy['host']}:{proxy['port']}: {e}"
+        return result
+    result["tcpOk"] = True
+    result["latencyMs"] = round((time.monotonic() - started) * 1000)
+
+    try:
+        result["exitIps"] = [fetch_ip(url, proxy) for url in ECHO_SERVICES]
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        result["error"] = f"the proxy did not carry traffic: {e}"
+        return result
+    result["exitIp"] = result["exitIps"][0]
+
+    try:
+        result["realIp"] = fetch_ip(ECHO_SERVICES[0], None)
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        result["realIpError"] = str(e)
+
+    try:
+        geo = get_geolocation(result["exitIp"])
+        locale = geo.locale
+        result.update(
+            country=locale.region,
+            timezone=geo.timezone,
+            locale=f"{locale.language}-{locale.region}" if locale.region else locale.language,
+            lat=geo.latitude,
+            lon=geo.longitude,
+        )
+    except Exception as e:  # the GeoIP library raises its own types
+        result["geoError"] = f"no location for {result['exitIp']}: {e}"
+    return result
+
+
+if __name__ == "__main__":
+    try:
+        out = main()
+    except (ValueError, KeyError, json.JSONDecodeError) as e:
+        out = {"error": f"bad proxy settings: {e}"}
+    json.dump(out, sys.stdout)
+    sys.stdout.write("\n")

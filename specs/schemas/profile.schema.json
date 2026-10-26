@@ -49,7 +49,8 @@
       "type": "object",
       "properties": {
         "idleStopMinutes": { "type": "integer", "minimum": 1 },
-        "screenMatchesFingerprint": { "type": "boolean" }
+        "screenMatchesFingerprint": { "type": "boolean" },
+        "usesTestProxy": { "type": "boolean" }
       }
     },
     "status": {

@@ -3,3 +3,10 @@ packages:
 
 # Exact versions only (CLAUDE.md: pin every dependency).
 saveExact: true
+
+# Install scripts stay off. These come with dockerode (SSH transport and gRPC), which the
+# agent does not use; their pure-JS fallbacks are enough.
+allowBuilds:
+  cpu-features: false
+  protobufjs: false
+  ssh2: false

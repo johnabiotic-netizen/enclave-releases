@@ -1,0 +1,637 @@
+// Profile lifecycle: create (safety check + fingerprint), start, stop, delete, idle stop.
+
+import { randomBytes } from 'node:crypto';
+import net from 'node:net';
+import os from 'node:os';
+import {
+  DEFAULT_IDLE_STOP_MINUTES,
+  type CreateProfileRequest,
+  type Fingerprint,
+  type Profile,
+  type ProfileStatus,
+  type ProxyCheckResult,
+  type ProxyInput,
+  type StreamInfo,
+  type SystemResponse,
+  type UpdateProfileRequest,
+} from '@enclave/shared';
+import type { AgentConfig } from './config.js';
+import { PROFILE_LABEL, type DockerRuntime } from './docker/runtime.js';
+import { makeTar } from './docker/tar.js';
+import { AgentError, InputError } from './errors.js';
+import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
+import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
+import { PROXY_SECRET_REF, type ProfileSecrets, type ProfileStore } from './store.js';
+
+/** Host ports for streams: web client/API and the WebRTC mux, in pairs. Bound to 127.0.0.1. */
+const PORT_RANGE = { first: 52100, last: 52998 };
+const START_TIMEOUT_MS = 120_000;
+const MONITOR_INTERVAL_MS = 60_000;
+/** The stream password lives as long as the container; this is a nominal upper bound. */
+const STREAM_TTL_MS = 24 * 60 * 60 * 1000;
+const CONTAINER_MEMORY_BYTES = 3 * 1024 ** 3;
+const SHM_BYTES = 2 * 1024 ** 3;
+const PROXY_UNREACHABLE = 'Proxy unreachable';
+
+const containerName = (id: string) => `enclave-${id}`;
+const networkName = (id: string) => `enclave-${id}`;
+const volumeName = (id: string) => `enclave-${id}-data`;
+const randomPassword = () => randomBytes(18).toString('base64url');
+
+export class ProfileService {
+  private readonly locks = new Map<string, Promise<unknown>>();
+  private readonly lastViewerAt = new Map<string, number>();
+  private readonly nekoTokens = new Map<string, string>();
+  private monitor: NodeJS.Timeout | undefined;
+
+  constructor(
+    private readonly config: AgentConfig,
+    private readonly store: ProfileStore,
+    private readonly runtime: DockerRuntime,
+  ) {}
+
+  // ---------------------------------------------------------------- queries
+
+  list(): Promise<Profile[]> {
+    return this.store.list();
+  }
+
+  get(id: string): Promise<Profile> {
+    return this.store.get(id);
+  }
+
+  async stream(id: string): Promise<StreamInfo> {
+    const profile = await this.store.get(id);
+    const secrets = await this.store.getSecrets(id);
+    if (profile.status.state !== 'running' || !profile.status.streamPort || !secrets.stream) {
+      throw new AgentError(
+        'PROFILE_NOT_RUNNING',
+        `"${profile.name}" isn't running. Start it first.`,
+      );
+    }
+    return streamInfo(profile.status.streamPort, secrets.stream);
+  }
+
+  logs(id: string, tail: number): Promise<string[]> {
+    return this.store.get(id).then(() => this.store.tailLog(id, tail));
+  }
+
+  async system(): Promise<SystemResponse> {
+    const dockerOk = await this.runtime.ping();
+    const profiles = await this.store.list();
+    return {
+      ram: { totalBytes: os.totalmem(), freeBytes: os.freemem() },
+      profilesRunning: profiles.filter((p) => p.status.state === 'running').length,
+      dockerOk,
+      virtualizationOk: dockerOk,
+      imageBuilt: dockerOk && (await this.runtime.imageExists()),
+    };
+  }
+
+  // ---------------------------------------------------------------- create / update / delete
+
+  async create(req: CreateProfileRequest): Promise<Profile> {
+    const name = validName(req.name);
+    const useTestProxy = req.useTestProxy === true;
+    let proxy: ProxyInput;
+    if (useTestProxy) {
+      if (!this.config.testProxy) throw new InputError('TEST_PROXY is not set in .env.');
+      proxy = parseProxy(this.config.testProxy);
+    } else {
+      if (!req.proxy) throw new InputError('A proxy is required (or use the test proxy).');
+      proxy = parseProxy(req.proxy);
+    }
+
+    await this.runtime.assertReady();
+    const raw = await this.checkProxy(proxy, useTestProxy);
+    const fingerprint = await this.generateFingerprint(raw);
+
+    const now = new Date().toISOString();
+    const id = this.store.newId();
+    const profile: Profile = {
+      id,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      ...(useTestProxy ? { notes: 'Test proxy, not for real accounts.' } : {}),
+      proxy: {
+        type: proxy.type,
+        host: proxy.host,
+        port: proxy.port,
+        ...(proxy.username ? { username: proxy.username } : {}),
+        ...(proxy.password ? { secretRef: PROXY_SECRET_REF } : {}),
+        lastCheck: checkResult(raw, true),
+      },
+      fingerprint,
+      runtime: {
+        idleStopMinutes: DEFAULT_IDLE_STOP_MINUTES,
+        ...(useTestProxy ? { usesTestProxy: true } : {}),
+      },
+      status: {
+        state: 'stopped',
+        containerId: null,
+        streamPort: null,
+        lastError: null,
+        lastStartedAt: null,
+      },
+    };
+    await this.store.saveSecrets(id, proxy.password ? { proxyPassword: proxy.password } : {});
+    await this.store.save(profile);
+    await this.store.log(id, 'created', {
+      name,
+      proxy: describeProxy(proxy),
+      exitIp: raw.exitIp,
+      country: raw.country,
+      timezone: raw.timezone,
+      userAgent: fingerprint.userAgent,
+    });
+    return profile;
+  }
+
+  async update(id: string, req: UpdateProfileRequest): Promise<Profile> {
+    return this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      if (req.name !== undefined) profile.name = validName(req.name);
+      if (req.notes !== undefined) profile.notes = String(req.notes).slice(0, 2000);
+      if (req.idleStopMinutes !== undefined) {
+        const minutes = Number(req.idleStopMinutes);
+        if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+          throw new InputError('idleStopMinutes must be a whole number from 1 to 1440.');
+        }
+        profile.runtime.idleStopMinutes = minutes;
+      }
+      if (req.proxy !== undefined) {
+        if (profile.status.state === 'running') {
+          throw new AgentError('PROFILE_RUNNING', 'Stop the profile before changing its proxy.');
+        }
+        const proxy = parseProxy(req.proxy);
+        await this.runtime.assertReady();
+        const raw = await this.checkProxy(proxy, false);
+        assertLocationMatches(profile.fingerprint, raw);
+        profile.proxy = {
+          type: proxy.type,
+          host: proxy.host,
+          port: proxy.port,
+          ...(proxy.username ? { username: proxy.username } : {}),
+          ...(proxy.password ? { secretRef: PROXY_SECRET_REF } : {}),
+          lastCheck: checkResult(raw, true),
+        };
+        delete profile.runtime.usesTestProxy;
+        const secrets = await this.store.getSecrets(id);
+        if (proxy.password) secrets.proxyPassword = proxy.password;
+        else delete secrets.proxyPassword;
+        await this.store.saveSecrets(id, secrets);
+        await this.store.log(id, 'proxy-changed', {
+          proxy: describeProxy(proxy),
+          exitIp: raw.exitIp,
+        });
+      }
+      profile.updatedAt = new Date().toISOString();
+      await this.store.save(profile);
+      return profile;
+    });
+  }
+
+  async delete(id: string, confirm: boolean): Promise<void> {
+    if (!confirm)
+      throw new InputError(
+        "Deleting removes all of this profile's data. Send confirm=true to go ahead.",
+      );
+    await this.exclusive(id, async () => {
+      await this.store.get(id);
+      await this.runtime.stopAndRemove(containerName(id));
+      await this.runtime.removeNetwork(networkName(id));
+      await this.runtime.removeVolume(volumeName(id));
+      await this.store.remove(id);
+      this.forget(id);
+    });
+  }
+
+  async checkProfileProxy(id: string): Promise<ProxyCheckResult> {
+    return this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      await this.runtime.assertReady();
+      const proxy = proxyInput(profile, await this.store.getSecrets(id));
+      const raw = await this.runProxyCheck(proxy);
+      const verdict = judgeProxyCheck(raw, profile.runtime.usesTestProxy === true);
+      profile.proxy.lastCheck = checkResult(raw, verdict.ok);
+      await this.store.save(profile);
+      await this.store.log(id, 'proxy-checked', {
+        ok: verdict.ok,
+        exitIp: raw.exitIp,
+        country: raw.country,
+      });
+      return profile.proxy.lastCheck;
+    });
+  }
+
+  // ---------------------------------------------------------------- start / stop
+
+  async start(id: string): Promise<{ stream: StreamInfo }> {
+    return this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      await this.runtime.assertReady();
+      const name = containerName(id);
+      const existing = await this.runtime.inspect(name);
+      if (existing?.State.Running) {
+        throw new AgentError('PROFILE_RUNNING', `"${profile.name}" is already running.`);
+      }
+      if (existing) await this.runtime.stopAndRemove(name);
+
+      await this.setStatus(profile, { state: 'starting', lastError: null });
+      await this.store.log(id, 'starting');
+      try {
+        const secrets = await this.store.getSecrets(id);
+        const proxy = proxyInput(profile, secrets);
+        const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
+        assertLocationMatches(profile.fingerprint, raw);
+        profile.proxy.lastCheck = checkResult(raw, true);
+
+        const [webPort, muxPort] = await this.allocatePorts();
+        const stream = {
+          userPassword: randomPassword(),
+          adminPassword: randomPassword(),
+          expiresAt: new Date(Date.now() + STREAM_TTL_MS).toISOString(),
+        };
+        await this.store.saveSecrets(id, { ...secrets, stream });
+
+        await this.runtime.ensureNetwork(networkName(id), id);
+        await this.runtime.ensureVolume(volumeName(id), id);
+        const container = await this.runtime.docker.createContainer({
+          name,
+          Image: this.runtime.image,
+          Labels: { [PROFILE_LABEL]: id },
+          Env: [
+            'NEKO_MEMBER_PROVIDER=multiuser',
+            `NEKO_MEMBER_MULTIUSER_USER_PASSWORD=${stream.userPassword}`,
+            `NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD=${stream.adminPassword}`,
+            `NEKO_WEBRTC_TCPMUX=${muxPort}`,
+            `NEKO_WEBRTC_UDPMUX=${muxPort}`,
+            'NEKO_WEBRTC_ICELITE=true',
+            'NEKO_WEBRTC_NAT1TO1=127.0.0.1',
+          ],
+          ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },
+          HostConfig: {
+            NetworkMode: networkName(id),
+            PortBindings: {
+              '8080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(webPort) }],
+              [`${muxPort}/tcp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
+              [`${muxPort}/udp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
+            },
+            Mounts: [{ Type: 'volume', Source: volumeName(id), Target: '/data' }],
+            // The egress lock needs NET_ADMIN once; the entrypoint drops it before the browser starts.
+            CapAdd: ['NET_ADMIN'],
+            SecurityOpt: ['no-new-privileges'],
+            ShmSize: SHM_BYTES,
+            Memory: CONTAINER_MEMORY_BYTES,
+            ExtraHosts: ['host.docker.internal:host-gateway'],
+          },
+        });
+        await container.putArchive(configArchive(profile, proxy), { path: '/' });
+        await container.start();
+        await this.waitUntilReady(name, webPort);
+
+        profile.status = {
+          state: 'running',
+          containerId: container.id,
+          streamPort: webPort,
+          lastError: null,
+          lastStartedAt: new Date().toISOString(),
+        };
+        await this.store.save(profile);
+        this.lastViewerAt.set(id, Date.now());
+        this.nekoTokens.delete(id);
+        await this.store.log(id, 'started', { webPort, muxPort, exitIp: raw.exitIp });
+        return { stream: streamInfo(webPort, stream) };
+      } catch (e) {
+        await this.runtime.stopAndRemove(name, 5).catch(() => {});
+        const message = e instanceof Error ? e.message : String(e);
+        const proxyProblem = e instanceof AgentError && e.code.startsWith('PROXY_');
+        await this.setStatus(profile, {
+          state: proxyProblem || e instanceof AgentError ? 'stopped' : 'error',
+          containerId: null,
+          streamPort: null,
+          lastError: message,
+        });
+        await this.store.log(id, 'start-failed', {
+          code: e instanceof AgentError ? e.code : 'INTERNAL',
+          message,
+        });
+        throw e instanceof AgentError || e instanceof InputError
+          ? e
+          : new AgentError('INTERNAL', `"${profile.name}" didn't start: ${message}`);
+      }
+    });
+  }
+
+  async stop(id: string, reason: 'requested' | 'idle' = 'requested'): Promise<void> {
+    await this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      const info = await this.runtime.inspect(containerName(id));
+      if (!info?.State.Running && profile.status.state !== 'running') {
+        throw new AgentError('PROFILE_NOT_RUNNING', `"${profile.name}" isn't running.`);
+      }
+      await this.runtime.stopAndRemove(containerName(id));
+      await this.runtime.removeNetwork(networkName(id));
+      const secrets = await this.store.getSecrets(id);
+      delete secrets.stream;
+      await this.store.saveSecrets(id, secrets);
+      await this.setStatus(profile, {
+        state: 'stopped',
+        containerId: null,
+        streamPort: null,
+        lastError: null,
+      });
+      this.forget(id);
+      await this.store.log(id, 'stopped', { reason });
+    });
+  }
+
+  // ---------------------------------------------------------------- background work
+
+  /** Brings stored status in line with Docker (after an agent or PC restart), then watches. */
+  async startMonitor(): Promise<void> {
+    if (await this.runtime.ping()) {
+      for (const profile of await this.store.list()) {
+        if (profile.status.state !== 'running' && profile.status.state !== 'starting') continue;
+        const info = await this.runtime.inspect(containerName(profile.id));
+        if (info?.State.Running && profile.status.state === 'running') {
+          this.lastViewerAt.set(profile.id, Date.now());
+        } else {
+          await this.runtime.stopAndRemove(containerName(profile.id), 5);
+          await this.setStatus(profile, { state: 'stopped', containerId: null, streamPort: null });
+          await this.store.log(profile.id, 'reconciled', { was: profile.status.state });
+        }
+      }
+    }
+    this.monitor = setInterval(() => void this.tick(), MONITOR_INTERVAL_MS);
+    this.monitor.unref();
+  }
+
+  stopMonitor(): void {
+    if (this.monitor) clearInterval(this.monitor);
+  }
+
+  private async tick(): Promise<void> {
+    let profiles: Profile[];
+    try {
+      profiles = await this.store.list();
+    } catch {
+      return;
+    }
+    for (const profile of profiles.filter((p) => p.status.state === 'running')) {
+      if (this.locks.has(profile.id)) continue;
+      await this.watch(profile).catch(() => {});
+    }
+  }
+
+  private async watch(profile: Profile): Promise<void> {
+    const id = profile.id;
+    const name = containerName(id);
+    const info = await this.runtime.inspect(name);
+    if (!info?.State.Running) {
+      await this.setStatus(profile, {
+        state: 'error',
+        containerId: null,
+        streamPort: null,
+        lastError: 'The browser stopped unexpectedly.',
+      });
+      await this.store.log(id, 'exited', { exitCode: info?.State.ExitCode ?? null });
+      this.forget(id);
+      return;
+    }
+
+    // Idle stop: nobody connected to the stream for idleStopMinutes.
+    const viewers = await this.countViewers(profile);
+    const now = Date.now();
+    if (viewers === null || viewers > 0 || !this.lastViewerAt.has(id))
+      this.lastViewerAt.set(id, now);
+    const idleMinutes = profile.runtime.idleStopMinutes ?? DEFAULT_IDLE_STOP_MINUTES;
+    if (now - this.lastViewerAt.get(id)! >= idleMinutes * 60_000) {
+      await this.stop(id, 'idle');
+      return;
+    }
+
+    // Proxy health, through the profile's own forwarder (the lock blocks everything else).
+    const code = await this.runtime
+      .exec(
+        name,
+        [
+          'curl',
+          '-s',
+          '-o',
+          '/dev/null',
+          '-m',
+          '15',
+          '--socks5-hostname',
+          '127.0.0.1:1080',
+          'https://api.ipify.org',
+        ],
+        'neko',
+      )
+      .catch(() => -1);
+    const healthy = code === 0;
+    if (!healthy && profile.status.lastError !== PROXY_UNREACHABLE) {
+      await this.setStatus(profile, { lastError: PROXY_UNREACHABLE });
+      await this.store.log(id, 'proxy-unreachable');
+    } else if (healthy && profile.status.lastError === PROXY_UNREACHABLE) {
+      await this.setStatus(profile, { lastError: null });
+      await this.store.log(id, 'proxy-back');
+    }
+  }
+
+  /** Viewers connected to the stream, or null if neko couldn't be asked. */
+  private async countViewers(profile: Profile): Promise<number | null> {
+    const port = profile.status.streamPort;
+    const secrets = await this.store.getSecrets(profile.id);
+    if (!port || !secrets.stream) return null;
+    const base = `http://127.0.0.1:${port}`;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        let token = this.nekoTokens.get(profile.id);
+        if (!token) {
+          token = await nekoLogin(base, 'enclave-agent', secrets.stream.adminPassword);
+          this.nekoTokens.set(profile.id, token);
+        }
+        const sessions = await nekoSessions(base, token);
+        return sessions.filter((s) => s.state?.is_connected).length;
+      } catch {
+        this.nekoTokens.delete(profile.id);
+      }
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------- helpers
+
+  /** Runs the safety check and throws the matching API error if it fails. */
+  private async checkProxy(proxy: ProxyInput, allowRealIp: boolean): Promise<RawProxyCheck> {
+    const raw = await this.runProxyCheck(proxy);
+    const verdict = judgeProxyCheck(raw, allowRealIp);
+    if (!verdict.ok) {
+      throw new AgentError(verdict.code, verdict.message, {
+        proxy: describeProxy(proxy),
+        ...(raw.exitIp ? { exitIp: raw.exitIp } : {}),
+      });
+    }
+    return raw;
+  }
+
+  private async runProxyCheck(proxy: ProxyInput): Promise<RawProxyCheck> {
+    const out = await this.runtime.runOneOff({
+      cmd: ['bash', '-c', '/opt/enclave/check_proxy.py < /run/check/proxy.json'],
+      files: [
+        { name: 'run/check/', mode: 0o700 },
+        { name: 'run/check/proxy.json', mode: 0o600, content: JSON.stringify(proxy) },
+      ],
+      timeoutMs: 90_000,
+    });
+    return JSON.parse(out) as RawProxyCheck;
+  }
+
+  private async generateFingerprint(raw: RawProxyCheck): Promise<Fingerprint> {
+    const out = await this.runtime.runOneOff({
+      cmd: [
+        '/opt/enclave/gen_fingerprint.py',
+        '--country',
+        raw.country!,
+        '--timezone',
+        raw.timezone!,
+        '--locale',
+        raw.locale ?? `en-${raw.country}`,
+        '--ip',
+        raw.exitIp!,
+      ],
+      networkMode: 'none',
+      timeoutMs: 120_000,
+    });
+    return JSON.parse(out) as Fingerprint;
+  }
+
+  private async allocatePorts(): Promise<[number, number]> {
+    const used = await this.runtime.usedHostPorts();
+    for (const p of await this.store.list()) if (p.status.streamPort) used.add(p.status.streamPort);
+    for (let web = PORT_RANGE.first; web < PORT_RANGE.last; web += 2) {
+      const mux = web + 1;
+      if (used.has(web) || used.has(mux)) continue;
+      if ((await portFree(web)) && (await portFree(mux))) return [web, mux];
+    }
+    throw new AgentError(
+      'INTERNAL',
+      'No free stream ports left. Stop another profile and try again.',
+    );
+  }
+
+  private async waitUntilReady(name: string, webPort: number): Promise<void> {
+    const deadline = Date.now() + START_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const info = await this.runtime.inspect(name);
+      if (!info?.State.Running) {
+        const tail = (await this.runtime.logsTail(name, 40))
+          .split('\n')
+          .filter((l) => l.includes('enclave:'))
+          .join(' ');
+        throw new Error(
+          tail || `the browser stopped during startup (code ${info?.State.ExitCode ?? '?'})`,
+        );
+      }
+      if (
+        info.State.Health?.Status === 'healthy' &&
+        (await nekoReachable(`http://127.0.0.1:${webPort}`))
+      )
+        return;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    throw new Error(`the browser wasn't ready after ${START_TIMEOUT_MS / 1000} s`);
+  }
+
+  private async setStatus(profile: Profile, patch: Partial<ProfileStatus>): Promise<void> {
+    profile.status = { ...profile.status, ...patch };
+    await this.store.save(profile);
+  }
+
+  private forget(id: string): void {
+    this.lastViewerAt.delete(id);
+    this.nekoTokens.delete(id);
+  }
+
+  /** One state change at a time per profile. */
+  private async exclusive<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.locks.get(id) ?? Promise.resolve();
+    const run = previous.catch(() => {}).then(fn);
+    this.locks.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (this.locks.get(id) === run) this.locks.delete(id);
+    }
+  }
+}
+
+function validName(name: unknown): string {
+  const text = typeof name === 'string' ? name.trim() : '';
+  if (!text || text.length > 60)
+    throw new InputError('The profile name must be 1 to 60 characters.');
+  return text;
+}
+
+function proxyInput(profile: Profile, secrets: ProfileSecrets): ProxyInput {
+  const { type, host, port, username } = profile.proxy;
+  return {
+    type,
+    host,
+    port,
+    ...(username ? { username } : {}),
+    ...(secrets.proxyPassword ? { password: secrets.proxyPassword } : {}),
+  };
+}
+
+function checkResult(raw: RawProxyCheck, ok: boolean): ProxyCheckResult {
+  return {
+    at: new Date().toISOString(),
+    ok,
+    ...(raw.exitIp ? { exitIp: raw.exitIp } : {}),
+    ...(raw.country ? { country: raw.country } : {}),
+    ...(raw.timezone ? { timezone: raw.timezone } : {}),
+    ...(raw.latencyMs !== undefined ? { latencyMs: raw.latencyMs } : {}),
+  };
+}
+
+/** Hard rule 3: the proxy's location must still match the saved fingerprint. */
+function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): void {
+  const country = fingerprint.locale.split('-')[1]?.toUpperCase();
+  if (raw.timezone === fingerprint.timezone && (!country || raw.country === country)) return;
+  throw new AgentError(
+    'PROXY_LOCATION_MISMATCH',
+    `The proxy is now in ${raw.country} (${raw.timezone}), but this profile was made for ${country ?? '?'} (${fingerprint.timezone}). Not starting, to keep the profile consistent.`,
+    {
+      expected: { country, timezone: fingerprint.timezone },
+      actual: { country: raw.country, timezone: raw.timezone, exitIp: raw.exitIp },
+    },
+  );
+}
+
+function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>): StreamInfo {
+  return {
+    url: `http://127.0.0.1:${port}/`,
+    password: stream.userPassword,
+    expiresAt: stream.expiresAt,
+  };
+}
+
+/** /config for the container (images/browser/README.md). proxy.json holds the password: root-only. */
+function configArchive(profile: Profile, proxy: ProxyInput): Buffer {
+  return makeTar([
+    { name: 'config/', mode: 0o755 },
+    { name: 'config/profile.json', mode: 0o644, content: JSON.stringify(profile) },
+    { name: 'config/proxy.json', mode: 0o600, content: JSON.stringify(proxy) },
+  ]);
+}
+
+function portFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
+  });
+}

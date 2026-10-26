@@ -68,7 +68,7 @@ pnpm workspace (`packages/*`) on Node 24 LTS. pnpm is pinned in `package.json` (
 - Add dependencies with exact versions (`saveExact` is set in `pnpm-workspace.yaml`).
 
 - Browser image: `.\scripts\build-image.ps1` (PowerShell) or `scripts/build-image.sh` (where `docker` runs; on the owner's PC that's inside WSL as root). Tag `enclave-browser:dev`. Large downloads are cached in `/var/cache/enclave/<stage>/`. Run `docker builder prune` after big rebuilds: disk on the owner's PC is tight. Runtime contract and known gaps: `images/browser/README.md`.
-- Stage 1 CLI (in `packages/agent`): `enclave create | list | start <id> | stop <id> | open <id> | delete <id>`.
+- Agent and Stage 1 CLI (in `packages/agent`, see its README): `node --env-file=.env packages/agent/dist/cli.js serve` runs the agent; then `... cli.js create <name> --proxy <proxy> | list | start <id> | open <id> | stop <id> | check <id> | logs <id> | delete <id> --yes`. On a PC without Docker Desktop set `ENCLAVE_WSL_DISTRO` in `.env`. Dev test proxy: `scripts/test-proxy.sh`.
 - Config comes from `.env` (copy `.env.example`): `AGENT_TOKEN`, `AGENT_PORT` (default 8787), `TEST_PROXY`. On Windows, dockerode uses Docker Desktop's named pipe, so `DOCKER_HOST` is normally unset.
 
 ## Architecture essentials

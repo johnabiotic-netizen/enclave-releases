@@ -55,7 +55,8 @@ Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json
 
   "runtime": {
     "idleStopMinutes": 20,
-    "screenMatchesFingerprint": true
+    "screenMatchesFingerprint": true,
+    "usesTestProxy": false          // optional: made with TEST_PROXY (PC's own IP), not for real accounts
   },
 
   "status": {

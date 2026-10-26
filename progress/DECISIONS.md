@@ -12,6 +12,16 @@ Reason: ...
 
 ---
 
+## 2026-10-26  Agent: reaching Docker, profile store, stream logins
+Context: The owner's PC has no Docker Desktop and no docker.exe; Docker Engine runs in WSL. The agent must work with both (CLAUDE.md).
+Decision: With Docker Desktop, dockerode uses its pipe. Otherwise the agent opens a private named pipe and, for each connection, runs `wsl.exe -d <ENCLAVE_WSL_DISTRO> -u root -- docker system dial-stdio` (no extra package, no TCP port, ~0.1 s per call). It holds WSL open while it runs. Profiles live in `%LOCALAPPDATA%\Enclave\profiles\<id>\` (override `ENCLAVE_HOME`); browser data in a Docker volume per profile. Config goes into the container with putArchive (no bind mounts, so no Windows path translation). The proxy check and fingerprint run in one-off containers of the image. neko gets fresh random passwords at every start; viewers get the normal (non-admin) one, which can control but not resize the screen. Stream ports: pairs from 52100 on 127.0.0.1. Containers get 3 GB memory and no-new-privileges.
+Reason: One code path for both Docker setups, nothing listening on the network, and no secrets on command lines. Moving to Docker Desktop later needs no change.
+
+## 2026-10-26  Test proxy profiles skip the real-IP check
+Context: The safety check refuses a proxy whose exit IP is the PC's own (REAL_IP_LEAK_SUSPECTED). The dev test proxy (`scripts/test-proxy.sh`) exits through the PC by design.
+Decision: Profiles created with `useTestProxy` are marked `runtime.usesTestProxy` and labeled "Test proxy, not for real accounts"; for them only, the real-IP check warns instead of refusing. Changing the proxy clears the mark.
+Reason: Lets Stage 1 be exercised end to end without a paid proxy, without weakening the check for real profiles.
+
 ## 2026-10-26  Egress lock: iptables inside the profile container
 Context: docs/04-security.md offers an in-container firewall or a sidecar container. Both have to work on Docker Engine in WSL and on Docker Desktop.
 Decision: In-container iptables, applied by the entrypoint as root before anything else starts (`apply_egress_lock.sh`). Outbound policy DROP; allowed: loopback, replies to inbound connections (the viewer's stream), and new TCP from uid 1100 (`egress`, the gost forwarder) to the proxy's IP and port only. Docker's embedded DNS (127.0.0.11) is refused; all IPv6 out is refused. The proxy hostname is resolved once before the lock and gost dials the IP. The container needs `--cap-add NET_ADMIN`; the entrypoint then drops NET_ADMIN and NET_RAW from the bounding set (capsh) before exec'ing supervisord, so no process in the container can lift the lock. If the lock fails, the container exits and the browser never starts.

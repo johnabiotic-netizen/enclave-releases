@@ -8,6 +8,8 @@ export const DEFAULT_IDLE_STOP_MINUTES = 20;
 export interface ProfileRuntime {
   idleStopMinutes?: number;
   screenMatchesFingerprint?: boolean;
+  /** Made with the built-in TEST_PROXY: exits through the PC's own IP. Not for real accounts. */
+  usesTestProxy?: boolean;
 }
 
 export const PROFILE_STATES = ['stopped', 'starting', 'running', 'error'] as const;
