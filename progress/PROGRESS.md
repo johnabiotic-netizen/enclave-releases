@@ -31,6 +31,18 @@ Notes / evidence:
 - Disk space is tight. C: hit 0 GB on 2026-10-26 during an image build, which crashed WSL; clearing the npm cache (6.5 GB) recovered it. WSL's disk (`ext4.vhdx`, about 16 GB) never shrinks by itself. Keep about 8 GB free inside Docker for rebuilds, run `docker builder prune` after builds, and plan to compact the disk (owner step, admin) or free more space on C:.
 - For the owner: acceptance test 3 says profiles show different canvas values, but Camoufox no longer adds canvas noise, so canvas is the same across profiles on one image (see DECISIONS.md). Stage 3 decides.
 
+## Stage 1 acceptance evidence
+- Test 2, proxy in effect (2026-10-26, owner, real HTTP proxy, profile 257c8d81): browserleaks.com/ip showed 62.192.100.40 (the proxy), Germany, Europe/Berlin, matching the fingerprint (de-DE, Europe/Berlin); Accept-Language de-DE; WebRTC public IP = proxy IP, no local IP; no IPv6. PASS.
+- Test 5, fixed fingerprint (2026-10-26, owner, same profile, before/after stop and start): canvas signature 3406796772e6374c6d90be480aee81de both times; unmasked WebGL vendor/renderer Google Inc. (NVIDIA) / ANGLE (NVIDIA, NVIDIA GeForce GTX 980 Direct3D11 vs_5_0 ps_5_0), matching the saved fingerprint. PASS.
+- Test 6, fail closed: verified with the dev test proxy (task C and D notes above); start with the proxy down is refused, and with the proxy stopped mid-session the browser loads nothing.
+- Test 7, idle stop: verified with the dev test proxy (task D note above).
+- Tests 1 and 4 (create/start with the PC browser; persistence across a PC restart) and test 3 (two profiles, two proxies) still to run.
+
+## Found during acceptance (for Stage 3)
+- WebGL plain RENDERER (0x1F01) reports the container's real "llvmpipe, or similar" while the unmasked renderer claims e.g. a GTX 980. The saved fingerprint has the right value (webGl:parameters 7937) but Camoufox 156.0.1-beta.36 does not apply it, and this build has no `webgl.renderer-string-override` pref. A site comparing the two sees the mismatch.
+- WebGL image hash (52387c989dd2dbcefac516a4c018bc95) is the same for two profiles claiming different GPUs, like canvas: all profiles on one image render identically. Acceptance test 3 asks for different canvas/WebGL values; the unmasked strings differ, the rendered output does not.
+- TCP/IP fingerprint seen by sites is the proxy server's (browserleaks: "Android" for both the test proxy and the real one), not Windows. Depends on the proxy provider.
+
 ## Notes for upcoming tasks
 - Viewer (Stages 4/5): neko's client guesses touch vs mouse from media queries (`client/core/src/client.ts` `isTouchDevice`). The owner's touchscreen PC reports `pointer:fine` false and `hover:hover` false, so the stock web page never focuses its key input: clicks work, typing doesn't. `any-pointer`/`any-hover` are false there too, so the image patches the stock page to always use mouse/keyboard mode (Dockerfile; owner confirmed typing works 2026-10-26). Our own viewer should pass `inputMode` to `NekoClient` from real pointer events, not media queries.
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
