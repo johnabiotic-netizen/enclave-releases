@@ -112,14 +112,19 @@ RUN --mount=type=bind,from=gost-dist,target=/dist/gost \
     chmod 0755 /usr/local/bin/gost; \
     gost -V
 
-# neko's web client takes a PC with a touchscreen for a tablet (it asks whether the *primary*
-# pointer is fine) and then never focuses its key input: clicks work, typing doesn't. Ask
-# whether *any* pointer is fine instead. The build fails if the code no longer matches.
+# neko's web client takes a PC with a touchscreen for a tablet and then never focuses its key
+# input: clicks work, typing doesn't. The owner's PC (touchscreen + mouse) reports no fine
+# pointer and no hover at all, so no media query can tell. Force mouse/keyboard mode; phones
+# use our own viewer (Stage 4). The ?v= query makes browsers drop a cached unpatched copy.
+# The build fails if the code no longer matches.
 RUN set -eux; \
-    f="$(grep -rlF 'matchMedia("(pointer:fine)")' /var/www/assets)"; \
+    f="$(grep -rlF '("ontouchstart"in window||navigator.maxTouchPoints>0)&&!matchMedia' /var/www/assets)"; \
     test "$(echo "$f" | wc -l)" = 1; \
-    sed -i 's/matchMedia("(pointer:fine)")/matchMedia("(any-pointer:fine)")/; s/matchMedia("(hover:hover)")/matchMedia("(any-hover:hover)")/' "$f"; \
-    grep -qF 'matchMedia("(any-pointer:fine)")' "$f"
+    sed -i 's/("ontouchstart"in window||navigator.maxTouchPoints>0)&&!matchMedia/false\&\&!matchMedia/' "$f"; \
+    grep -qF 'inputMode==="touch":false&&' "$f"; \
+    b="$(basename "$f")"; \
+    sed -i "s#${b}\"#${b}?v=enclave1\"#" /var/www/index.html; \
+    grep -qF "${b}?v=enclave1" /var/www/index.html
 
 COPY openbox.xml /etc/neko/openbox.xml
 COPY supervisord.conf /etc/neko/supervisord/enclave.conf
