@@ -1,0 +1,203 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Enclave fingerprint probe</title>
+<pre id="out" style="font: 16px monospace">collecting…</pre>
+<script>
+  // Collects what a website can read about this profile and downloads it as
+  // enclave-baseline.json, which scripts/fingerprint/baseline.mjs copies out of the
+  // container. Values only; nothing leaves the browser.
+  const hash = (s) => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+    return h.toString(16).padStart(8, '0');
+  };
+
+  function canvasHash() {
+    const c = document.createElement('canvas');
+    c.width = 280;
+    c.height = 60;
+    const x = c.getContext('2d');
+    x.textBaseline = 'top';
+    x.font = '16px Arial';
+    x.fillStyle = '#f60';
+    x.fillRect(100, 1, 62, 20);
+    x.fillStyle = '#069';
+    x.fillText('Enclave canvas probe, 😃', 2, 15);
+    x.fillStyle = 'rgba(102, 204, 0, 0.7)';
+    x.fillText('Enclave canvas probe, 😃', 4, 17);
+    return hash(c.toDataURL());
+  }
+
+  function webgl(kind) {
+    const gl = document.createElement('canvas').getContext(kind);
+    if (!gl) return null;
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const names = [
+      'MAX_TEXTURE_SIZE',
+      'MAX_RENDERBUFFER_SIZE',
+      'MAX_VIEWPORT_DIMS',
+      'MAX_VERTEX_ATTRIBS',
+      'MAX_VERTEX_UNIFORM_VECTORS',
+      'MAX_FRAGMENT_UNIFORM_VECTORS',
+      'MAX_VARYING_VECTORS',
+      'MAX_COMBINED_TEXTURE_IMAGE_UNITS',
+      'MAX_TEXTURE_IMAGE_UNITS',
+      'MAX_VERTEX_TEXTURE_IMAGE_UNITS',
+      'MAX_CUBE_MAP_TEXTURE_SIZE',
+      'ALIASED_LINE_WIDTH_RANGE',
+      'ALIASED_POINT_SIZE_RANGE',
+      'STENCIL_VALUE_MASK',
+      'STENCIL_WRITEMASK',
+      'STENCIL_BACK_VALUE_MASK',
+      'STENCIL_BACK_WRITEMASK',
+      'SHADING_LANGUAGE_VERSION',
+      'VERSION',
+      'VENDOR',
+      'RENDERER',
+    ];
+    const params = {};
+    for (const n of names) {
+      const v = gl.getParameter(gl[n]);
+      params[n] = v && typeof v === 'object' ? Array.from(v) : v;
+    }
+    const exts = gl.getSupportedExtensions() || [];
+    return {
+      vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : null,
+      renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : null,
+      params,
+      extensions: exts.length,
+      extensionsHash: hash(exts.join(',')),
+    };
+  }
+
+  async function audioSum() {
+    const ctx = new OfflineAudioContext(1, 5000, 44100);
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = 10000;
+    const comp = ctx.createDynamicsCompressor();
+    osc.connect(comp);
+    comp.connect(ctx.destination);
+    osc.start(0);
+    const buf = await ctx.startRendering();
+    const d = buf.getChannelData(0);
+    let sum = 0;
+    for (let i = 4500; i < 5000; i++) sum += Math.abs(d[i]);
+    return sum;
+  }
+
+  function fonts() {
+    const probe = 'mmmmmmmmmmlli1WwQq@#&%$';
+    const bases = ['monospace', 'sans-serif', 'serif'];
+    const c = document.createElement('canvas').getContext('2d');
+    const size = (f) => ((c.font = `72px ${f}`), c.measureText(probe).width);
+    const base = bases.map(size);
+    const has = (f) => bases.some((b, i) => size(`"${f}", ${b}`) !== base[i]);
+    const list = [
+      'Arial',
+      'Calibri',
+      'Cambria',
+      'Consolas',
+      'Courier New',
+      'Georgia',
+      'Segoe UI',
+      'Segoe UI Emoji',
+      'Tahoma',
+      'Times New Roman',
+      'Verdana',
+      'Bahnschrift',
+      'DejaVu Sans',
+      'Liberation Sans',
+      'Noto Sans',
+      'Noto Color Emoji',
+      'Ubuntu',
+      'Cantarell',
+    ];
+    return list.filter(has);
+  }
+
+  async function permission(name) {
+    try {
+      return (await navigator.permissions.query({ name })).state;
+    } catch {
+      return 'error';
+    }
+  }
+
+  async function collect() {
+    const n = navigator;
+    const devices = (await n.mediaDevices.enumerateDevices()).map((d) => d.kind);
+    const voices = await new Promise((r) => {
+      const v = speechSynthesis.getVoices();
+      if (v.length) return r(v);
+      speechSynthesis.onvoiceschanged = () => r(speechSynthesis.getVoices());
+      setTimeout(() => r(speechSynthesis.getVoices()), 2000);
+    });
+    return {
+      takenAt: new Date().toISOString(),
+      navigator: {
+        userAgent: n.userAgent,
+        platform: n.platform,
+        oscpu: n.oscpu,
+        appVersion: n.appVersion,
+        buildID: n.buildID,
+        language: n.language,
+        languages: n.languages,
+        hardwareConcurrency: n.hardwareConcurrency,
+        maxTouchPoints: n.maxTouchPoints,
+        webdriver: n.webdriver,
+        doNotTrack: n.doNotTrack,
+        globalPrivacyControl: n.globalPrivacyControl,
+        pdfViewerEnabled: n.pdfViewerEnabled,
+        plugins: Array.from(n.plugins).map((p) => p.name),
+        mimeTypes: n.mimeTypes.length,
+      },
+      screen: {
+        width: screen.width,
+        height: screen.height,
+        availWidth: screen.availWidth,
+        availHeight: screen.availHeight,
+        colorDepth: screen.colorDepth,
+        pixelDepth: screen.pixelDepth,
+        devicePixelRatio,
+        outerWidth,
+        outerHeight,
+        screenX,
+        screenY,
+      },
+      time: {
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        januaryOffset: new Date(2026, 0, 1).getTimezoneOffset(),
+        julyOffset: new Date(2026, 6, 1).getTimezoneOffset(),
+      },
+      webgl: webgl('webgl'),
+      webgl2: webgl('webgl2'),
+      audioSum: await audioSum(),
+      fonts: fonts(),
+      voices: voices.map((v) => v.name),
+      mediaDevices: devices,
+      permissions: {
+        geolocation: await permission('geolocation'),
+        notifications: await permission('notifications'),
+      },
+      math: [Math.tan(-1e300), Math.acosh(1e300), Math.expm1(1), Math.sinh(1)].map(String),
+      // Only checked for stability within the run. On websites Firefox Strict gives each
+      // profile its own canvas, renewed each browser start (DECISIONS.md, option A); on
+      // this file:// page it does not randomize, so the value is the same in every profile.
+      canvas: { first: canvasHash(), second: canvasHash() },
+    };
+  }
+
+  collect().then(
+    (result) => {
+      const text = JSON.stringify(result, null, 2);
+      document.getElementById('out').textContent = text;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      a.download = 'enclave-baseline.json';
+      a.click();
+    },
+    (e) => (document.getElementById('out').textContent = 'probe failed: ' + e),
+  );
+</script>
