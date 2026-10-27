@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 3, Fingerprint hardening. Not started (waiting for the owner's go-ahead). Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
+**Current stage:** Stage 3, Fingerprint hardening. In progress (2026-10-27). Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -36,7 +36,20 @@ Stage 2 acceptance evidence (2026-10-27, owner, Android phone V2318, Profile 1 o
 - Test 3 no logout: test account still logged in on the phone, no verification prompt (owner). PASS.
 - Test 4 input: tap, type, back/forward/reload work; drag scrolls after the gesture fix (owner). PASS.
 - Test 5 reconnect: four phone reconnects 12:10 to 12:15 UTC, Camoufox uptime unbroken since 12:08 (log). PASS.
-## Stage 3: Fingerprint hardening  [ ]
+## Stage 3: Fingerprint hardening  [~]
+
+Spec and checklist updated to option A (canvas by Firefox Strict, stock audio, the PC's GPU).
+Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
+- [x] Fonts: all common Windows fonts present; no Linux-only font visible (test page measuring 22 Linux fonts). CreepJS: "Like Windows 11".
+- [x] Emoji: drawn like Segoe UI Emoji after setting Windows Firefox's `font.name-list.emoji` (was Twemoji via Linux's list).
+- [x] Geolocation permission: back to ask-first (Camoufox granted it to every site).
+- [x] Navigator: webdriver false, Win32 / Windows NT 10.0 x64, build ID 20181001000000, PDF viewer plugins, Microsoft speech voices; workers agree with the page (CreepJS: Windows 10 64-bit, 4 cores, Intel HD 400, high confidence).
+- [x] Screen, timezone, Intl, WebRTC (proxy IP and mDNS only): consistent (CreepJS).
+- [ ] CreepJS WebGL flagged "suspicious capabilities": 43 of 47 parameters it reads come from the recorded real Windows device, but STENCIL_VALUE_MASK, STENCIL_WRITEMASK and the back masks report 255 (from the D3D12 driver) instead of the recorded 2147483647. Firefox answers these from its client-side state, so Camoufox's override does not apply. Needs a Camoufox fix; candidate upstream issue.
+- [ ] CreepJS audio sum 35.749972093850374 is not one of its known sums for this gain (35.749960/35.749968): Firefox's audio math on Linux differs slightly from Windows. Not flagged as a lie. Needs an engine-level change.
+- [ ] Notification.permission reads "granted" on a local test page; recheck on a website.
+- [ ] Pixelscan, amiunique, BrowserLeaks pages; three profiles; baselines under profiles/<id>/baselines/.
+
 ## Stage 4: Camera and mic passthrough  [ ]
 ## Stage 5: Windows app  [ ]
 ## Stage 6: Phone linking  [ ]
