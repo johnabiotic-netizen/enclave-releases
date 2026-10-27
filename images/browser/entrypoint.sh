@@ -30,7 +30,7 @@ if ! /opt/enclave/apply_egress_lock.sh "$PROXY_IP" "$PROXY_PORT"; then
   exit 1
 fi
 
-install -d -m 0700 -o neko -g neko /data/profile
+install -d -m 0700 -o neko -g neko /data/profile /data/downloads
 
 # Screen size from the saved fingerprint (supervisord passes its environment to neko).
 set -a

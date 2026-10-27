@@ -42,7 +42,12 @@ RUNTIME_PREFS = {
     "browser.sessionstore.resume_from_crash": True,
     # The image is pinned; the browser must not update itself.
     "app.update.enabled": False,
+    # Downloads go to the profile's volume, so they survive the container being recreated.
+    "browser.download.folderList": 2,
+    "browser.download.dir": "/data/downloads",
 }
+DOWNLOADS_DIR = "/data/downloads"
+GL_SHIM = "/opt/enclave/libenclave_gl.so"
 
 # Every profile behaves as Firefox with Enhanced Tracking Protection set to Strict
 # (DECISIONS.md). Firefox applies the category's settings itself at startup
@@ -90,8 +95,11 @@ def main() -> None:
         get_pref_env_vars({**raw.get("prefs", {}), **WINDOWS_DEFAULT_PREFS, **gpu_prefs, **RUNTIME_PREFS})
     )
 
+    # Answers the GL driver's initial stencil masks as Windows' ANGLE does (gl_shim.c).
+    env["LD_PRELOAD"] = GL_SHIM
     binary = str(camoufox_path(download_if_missing=False) / "camoufox-bin")
     os.makedirs(PROFILE_DIR, exist_ok=True)
+    os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     with open(os.path.join(PROFILE_DIR, "user.js"), "w", encoding="utf-8") as f:
         for name, value in USER_PREFS.items():
             f.write(f"user_pref({json.dumps(name)}, {json.dumps(value)});\n")

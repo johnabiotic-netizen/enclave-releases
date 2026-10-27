@@ -25,6 +25,15 @@ ADD --checksum=sha256:e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0b
     https://github.com/go-gost/gost/releases/download/v3.3.1/gost_3.3.1_linux_amd64.tar.gz \
     /gost.tar.gz
 
+# --- GL shim (gl_shim.c), built apart so the image carries no compiler ----------
+
+FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647c57cf5b9695a90234a0edaa446 AS gl-shim
+COPY gl_shim.c /src/gl_shim.c
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends gcc-14=14.2.0-19 libc6-dev=2.41-12+deb13u4; \
+    gcc-14 -O2 -Wall -Werror -shared -fPIC -o /libenclave_gl.so /src/gl_shim.c -ldl
+
 # --- Image -------------------------------------------------------------------
 
 FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647c57cf5b9695a90234a0edaa446
@@ -162,5 +171,7 @@ COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fin
 # Windows line endings break the shebang ("required file not found"): refuse them.
 RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
     && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf
+
+COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
 
 ENTRYPOINT ["/opt/enclave/entrypoint.sh"]
