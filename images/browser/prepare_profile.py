@@ -3,8 +3,8 @@
 
 Writes into /run/enclave:
   gost.yaml    local SOCKS5 on 127.0.0.1:1080 forwarding to the profile's proxy
-  openbox.xml  window manager config whose screen margins leave the fingerprint's
-               taskbar area free, so the maximized window matches the claimed geometry
+  openbox.xml  window manager config: no desktop margins, and the browser window placed
+               and sized exactly as the fingerprint says (screenX/Y, outerWidth/Height)
   neko.env     NEKO_DESKTOP_SCREEN sized to the fingerprint's screen
   egress.env   PROXY_IP and PROXY_PORT for the egress lock (apply_egress_lock.sh)
 
@@ -105,23 +105,36 @@ def screen_of(profile: dict) -> dict:
         width, height = config["screen.width"], config["screen.height"]
     except KeyError:
         raise ValueError("profile.json has no saved fingerprint screen") from None
-    # Only the taskbar area is reserved. availLeft/availTop place the screen on a wider
-    # multi-monitor desktop, so they say nothing about margins on this one display.
+    # The page reads the real window and work area (Camoufox 158 defers to Firefox there),
+    # so the desktop is built to match the fingerprint instead of spoofing it: no margins,
+    # so the work area is the whole screen, as Firefox with Strict protection reports it on
+    # Windows; and the window placed exactly where and as large as the fingerprint says
+    # (a window maximized above a taskbar).
     return {
         "width": width,
         "height": height,
-        "top": 0,
-        "left": 0,
-        "right": width - config.get("screen.availWidth", width),
-        "bottom": height - config.get("screen.availHeight", height),
+        "x": config.get("window.screenX", 0),
+        "y": config.get("window.screenY", 0),
+        "outer_width": config.get("window.outerWidth", width),
+        "outer_height": config.get("window.outerHeight", height),
     }
 
 
 def openbox_config(template: str, screen: dict) -> str:
-    margins = "".join(f"  <{side}>{screen[side]}</{side}>\n" for side in ("top", "bottom", "left", "right"))
+    margins = "".join(f"  <{side}>0</{side}>\n" for side in ("top", "bottom", "left", "right"))
     result, count = re.subn(r"<margins>.*?</margins>", f"<margins>\n{margins}</margins>", template, flags=re.S)
     if count != 1:
         raise ValueError("openbox template has no <margins> section")
+    window = (
+        f"<position force=\"yes\"><x>{screen['x']}</x><y>{screen['y']}</y></position>\n"
+        f"      <size><width>{screen['outer_width']}</width><height>{screen['outer_height']}</height></size>\n"
+        "      <maximized>false</maximized>"
+    )
+    result, count = re.subn(
+        r"<!-- ENCLAVE_WINDOW:[^>]*-->\s*<maximized>true</maximized>", lambda _: window, result
+    )
+    if count != 1:
+        raise ValueError("openbox template has no ENCLAVE_WINDOW rule")
     return result
 
 
@@ -140,7 +153,11 @@ def main() -> None:
     with open(f"{OUT}/openbox.xml", "w", encoding="utf-8") as f:
         f.write(openbox)
     with open(f"{OUT}/neko.env", "w", encoding="utf-8") as f:
-        f.write(f"NEKO_DESKTOP_SCREEN={screen['width']}x{screen['height']}@30\n")
+        # The X dummy driver only takes widths that are multiples of 8 (1366 -> 1368). The
+        # page still sees the claimed width: Camoufox reports the screen size and the
+        # window is placed at the claimed size.
+        display_width = -(-screen["width"] // 8) * 8
+        f.write(f"NEKO_DESKTOP_SCREEN={display_width}x{screen['height']}@30\n")
     with open(f"{OUT}/egress.env", "w", encoding="utf-8") as f:
         f.write(f"PROXY_IP={ip}\nPROXY_PORT={port}\n")
 

@@ -37,6 +37,8 @@ The browser image must be built first (`.\scripts\build-image.ps1`). For a test 
 | `src/server.ts` | The API (Fastify), 127.0.0.1 only, bearer token |
 | `src/cli.ts` | `enclave serve` runs the agent; other commands call its API |
 
+The PC's graphics card: profiles render on it and claim it (DECISIONS.md, 2026-10-26). The agent asks Windows for it (`src/gpu.ts`; `ENCLAVE_GPU` picks one on a PC with several), refuses to create a profile when Docker can't hand `/dev/dxg` to containers, saves the card as `fingerprint.webgl.hostAdapter`, and refuses to start a profile on a different card (`GPU_UNAVAILABLE`).
+
 Per profile:
 - **Create** runs `check_proxy.py` in a one-off container (the proxy goes in as a file, never as an argument), then `gen_fingerprint.py` with no network, using the exit IP's country, timezone and locale.
 - **Start** reruns the check, refuses if the location no longer matches the fingerprint, then creates the container `enclave-<id>` on its own network `enclave-<id>`, with the data volume `enclave-<id>-data` on `/data`, `/config` copied in, `--cap-add NET_ADMIN` for the egress lock, `no-new-privileges`, 3 GB memory, 2 GB shm. Stream ports come in pairs from 52100 to 52999 on 127.0.0.1. Fresh neko passwords every start: the viewer gets the normal one (can control, can't change the screen size); the admin one stays with the agent.

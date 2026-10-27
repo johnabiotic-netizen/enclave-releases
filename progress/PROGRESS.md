@@ -38,10 +38,19 @@ Notes / evidence:
 - Test 7, idle stop: verified with the dev test proxy (task D note above).
 - Tests 1 and 4 (create/start with the PC browser; persistence across a PC restart) and test 3 (two profiles, two proxies) still to run.
 
-## Found during acceptance (for Stage 3)
-- WebGL plain RENDERER (0x1F01) reports the container's real "llvmpipe, or similar" while the unmasked renderer claims e.g. a GTX 980. The saved fingerprint has the right value (webGl:parameters 7937) but Camoufox 156.0.1-beta.36 does not apply it, and this build has no `webgl.renderer-string-override` pref. A site comparing the two sees the mismatch.
-- WebGL image hash (52387c989dd2dbcefac516a4c018bc95) is the same for two profiles claiming different GPUs, like canvas: all profiles on one image render identically. Acceptance test 3 asks for different canvas/WebGL values; the unmasked strings differ, the rendered output does not.
-- TCP/IP fingerprint seen by sites is the proxy server's (browserleaks: "Android" for both the test proxy and the real one), not Windows. Depends on the proxy provider.
+## Fixed after acceptance found fingerprint gaps (2026-10-27, owner chose option A)
+Verified on the owner's PC with two profiles running side by side (test proxy):
+- Renderer pair: plain RENDERER and UNMASKED_RENDERER both "ANGLE (Intel, Intel(R) HD Graphics 400 Direct3D11 vs_5_0 ps_5_0), or similar" (was llvmpipe vs GTX 980). Camoufox 158.0-beta.40 / camoufox 0.5.9b5.
+- Real GPU: profiles render on the Intel HD Graphics 620 through WSL's D3D12 driver; the claimed GPU is what Windows Firefox reports for it.
+- Canvas: browserleaks.com/canvas gave different signatures in the two profiles (79064E37... vs 567543DD...) and a new one after a restart (Firefox Strict canvas randomization).
+- Screen and window: page values equal the fingerprint (1920x1080, avail 1920x1032, window 1920x1032 at 0,0; and 1366x768, avail 1366x720, window 1366x720 on the 1368x768 display mode). No title bar or border.
+- Touch points 0, cores 4, language en-NG for a Nigerian exit (was pcm-NG), de-DE for Germany, timezone from the proxy.
+- Old profiles are refused with "made before profiles used the graphics card"; Profile 1 recreated (ea427e56) with the same German proxy; the old one is "Profile 1 (old)" for the owner to delete.
+
+Still true (not fixable in software):
+- WebGL image hash is the same for all profiles on one PC (Strict randomizes 2D canvas, not WebGL drawings), as on one real PC.
+- WebGPU reports no adapter ("blocked device"), as Windows Firefox does when it blocklists a driver; real HD 620s usually get one.
+- The TCP/IP fingerprint is the proxy server's (most look Linux/"Android"); choose proxies accordingly.
 
 ## Notes for upcoming tasks
 - Viewer (Stages 4/5): neko's client guesses touch vs mouse from media queries (`client/core/src/client.ts` `isTouchDevice`). The owner's touchscreen PC reports `pointer:fine` false and `hover:hover` false, so the stock web page never focuses its key input: clicks work, typing doesn't. `any-pointer`/`any-hover` are false there too, so the image patches the stock page to always use mouse/keyboard mode (Dockerfile; owner confirmed typing works 2026-10-26). Our own viewer should pass `inputMode` to `NekoClient` from real pointer events, not media queries.

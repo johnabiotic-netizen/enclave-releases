@@ -13,6 +13,8 @@ export interface AgentConfig {
   dockerHost: string | undefined;
   /** WSL distro running Docker Engine, for PCs without Docker Desktop. */
   wslDistro: string | undefined;
+  /** Part of the graphics card's name, on a PC with several (ENCLAVE_GPU). */
+  gpu: string | undefined;
 }
 
 const MIN_TOKEN_LENGTH = 24;
@@ -37,5 +39,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
     testProxy: env.TEST_PROXY || undefined,
     dockerHost: env.DOCKER_HOST || undefined,
     wslDistro: env.ENCLAVE_WSL_DISTRO || undefined,
+    gpu: env.ENCLAVE_GPU || undefined,
   };
 }

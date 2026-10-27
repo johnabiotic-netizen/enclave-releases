@@ -3,8 +3,10 @@
 <!-- Default openbox config but all window decorations are moved
   thereby making it harder to accidentally close the virtual browser -->
 <!-- From neko v3.2.0 apps/firefox/openbox.xml (Apache 2.0). Enclave change: the
-  application rule matches Camoufox's window class instead of Firefox's. Known gap (Stage 3):
-  openbox still draws a title bar on Camoufox, so outerHeight exceeds screen.availHeight. -->
+  application rule matches Camoufox's window class instead of Firefox's, has no border
+  (keepBorder no), and prepare_profile.py writes the fingerprint's window position and size
+  into the copy openbox uses. The desktop has no margins, so the real work area is the whole
+  screen, as Firefox with Strict protection reports it. -->
 
 <openbox_config xmlns="http://openbox.org/3.4/rc"
                 xmlns:xi="http://www.w3.org/2001/XInclude">
@@ -18,6 +20,7 @@
     <!-- Match all windows and remove their decorations (obxprop | grep "^_OB_APP") -->
     <application class="camoufox" name="Navigator" role="browser">
       <decor>no</decor>
+      <!-- ENCLAVE_WINDOW: prepare_profile.py puts the fingerprint's window position and size here -->
       <maximized>true</maximized>
       <focus>yes</focus>
       <layer>normal</layer>
@@ -74,7 +77,7 @@
       S: shade (roll up/down)
       D: omnipresent (on all desktops).
   -->
-  <keepBorder>yes</keepBorder>
+  <keepBorder>no</keepBorder>
   <animateIconify>yes</animateIconify>
   <font place="ActiveWindow">
     <name>sans</name>

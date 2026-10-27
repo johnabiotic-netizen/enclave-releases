@@ -21,7 +21,44 @@ import time
 
 os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("ENCLAVE_CAMOUFOX_CACHE", "/opt/camoufox-cache"))
 
+import xml.etree.ElementTree as ET  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import camoufox  # noqa: E402
 from camoufox.geolocation import get_geolocation  # noqa: E402
+
+# Languages Firefox ships in (its l10n locales, by language). Camoufox picks a country's
+# language at random by population, which can give one no Firefox build exists for
+# (Nigerian Pidgin for Nigeria): a browser language no real PC reports.
+FIREFOX_LANGUAGES = set(
+    "af ar az be bg bn bs ca cs cy da de el en eo es et eu fa fi fr fy ga gd gl gu he hi hr hu "
+    "hy id is it ja ka kk km kn ko lo lt lv mk ml mr ms my nb ne nl nn pa pl pt ro ru si sk sl "
+    "sq sr sv ta te th tl tr uk ur uz vi zh".split()
+)
+OFFICIAL = ("official", "de_facto_official")
+
+
+def browser_language(region: str) -> str:
+    """The language a browser in `region` most likely runs in: English where it is an
+    official language (browsers there overwhelmingly run in English), else the most spoken
+    official language Firefox ships in, else English. From CLDR's territoryInfo.xml, which
+    the camoufox package bundles."""
+    data = ET.parse(Path(camoufox.__file__).parent / "territoryInfo.xml").getroot()
+    territory = data.find(f".//territory[@type='{region.upper()}']")
+    if territory is None:
+        return "en"
+    official = sorted(
+        (
+            (float(lp.get("populationPercent", "0")), lp.get("type", "").split("_")[0])
+            for lp in territory.findall("languagePopulation")
+            if lp.get("officialStatus") in OFFICIAL
+        ),
+        reverse=True,
+    )
+    languages = [lang for _, lang in official]
+    if "en" in languages:
+        return "en"
+    return next((lang for lang in languages if lang in FIREFOX_LANGUAGES), "en")
 
 ECHO_SERVICES = ["https://api.ipify.org", "https://icanhazip.com"]
 SCHEMES = {"socks5": "socks5h", "http": "http", "https": "https"}
@@ -78,10 +115,11 @@ def main() -> dict:
     try:
         geo = get_geolocation(result["exitIp"])
         locale = geo.locale
+        language = browser_language(locale.region) if locale.region else locale.language
         result.update(
             country=locale.region,
             timezone=geo.timezone,
-            locale=f"{locale.language}-{locale.region}" if locale.region else locale.language,
+            locale=f"{language}-{locale.region}" if locale.region else language,
             lat=geo.latitude,
             lon=geo.longitude,
         )

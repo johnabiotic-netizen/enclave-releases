@@ -52,9 +52,9 @@ Check these against current official sources before building; fix the specs here
 
 1. **Create and start:** create a profile with the test proxy, start it, open the URL in your PC browser, see a working Camoufox browser.
 2. **Proxy in effect:** inside the profile, an IP check shows the proxy's IP, and its country/timezone match the fingerprint.
-3. **Two isolated profiles:** create a second profile with a different proxy. The two show different IPs and different canvas/WebGL values. Neither can see the other's cookies.
+3. **Two isolated profiles:** create a second profile with a different proxy. The two show different IPs and different canvas signatures (Firefox Strict canvas randomization). Both claim the PC's real GPU, so the WebGL vendor/renderer are the same, as on one real PC (owner decision 2026-10-26, `progress/DECISIONS.md`). Neither can see the other's cookies.
 4. **Persistence:** log into any test account in profile 1, stop it, restart the PC, start it again. Still logged in, history intact.
-5. **Fixed fingerprint:** record profile 1's fingerprint (user agent, canvas hash, WebGL renderer). Stop, start. Values identical.
+5. **Fixed fingerprint:** record profile 1's fingerprint (user agent, WebGL vendor and renderer, screen, timezone, language). Stop, start. Values identical. The canvas signature changes on each start, as Firefox Strict does for every user (owner decision 2026-10-26).
 6. **Fail closed:** break the proxy, start the profile. No page loads, no real IP leak. Restore proxy, pages load again.
 7. **Idle stop:** leave a profile with no viewer past the idle timeout. It stops on its own. Data persists.
 

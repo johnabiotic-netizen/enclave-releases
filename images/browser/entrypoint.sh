@@ -14,7 +14,9 @@ for f in /config/profile.json /config/proxy.json; do
   fi
 done
 
-install -d -m 0750 -o root -g egress /run/enclave
+# 0711: every user can open a file it knows the name of (openbox, running as neko, reads
+# openbox.xml) but not list the folder; gost.yaml itself is readable by egress only.
+install -d -m 0711 -o root -g egress /run/enclave
 /opt/enclave/prepare_profile.py
 # The forwarder config holds the proxy password: readable by the egress user only.
 chown egress:egress /run/enclave/gost.yaml

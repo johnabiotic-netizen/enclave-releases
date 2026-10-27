@@ -18,6 +18,7 @@ import {
 import type { AgentConfig } from './config.js';
 import { PROFILE_LABEL, type DockerRuntime } from './docker/runtime.js';
 import { makeTar } from './docker/tar.js';
+import { detectGpu, gpuContainerSettings } from './gpu.js';
 import { AgentError, InputError } from './errors.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
@@ -103,8 +104,9 @@ export class ProfileService {
     }
 
     await this.runtime.assertReady();
+    const adapter = await this.requireGpu();
     const raw = await this.checkProxy(proxy, useTestProxy);
-    const fingerprint = await this.generateFingerprint(raw);
+    const fingerprint = await this.generateFingerprint(raw, adapter);
 
     const now = new Date().toISOString();
     const id = this.store.newId();
@@ -246,6 +248,7 @@ export class ProfileService {
         const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
         assertLocationMatches(profile.fingerprint, raw);
         profile.proxy.lastCheck = checkResult(raw, true);
+        const gpu = gpuContainerSettings(await this.requireSameGpu(profile.fingerprint));
 
         const [webPort, muxPort] = await this.allocatePorts();
         const stream = {
@@ -269,6 +272,7 @@ export class ProfileService {
             `NEKO_WEBRTC_UDPMUX=${muxPort}`,
             'NEKO_WEBRTC_ICELITE=true',
             'NEKO_WEBRTC_NAT1TO1=127.0.0.1',
+            ...gpu.env,
           ],
           ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },
           HostConfig: {
@@ -278,7 +282,8 @@ export class ProfileService {
               [`${muxPort}/tcp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
               [`${muxPort}/udp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
             },
-            Mounts: [{ Type: 'volume', Source: volumeName(id), Target: '/data' }],
+            Mounts: [{ Type: 'volume', Source: volumeName(id), Target: '/data' }, ...gpu.mounts],
+            Devices: gpu.devices,
             // The egress lock needs NET_ADMIN once; the entrypoint drops it before the browser starts.
             CapAdd: ['NET_ADMIN'],
             SecurityOpt: ['no-new-privileges'],
@@ -489,10 +494,65 @@ export class ProfileService {
     return JSON.parse(out) as RawProxyCheck;
   }
 
-  private async generateFingerprint(raw: RawProxyCheck): Promise<Fingerprint> {
+  /**
+   * The PC's GPU, which profiles render on and claim. Refuses when there is none, or when
+   * Docker can't hand it to containers: a profile drawing in software would show output
+   * no Windows PC produces.
+   */
+  private async requireGpu(): Promise<string> {
+    const adapter = await detectGpu(this.config.gpu).catch(() => null);
+    if (!adapter) {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        this.config.gpu
+          ? `No graphics card matching "${this.config.gpu}" (ENCLAVE_GPU). Check the name in Device Manager.`
+          : "This PC's graphics card couldn't be found. Profiles need it to draw like a real Windows PC.",
+      );
+    }
+    const gpu = gpuContainerSettings(adapter);
+    try {
+      await this.runtime.runOneOff({
+        cmd: ['test', '-c', '/dev/dxg'],
+        networkMode: 'none',
+        devices: gpu.devices,
+        mounts: gpu.mounts,
+        timeoutMs: 60_000,
+      });
+    } catch {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        `Docker can't give profiles the graphics card (${adapter}). Update Windows, WSL and the graphics driver, then try again.`,
+      );
+    }
+    return adapter;
+  }
+
+  /** A profile claims the GPU it was made on; starting it on another would contradict that. */
+  private async requireSameGpu(fingerprint: Fingerprint): Promise<string> {
+    const madeOn = fingerprint.webgl?.hostAdapter;
+    if (typeof madeOn !== 'string') {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        'This profile was made before profiles used the graphics card. Create a new profile.',
+      );
+    }
+    const adapter = await this.requireGpu();
+    if (adapter !== madeOn) {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        `This profile was made on a PC with ${madeOn}, but this one has ${adapter}. It can't start here without changing its fingerprint.`,
+        { madeOn, current: adapter },
+      );
+    }
+    return adapter;
+  }
+
+  private async generateFingerprint(raw: RawProxyCheck, adapter: string): Promise<Fingerprint> {
     const out = await this.runtime.runOneOff({
       cmd: [
         '/opt/enclave/gen_fingerprint.py',
+        '--gpu',
+        adapter,
         '--country',
         raw.country!,
         '--timezone',

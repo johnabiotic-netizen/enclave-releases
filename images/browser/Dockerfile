@@ -6,8 +6,8 @@
 # --build-context <stage>=<dir>; the checksums are re-checked below either way.
 
 FROM scratch AS camoufox-dist
-ADD --checksum=sha256:72637885ee67c93466ad377831c647192f8f08fb5c6fd9279de1320b49dd2b53 \
-    https://github.com/daijro/camoufox/releases/download/v156.0.1-beta.36/camoufox-156.0.1-beta.36-lin.x86_64.zip \
+ADD --checksum=sha256:2ead498d4765394addd3278d6a663962f3f99b189a99d3f966de56656cefc823 \
+    https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-lin.x86_64.zip \
     /camoufox.zip
 
 FROM scratch AS geoip-dist
@@ -31,8 +31,8 @@ FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647
 
 # Camoufox browser build. The folder suffix is the first 8 hex chars of the zip's sha256,
 # which is how the camoufox package names its installs.
-ARG CAMOUFOX_INSTALL=browsers/official/156.0.1-beta.36-72637885
-ARG CAMOUFOX_SHA256=72637885ee67c93466ad377831c647192f8f08fb5c6fd9279de1320b49dd2b53
+ARG CAMOUFOX_INSTALL=browsers/official/158.0-beta.40-2ead498d
+ARG CAMOUFOX_SHA256=2ead498d4765394addd3278d6a663962f3f99b189a99d3f966de56656cefc823
 ARG GEOIP_SHA256=1823c162efe356bb8a588f10f027c41bd19d742cd00b4696d8f74ea0a3856358
 ARG UBLOCK_SHA256=5b74415860456370644bd80f16125e865b0e6c356bb5dfcfb84069967eaa5287
 ARG GOST_SHA256=e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0bcae37c
@@ -85,7 +85,7 @@ RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
     printf 'name: GeoIP AIO by daijro\n' > "$c/geoip/config.yml"; \
     unzip -q /dist/ublock/ublock-origin.xpi -d "$c/addons/UBO"; \
     # The same metadata `camoufox fetch` writes, so the package recognises the install.
-    printf '{"version":"156.0.1","build":"beta.36","prerelease":false,"asset_size":1294875941,"sha256":"%s","interface":1}\n' \
+    printf '{"version":"158.0","build":"beta.40","prerelease":true,"asset_size":1299054257,"sha256":"%s","interface":1}\n' \
       "${CAMOUFOX_SHA256}" > "$c/${CAMOUFOX_INSTALL}/version.json"; \
     printf '{"active_version": "%s"}\n' "${CAMOUFOX_INSTALL}" > "$c/config.json"; \
     touch "$c/.0.5_FLAG"; \
@@ -135,6 +135,19 @@ RUN set -eux; \
     sed -i "s#${b}\"#${b}?v=enclave1\"#" /var/www/index.html; \
     grep -qF "${b}?v=enclave1" /var/www/index.html
 
+# Screen sizes profiles may claim (gen_fingerprint.py SCREENS) need a display mode at the
+# 30 Hz neko streams at. neko's list lacks 1440x900, 1680x1050, and 1600x900 at 30 Hz
+# (timings from gtf). 1366x768 runs on neko's 1368x768 mode: the dummy driver only takes
+# widths that are multiples of 8, the page sees the claimed 1366 (Camoufox reports the
+# screen size) and the 1366-wide window, and prepare_profile.py picks the mode.
+RUN set -eux; \
+    f=/etc/neko/xorg.conf; \
+    sed -i '/^Section "Monitor"/,/^EndSection/ s|^EndSection|  Modeline "1440x900_30.00"  48.80  1440 1464 1608 1776  900 901 904 916  -HSync +Vsync\n  Modeline "1680x1050_30.00"  67.73  1680 1728 1896 2112  1050 1051 1054 1069  -HSync +Vsync\n  Modeline "1600x900_30.00"  54.52  1600 1632 1792 1984  900 901 904 916  -HSync +Vsync\nEndSection|' "$f"; \
+    sed -i 's|^\( *Modes ".*\)$|\1 "1440x900_30.00" "1680x1050_30.00" "1600x900_30.00"|' "$f"; \
+    test "$(grep -cE '^ *Modeline "(1440x900|1680x1050|1600x900)_30.00"' "$f")" = 3; \
+    grep -q 'Modes .*"1440x900_30.00" "1680x1050_30.00" "1600x900_30.00"' "$f"; \
+    grep -q '"1368x768_30.00"' "$f"
+
 COPY openbox.xml /etc/neko/openbox.xml
 COPY supervisord.conf /etc/neko/supervisord/enclave.conf
 # Firewall for the egress lock (apply_egress_lock.sh). capsh (libcap2-bin) is in the base.
@@ -145,7 +158,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*; \
     command -v capsh
 
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py apply_egress_lock.sh check_proxy.py /opt/enclave/
+COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py /opt/enclave/
 # Windows line endings break the shebang ("required file not found"): refuse them.
 RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
     && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf

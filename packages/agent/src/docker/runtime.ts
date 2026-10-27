@@ -13,6 +13,8 @@ export interface OneOffOptions {
   files?: TarEntry[];
   /** `none` for no network at all. Default: Docker's default bridge. */
   networkMode?: string;
+  devices?: Docker.DeviceMapping[];
+  mounts?: Docker.MountSettings[];
   timeoutMs?: number;
 }
 
@@ -64,6 +66,8 @@ export class DockerRuntime {
       Labels: { [PROFILE_LABEL]: 'one-off' },
       HostConfig: {
         NetworkMode: opts.networkMode ?? 'bridge',
+        ...(opts.devices ? { Devices: opts.devices } : {}),
+        ...(opts.mounts ? { Mounts: opts.mounts } : {}),
         // Lets a test proxy on the Docker host be reached the same way as from profiles.
         ExtraHosts: ['host.docker.internal:host-gateway'],
         SecurityOpt: ['no-new-privileges'],

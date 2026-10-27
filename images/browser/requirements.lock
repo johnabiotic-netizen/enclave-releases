@@ -2,7 +2,7 @@
 # Regenerate by installing camoufox[geoip]==<new> in a clean venv on the base image and running pip freeze.
 anyio==4.15.1
 blessed==1.52.0
-camoufox==0.5.8
+camoufox==0.5.9b5
 certifi==2026.10.23
 charset-normalizer==3.5.2
 click==8.5.0

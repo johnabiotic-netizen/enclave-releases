@@ -3,6 +3,7 @@ import type { ApiError, ErrorCode } from '@enclave/shared';
 const STATUS: Record<ErrorCode, number> = {
   DOCKER_DOWN: 503,
   IMAGE_NOT_BUILT: 503,
+  GPU_UNAVAILABLE: 503,
   PROXY_UNREACHABLE: 422,
   PROXY_LOCATION_MISMATCH: 422,
   REAL_IP_LEAK_SUSPECTED: 422,

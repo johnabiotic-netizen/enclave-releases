@@ -12,6 +12,22 @@ Reason: ...
 
 ---
 
+## 2026-10-26  Profiles render on the PC's GPU and behave as Firefox Strict (owner: option A)
+Context: Acceptance found (1) the plain WebGL RENDERER showed the container's "llvmpipe" while the unmasked one claimed another GPU, and (2) canvas and WebGL output was identical for all profiles and rare (software rendering). Camoufox removed canvas noise on purpose (#528, #860: noise is something stock Firefox never shows) and covers the canvas with random data whenever the identity's GPU differs from the rendering one. Nothing available gives a canvas that is genuine, different per profile and stable across restarts at once; a stable seed would need patching and rebuilding Firefox (not feasible on the owner's PC). The owner chose option A.
+Decision:
+- Camoufox 158.0-beta.40 with the camoufox 0.5.9b5 package (fixes the RENDERER/UNMASKED pair, #839/#846).
+- Profiles render on the PC's real GPU: the container gets /dev/dxg and WSL's /usr/lib/wsl, Mesa's d3d12 driver (already in the base image) with GALLIUM_DRIVER=d3d12, and Camoufox's GPU prefs. Verified on the owner's Intel HD Graphics 620: plain RENDERER no longer llvmpipe.
+- Each profile claims that GPU as Windows Firefox names it: windows_gpu.py ports Firefox's SanitizeRenderer (HD Graphics 620 -> "Intel(R) HD Graphics 400"), with Camoufox's recorded parameters (webgl_config, canvas_noise=False). The agent detects the adapter through Windows (ENCLAVE_GPU picks one on multi-GPU PCs), saves it as fingerprint.webgl.hostAdapter, and refuses to start a profile on a different GPU (GPU_UNAVAILABLE).
+- Every profile is Firefox with Enhanced Tracking Protection "Strict", set as a user pref in user.js so Firefox applies the whole category itself. Its fingerprinting protection randomizes canvas per profile, per site and per browser start (verified: BrowserLeaks signature changed across a restart). The fingerprint stores what Strict reports on Windows: available screen = screen minus a 48 px taskbar (nsRFPService::GetSpoofedScreenAvailSize; the browser computes it itself); tiered core counts; touch points 0 (a desktop; set explicitly, or neko's touch device shows as 5). The virtual desktop is built to match instead of spoofed (Camoufox 158 reports the real window): no desktop margins, the window placed at the fingerprint's position and size, no border. The browser language is the country's official language Firefox ships in, English where English is official (check_proxy.py; Camoufox's population-weighted pick gave Nigerian Pidgin).
+- Audio is stock (no noise): every x86 PC renders the standard probe the same, and Firefox adds none.
+- Acceptance tests 3 and 5 reworded accordingly (stages/stage-1-local-core.md).
+Reason: All values are genuine or exactly what a real Firefox Strict user shows; profiles cannot be linked by canvas; no Linux software renderer is visible. Costs: all profiles on one PC claim the same GPU (as one real PC does), canvas changes per session (as for every Strict user), profiles are tied to the PC's GPU.
+
+## 2026-10-26  More screen sizes
+Context: All profiles had 1920x1080. neko's display modes lack common Windows sizes.
+Decision: Profiles get a weighted random size from 1920x1080, 1366x768, 1600x900, 1440x900, 1680x1050 (all at 100% scaling, at most 1080p so streaming stays light). The image adds 30 Hz modes for the missing ones (1366 wide written by hand; gtf rounds to 1368).
+Reason: A realistic spread instead of one size for every profile.
+
 ## 2026-10-26  Agent: reaching Docker, profile store, stream logins
 Context: The owner's PC has no Docker Desktop and no docker.exe; Docker Engine runs in WSL. The agent must work with both (CLAUDE.md).
 Decision: With Docker Desktop, dockerode uses its pipe. Otherwise the agent opens a private named pipe and, for each connection, runs `wsl.exe -d <ENCLAVE_WSL_DISTRO> -u root -- docker system dial-stdio` (no extra package, no TCP port, ~0.1 s per call). It holds WSL open while it runs. Profiles live in `%LOCALAPPDATA%\Enclave\profiles\<id>\` (override `ENCLAVE_HOME`); browser data in a Docker volume per profile. Config goes into the container with putArchive (no bind mounts, so no Windows path translation). The proxy check and fingerprint run in one-off containers of the image. neko gets fresh random passwords at every start; viewers get the normal (non-admin) one, which can control but not resize the screen. Stream ports: pairs from 52100 on 127.0.0.1. Containers get 3 GB memory and no-new-privileges.
