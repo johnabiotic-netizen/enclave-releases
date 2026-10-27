@@ -83,6 +83,16 @@ def main() -> None:
     if not config:
         sys.exit("enclave: profile.json has no saved fingerprint (fingerprint.raw.config); not starting")
 
+    # WebRTC must report the IP websites see now (the agent's check before this start),
+    # not the one saved at creation. Only where the fingerprint has WebRTC on.
+    exit_ip = os.environ.get("ENCLAVE_EXIT_IP")
+    if exit_ip and "webrtc:ipv4" in config:
+        config = {**config, "webrtc:ipv4": exit_ip}
+    # Same for the location the browser reports: where that IP is now.
+    lat, lon = os.environ.get("ENCLAVE_EXIT_LAT"), os.environ.get("ENCLAVE_EXIT_LON")
+    if lat and lon and "geolocation:latitude" in config:
+        config = {**config, "geolocation:latitude": float(lat), "geolocation:longitude": float(lon)}
+
     env = dict(os.environ)
     env.pop("XDG_CACHE_HOME")
     if BROWSER_XDG_CACHE_HOME:

@@ -173,6 +173,7 @@ export class ProfileService {
         await this.runtime.assertReady();
         const raw = await this.checkProxy(proxy, false);
         assertLocationMatches(profile.fingerprint, raw);
+        moveGeolocation(profile.fingerprint, raw);
         profile.proxy = {
           type: proxy.type,
           host: proxy.host,
@@ -292,6 +293,15 @@ export class ProfileService {
                 ]
               : []),
             ...gpu.env,
+            // The address WebRTC reports as the profile's public IP: the exit IP this start's
+            // check just saw, not the one saved at creation, so it stays equal to the IP
+            // websites see after a proxy change or a new sticky IP.
+            ...(raw.exitIp ? [`ENCLAVE_EXIT_IP=${raw.exitIp}`] : []),
+            // Likewise the browser's location: where that IP is now (same country and
+            // timezone, checked above), in case a sticky IP was renewed elsewhere.
+            ...(raw.lat !== undefined && raw.lon !== undefined
+              ? [`ENCLAVE_EXIT_LAT=${raw.lat}`, `ENCLAVE_EXIT_LON=${raw.lon}`]
+              : []),
           ],
           ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },
           HostConfig: {
@@ -709,6 +719,20 @@ function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): vo
       actual: { country: raw.country, timezone: raw.timezone, exitIp: raw.exitIp },
     },
   );
+}
+
+/**
+ * A new proxy in the same country and timezone can exit in another city. The browser's
+ * location follows it (hard rule 3), as "Update location" allows; nothing else changes.
+ */
+function moveGeolocation(fingerprint: Fingerprint, raw: RawProxyCheck): void {
+  if (raw.lat === undefined || raw.lon === undefined || !fingerprint.geolocation) return;
+  fingerprint.geolocation = { ...fingerprint.geolocation, lat: raw.lat, lon: raw.lon };
+  const config = fingerprint.raw?.config as Record<string, unknown> | undefined;
+  if (config && 'geolocation:latitude' in config) {
+    config['geolocation:latitude'] = raw.lat;
+    config['geolocation:longitude'] = raw.lon;
+  }
 }
 
 function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>): StreamInfo {

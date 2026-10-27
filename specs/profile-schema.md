@@ -71,5 +71,6 @@ Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json
 
 ## Rules
 - `fingerprint` is written once at creation. Only `timezone`, `locale`, `languages`, `geolocation` may change later, and only via the explicit "Update location" action when the proxy's country changes. All other fields are immutable for the life of the profile.
+- Changing the proxy (same country and timezone, enforced) moves `geolocation` to the new exit IP's location. At every start the browser reports the IP and location from that start's proxy check (`ENCLAVE_EXIT_IP`, `ENCLAVE_EXIT_LAT`, `ENCLAVE_EXIT_LON`), not the values saved at creation, so WebRTC and geolocation always agree with the IP websites see (hard rule 3).
 - The proxy password is never stored in `profile.json`. Only `secretRef` is.
 - `status` is runtime only and may be rewritten freely.
