@@ -108,6 +108,20 @@ RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
     chmod -R 755 "$c/${CAMOUFOX_INSTALL}"; \
     chmod -R a+rX "${ENCLAVE_CAMOUFOX_CACHE}"
 
+# Text as Windows lays it out: Windows Firefox (DirectWrite) uses exact glyph advances;
+# Camoufox's fontconfig asks FreeType for full hinting, which rounds every advance to a
+# pixel (Arial at 100px: 660 instead of Windows' 656.017) and gave one emoji sequence
+# 71 million px of bounds in getBBox(). Measured against Windows Firefox 158 on the
+# owner's PC, 2026-10-27: unhinted widths match exactly.
+RUN set -eux; \
+    f="$(echo "${ENCLAVE_CAMOUFOX_CACHE}"/camoufox/browsers/official/*/fontconfig/windows/fonts.conf)"; \
+    sed -i \
+      -e 's#<edit name="hinting" mode="assign"><bool>true</bool></edit>#<edit name="hinting" mode="assign"><bool>false</bool></edit>#' \
+      -e 's#<edit name="hintstyle" mode="assign"><const>hintfull</const></edit>#<edit name="hintstyle" mode="assign"><const>hintnone</const></edit>#' \
+      "$f"; \
+    grep -q '<edit name="hinting" mode="assign"><bool>false</bool></edit>' "$f"; \
+    grep -q '<const>hintnone</const>' "$f"
+
 # Camoufox writes its fontconfig file on first use. It depends only on the bundled
 # fonts, so create it now and keep the install read-only for the browser user.
 RUN XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -c \
