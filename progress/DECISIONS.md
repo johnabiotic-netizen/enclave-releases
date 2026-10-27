@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-27  WebRTC IP and geolocation come from each start's proxy check
+Context: After a proxy change, WebRTC still reported the IP saved at creation (Pixelscan: proxy detected). A sticky IP that renews would do the same, and the saved location may be another city.
+Decision: The agent passes the exit IP and its GeoIP location from the check it runs before every start (ENCLAVE_EXIT_IP/LAT/LON); launch_browser.py puts them into webrtc:ipv4 and geolocation. A proxy change also moves the saved geolocation. Country and timezone must still match, or the start is refused as before.
+Reason: Hard rule 3: what the browser reports must agree with the IP websites see. Treated as the "Update location" exception in specs/profile-schema.md; the rest of the fingerprint stays fixed.
+
 ## 2026-10-27  Reference for "looks like Windows": real Firefox on the owner's PC
 Context: Recorded values (Camoufox's device recordings, CreepJS's known lists) disagreed with each other and with what a current Windows Firefox reports (stencil masks, extension list).
 Decision: The reference is the same Firefox version as Camoufox's base, official Mozilla build (checksum-verified), unpacked (not installed) and run headless with a throwaway profile on the owner's PC, which has the GPU the profiles claim. Compare with scripts/fingerprint/probe.html and CreepJS; per-machine values (screen, timezone, fonts the PC happens to have) are excluded.
