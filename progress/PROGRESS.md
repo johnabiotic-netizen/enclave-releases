@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 1, Local core. In progress (tasks A to E done; acceptance tests next).
+**Current stage:** Stage 1, Local core. In progress (tasks A to E done, all acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -38,7 +38,8 @@ Notes / evidence:
 - Test 7, idle stop: verified with the dev test proxy (task D note above).
 - Test 1, create and start (2026-10-27, owner): Profile 1 (ea427e56) and Profile 2 (88c2fbfe) created with real proxies and opened in the owner's PC browser via `enclave open`. PASS.
 - Test 3, two isolated profiles (2026-10-27, owner; proxies from one provider, ports 10006 and 10050, both checked sticky twice): Profile 1 62.192.100.40 Germany, Europe/Berlin, Accept-Language de-DE; Profile 2 198.145.172.41 USA, America/New_York, en-US. Canvas signatures dfcf5c103131b3f020f6ae85cea99cfb vs b2ee72212d771e72c4ae674df271afbf. Cookies: Profile 2 set httpbin owner=profile2 at 09:44:45; Profile 1 still showed owner=profile1 at 09:45:19 (checked in each profile's own history). WebGL vendor/renderer the same by design (one PC). PASS.
-- Test 4 (persistence across a PC restart) still to run.
+- Test 4, persistence (2026-10-27, owner): logged into a test account in Profile 1, `enclave stop` at 10:03 UTC, Windows rebooted (boot 10:09 UTC), agent and profile started 10:12 UTC. All six tabs restored, still logged in (account overview page), history intact (Ctrl+H lists the pre-restart visits). PASS.
+- All seven Stage 1 acceptance tests pass (6 and 7 verified with the dev test proxy, the rest with the owner's real proxies).
 
 ## Fixed after acceptance found fingerprint gaps (2026-10-27, owner chose option A)
 Verified on the owner's PC with two profiles running side by side (test proxy):
@@ -59,4 +60,4 @@ Still true (not fixable in software):
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 
 ## Next action
-Owner is running acceptance test 4 (2026-10-27): logged into a throwaway account in Profile 1 (ea427e56), stopped it, restarting the PC. After the restart: `serve`, then `start ea42` / `open ea42`, check still logged in and history (Ctrl+H). If it passes, Stage 1 is done; run `/verify-stage`. Proxies: one provider, ports 10001-10100 (60 US, 10 DE, 10 ES, 10 UK, 10 FR, 3 AU per the owner), all sticky; Profile 1 = 10006, Profile 2 = 10050.
+Stage 1 acceptance complete (2026-10-27). Next: owner's go-ahead for Stage 2 (phone access, `stages/stage-2-phone-access.md`); run its "Verify first" checks before building. Proxies: one provider, ports 10001-10100 (60 US, 10 DE, 10 ES, 10 UK, 10 FR, 3 AU per the owner), all sticky; Profile 1 = 10006, Profile 2 = 10050.
