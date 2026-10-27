@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-27  Own Camoufox build for Windows text metrics (owner: yes, private repo)
+Context: Linux Firefox measures text with FreeType rules (whole-pixel glyph heights, hhea line metrics, outward rounding); Windows Firefox with DirectWrite rules. Sites can measure the difference; no setting changes it. The owner's PC cannot build Firefox (WSL unsupported upstream, ~9.5 GB free).
+Decision: A private GitHub repo `enclave-camoufox` (Camoufox at tag v158.0-beta.40, branch `enclave`) adds browser/patches/enclave-windows-font-metrics.patch: in gfxFT2FontBase, when ENCLAVE_FONT_METRICS=dwrite, HarfBuzz scales design advances, font metrics follow gfxDWriteFont::ComputeMetrics, glyph bounds are the design box. Built by a manual GitHub Actions workflow (Camoufox's own release steps, Linux x86_64 only). The image takes the zip from the local cache with its SHA-256 pinned. Camoufox's release/test workflows are removed from the copy.
+Reason: Exact Windows numbers need Firefox code; GitHub's free runners are what Camoufox itself builds on. Private keeps the patches from competitors. Camoufox is MPL-2.0: when Enclave is sold, the modified files' source must be offered to buyers (docs/07 legal, later).
+
 ## 2026-10-27  WebRTC IP and geolocation come from each start's proxy check
 Context: After a proxy change, WebRTC still reported the IP saved at creation (Pixelscan: proxy detected). A sticky IP that renews would do the same, and the saved location may be another city.
 Decision: The agent passes the exit IP and its GeoIP location from the check it runs before every start (ENCLAVE_EXIT_IP/LAT/LON); launch_browser.py puts them into webrtc:ipv4 and geolocation. A proxy change also moves the saved geolocation. Country and timezone must still match, or the start is refused as before.
