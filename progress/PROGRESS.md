@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 2, Phone access. In progress (all tasks built; acceptance 1 to 5 pass; home-screen install to confirm). Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
+**Current stage:** Stage 3, Fingerprint hardening. Not started (waiting for the owner's go-ahead). Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -19,7 +19,7 @@ Spec: `stages/stage-1-local-core.md`
 Notes / evidence:
 - (none yet)
 
-## Stage 2: Phone access  [~]
+## Stage 2: Phone access  [x]
 
 - [x] `docs/setup/tailscale.md`: PC and phone setup, HTTPS certificates, finding the PC's name.
 - [x] Agent phone switch: `ENCLAVE_PHONE=tailscale`. Streams stay bound to 127.0.0.1; `tailscale serve` relays them (DECISIONS.md 2026-10-27: binding to the Tailscale interface is impossible with Docker in WSL).
@@ -27,7 +27,7 @@ Notes / evidence:
 - [x] `packages/mobile`: PWA served by the agent at `https://<pc>.<tailnet>.ts.net:8787/`, paired once with `enclave phone` (QR code, token in the URL fragment). Lists profiles, starts, stops and opens them.
 - [x] Mobile viewer: full screen (neko client 3.2.0, touch mode), drag scrolls, tap clicks, long press right-clicks, Back/Forward/Reload/Keyboard/Close bar.
 - [x] Sleep and network change: the neko client reconnects; verified 4 reconnects while the browser kept running.
-- [ ] Owner: install to the home screen and open from the icon.
+- [x] Home screen (2026-10-27, owner): Android Chrome's "Install" never finished, because Chrome packages installed apps (WebAPK) on a Google server that has to fetch the manifest and icons, and the app is reachable only inside the tailnet. "Add to home screen → Create shortcut" works. A standalone install without that step is possible in Firefox or Samsung Internet; Stage 6 (own phone linking) revisits it.
 
 Stage 2 acceptance evidence (2026-10-27, owner, Android phone V2318, Profile 1 on port 10006):
 - Setup found and fixed on the way: only one WebRTC address is used by pion, so phone mode advertises the PC's Tailscale IP only; neko's CORS list must include the PC page's origin too; touches are translated (the profile has no touchscreen). With the PC on the same phone's hotspot, Tailscale went through the London relay (0.4 to 1.7 s round trips); with the PC on another network it connects directly (126 ms).

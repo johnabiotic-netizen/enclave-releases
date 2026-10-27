@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-27  Phone app: home-screen shortcut, not a WebAPK install
+Context: Android Chrome's "Install" hung at "Installing". Chrome turns an installed web app into a WebAPK on a Google server, which fetches the manifest and icons from the site; the app is reachable only inside the owner's tailnet.
+Decision: Keep the app private and use Chrome's "Add to home screen → Create shortcut" (works). Do not expose the app publicly (e.g. Tailscale Funnel) to make WebAPK minting work.
+Reason: Exposing the agent's address to the internet for a nicer icon would weaken the "only your devices can reach the PC" design. Revisit with Stage 6's own phone linking.
+
 ## 2026-10-27  Phone access: tailscale serve, not binding to the Tailscale interface
 Context: Stage 2 "verify first" asks whether to expose streams with `tailscale serve` or by binding neko's ports to the Tailscale interface. On the owner's PC Docker runs inside WSL, whose published ports reach Windows on 127.0.0.1 only, so they cannot be bound to the Tailscale IP.
 Decision: Streams stay bound to 127.0.0.1. In phone mode (`ENCLAVE_PHONE=tailscale`) the agent runs `tailscale serve --bg` for each running profile (`--https=<web port>` and `--tcp=<mux port>`) and for itself (`--https=<agent port>`, which also serves the phone app), and removes them on stop. Verified: HTTPS on custom ports works with Tailscale's certificate; TCP relay reachable from the tailnet. neko advertises a single address (the PC's Tailscale IP in phone mode, else 127.0.0.1): with two, pion keeps only the first ("overlapping address rewrite rule"), which left the phone with 127.0.0.1. The PC reaches its own Tailscale IP through the same relay. neko's CORS allows only the phone app's origin.
