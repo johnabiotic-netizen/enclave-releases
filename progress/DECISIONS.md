@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-27  GL shim for Windows stencil masks, instead of waiting for Camoufox
+Context: CreepJS flagged WebGL "suspicious capabilities": four stencil masks read 255 (Mesa) next to a Windows GPU, where Windows Firefox (ANGLE) reads 2147483647, confirmed on this PC's own Windows Firefox. Firefox takes them from the driver at context setup, outside Camoufox's override.
+Decision: A small preloaded library (`images/browser/gl_shim.c`, built in its own Dockerfile stage with pinned gcc, set as LD_PRELOAD by launch_browser.py) wraps glGetIntegerv, found through dlsym/eglGetProcAddress, and answers all-ones masks as ANGLE does. It must not make any extra GL call (a GL error makes Firefox refuse WebGL). The Camoufox issue is not filed.
+Reason: Fixes the flag now, for all profiles, without a Firefox rebuild; values a page sets itself are cached by Firefox and unaffected.
+
 ## 2026-10-27  Every new profile has one built-in camera
 Context: Stage 3 asks for a consistent device list with a camera. Camoufox draws a Windows machine's devices from its own catalogue and gives it a built-in camera about 78% of the time, so some profiles have none. Stage 4 passes the phone camera through, which needs a camera in the list; adding one later would change a saved fingerprint (hard rule 2).
 Decision: gen_fingerprint.py keeps Camoufox's draw and, when it has no camera, adds one built-in camera picked from Camoufox's Windows list by its weights (IR camera excluded), in its own device group. Profiles 1 and 2 predate this and have no camera; Stage 4 decides for them.
