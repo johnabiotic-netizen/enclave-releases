@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 2, Phone access. Not started (waiting for the owner's go-ahead). Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
+**Current stage:** Stage 2, Phone access. In progress (all tasks built; acceptance 1 to 5 pass; home-screen install to confirm). Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -8,18 +8,34 @@ Update this at the end of every work session. Keep it short and current.
 - `[ ]` not started, `[~]` in progress, `[x]` done (with a note on how it was verified).
 - When a stage's acceptance tests all pass, mark the stage complete and move "Current stage" to the next one.
 
-## Stage 1: Local core  [~]
+## Stage 1: Local core  [x]
 Spec: `stages/stage-1-local-core.md`
 - [x] A. Monorepo skeleton. Verified 2026-10-25: `pnpm install`, `pnpm build` (shared compiles to `dist/`), `pnpm lint`, `pnpm format:check` and `pnpm test` (3/3 schema contract tests) all pass on Node 24.14.1, pnpm 12.15.0. `.gitignore` and `.env.example` were already correct. Git repo initialised.
 - [x] B. Browser image. Verified 2026-10-26 on Docker Engine 29.9.2 in WSL. `scripts/build-image.sh` builds `enclave-browser:dev`, with every download pinned and checksummed. `gen_fingerprint.py` runs with `--network none`, gives 1920x1080 Windows fingerprints, gives two profiles different WebGL and audio seeds, and rejects an IP from the wrong country. A test container behind a password-protected SOCKS5 test proxy runs openbox, the gost forwarder, Camoufox and neko. Through the stream API, the browser loaded api.ipify.org via the proxy, and a test page showed exactly the saved UA, timezone, languages, screen, cores and WebGL, with webdriver=false. With the proxy stopped, pages fail ("Unable to connect"), with no direct fallback. After deleting the container and starting a new one on the same volume, the open tab came back. From Windows, 127.0.0.1:8080 (HTTP 200) and the WebRTC TCP port 52000 are reachable. Still to check by the owner: the live stream in a PC browser.
 - [x] C. Egress lock. Verified 2026-10-26 in WSL: in-container iptables (`apply_egress_lock.sh`) allows only uid 1100 (gost) to the proxy IP:port; Docker's DNS (127.0.0.11), all other IPv4 and all IPv6 are refused. Without `--cap-add NET_ADMIN` the container refuses to start. After setup, supervisord's capability bounding set has no NET_ADMIN/NET_RAW. Tests: direct HTTPS as the browser user, the forwarder user and root all blocked; DNS via Docker and UDP 53 to 8.8.8.8 blocked; through the proxy works; the browser loads pages through the proxy and, with the proxy stopped, loads nothing (no direct fallback); stream ports 8080 and 52000 still reachable from Windows. Owner to confirm the live stream still works.
 - [x] D. Agent. Verified 2026-10-26 on the owner's PC (Docker Engine in WSL, reached through `wsl.exe docker system dial-stdio`). With the dev test proxy: create (safety check + fingerprint, 7 s), start (17 s, port 52100), the browser showed the proxy's IP and matching timezone on browserleaks.com/ip with WebRTC showing only that IP; the normal viewer login can take control but changing the screen size is refused (403), screen stays 1920x1080; stop, then start again restored the open tab; start with the proxy down was refused (no container); idle stop with a 1 minute limit stopped the profile at about 1.5 minutes and logged `reason: idle`; restarting the agent kept the running profile tracked; requests without the token get 401; the API listens on 127.0.0.1:8787 only; logs hold no secrets. The agent holds WSL open while it runs.
 - [x] E. CLI. `enclave serve | create | list | start | open | stop | check | logs | delete` (`packages/agent/README.md`); used for all the task D checks above.
-- [ ] Acceptance tests 1 to 7
+- [x] Acceptance tests 1 to 7 (evidence below)
 Notes / evidence:
 - (none yet)
 
-## Stage 2: Phone access  [ ]
+## Stage 2: Phone access  [~]
+
+- [x] `docs/setup/tailscale.md`: PC and phone setup, HTTPS certificates, finding the PC's name.
+- [x] Agent phone switch: `ENCLAVE_PHONE=tailscale`. Streams stay bound to 127.0.0.1; `tailscale serve` relays them (DECISIONS.md 2026-10-27: binding to the Tailscale interface is impossible with Docker in WSL).
+- [x] Stable Tailscale URL per profile: `https://<pc>.<tailnet>.ts.net:<web port>/` with the per-start password, as `phoneUrl` in `GET /profiles/:id/stream`.
+- [x] `packages/mobile`: PWA served by the agent at `https://<pc>.<tailnet>.ts.net:8787/`, paired once with `enclave phone` (QR code, token in the URL fragment). Lists profiles, starts, stops and opens them.
+- [x] Mobile viewer: full screen (neko client 3.2.0, touch mode), drag scrolls, tap clicks, long press right-clicks, Back/Forward/Reload/Keyboard/Close bar.
+- [x] Sleep and network change: the neko client reconnects; verified 4 reconnects while the browser kept running.
+- [ ] Owner: install to the home screen and open from the icon.
+
+Stage 2 acceptance evidence (2026-10-27, owner, Android phone V2318, Profile 1 on port 10006):
+- Setup found and fixed on the way: only one WebRTC address is used by pion, so phone mode advertises the PC's Tailscale IP only; neko's CORS list must include the PC page's origin too; touches are translated (the profile has no touchscreen). With the PC on the same phone's hotspot, Tailscale went through the London relay (0.4 to 1.7 s round trips); with the PC on another network it connects directly (126 ms).
+- Test 1 continuity: half-typed text on the PC was there on the phone (owner). PASS.
+- Test 2 same IP: 62.192.100.40 on both (owner; profile forwarder checked). PASS.
+- Test 3 no logout: test account still logged in on the phone, no verification prompt (owner). PASS.
+- Test 4 input: tap, type, back/forward/reload work; drag scrolls after the gesture fix (owner). PASS.
+- Test 5 reconnect: four phone reconnects 12:10 to 12:15 UTC, Camoufox uptime unbroken since 12:08 (log). PASS.
 ## Stage 3: Fingerprint hardening  [ ]
 ## Stage 4: Camera and mic passthrough  [ ]
 ## Stage 5: Windows app  [ ]
