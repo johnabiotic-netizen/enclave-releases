@@ -74,6 +74,8 @@ export type DeleteProfileResponse = OkResponse;
 // GET /profiles/:id/stream
 export interface StreamInfo {
   url: string;
+  /** Phone mode (Stage 2): the same stream over Tailscale, e.g. https://pc.tail1234.ts.net:52100/. */
+  phoneUrl?: string;
   password: string;
   expiresAt: string;
 }

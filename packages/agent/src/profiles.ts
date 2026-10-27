@@ -19,6 +19,7 @@ import type { AgentConfig } from './config.js';
 import { PROFILE_LABEL, type DockerRuntime } from './docker/runtime.js';
 import { makeTar } from './docker/tar.js';
 import { detectGpu, gpuContainerSettings } from './gpu.js';
+import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { AgentError, InputError } from './errors.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
@@ -49,6 +50,8 @@ export class ProfileService {
     private readonly config: AgentConfig,
     private readonly store: ProfileStore,
     private readonly runtime: DockerRuntime,
+    /** Phone mode (ENCLAVE_PHONE=tailscale): relays streams to the tailnet. */
+    private readonly phone?: Tailscale,
   ) {}
 
   // ---------------------------------------------------------------- queries
@@ -242,6 +245,7 @@ export class ProfileService {
 
       await this.setStatus(profile, { state: 'starting', lastError: null });
       await this.store.log(id, 'starting');
+      let relayed: number | null = null;
       try {
         const secrets = await this.store.getSecrets(id);
         const proxy = proxyInput(profile, secrets);
@@ -251,10 +255,15 @@ export class ProfileService {
         const gpu = gpuContainerSettings(await this.requireSameGpu(profile.fingerprint));
 
         const [webPort, muxPort] = await this.allocatePorts();
+        // Phone mode: the stream is also relayed to the tailnet. Without Tailscale the
+        // profile still starts for the PC; the phone link is simply missing.
+        const tailnet = this.phone ? await this.phone.address() : null;
+        if (this.phone && !tailnet) await this.store.log(id, 'phone-unavailable');
         const stream = {
           userPassword: randomPassword(),
           adminPassword: randomPassword(),
           expiresAt: new Date(Date.now() + STREAM_TTL_MS).toISOString(),
+          ...(tailnet ? { phoneHost: tailnet.host } : {}),
         };
         await this.store.saveSecrets(id, { ...secrets, stream });
 
@@ -271,7 +280,11 @@ export class ProfileService {
             `NEKO_WEBRTC_TCPMUX=${muxPort}`,
             `NEKO_WEBRTC_UDPMUX=${muxPort}`,
             'NEKO_WEBRTC_ICELITE=true',
-            'NEKO_WEBRTC_NAT1TO1=127.0.0.1',
+            // The addresses WebRTC tells viewers to reach the mux port at: the PC itself,
+            // and in phone mode the PC's Tailscale IP (tailscale serve relays that port).
+            `NEKO_WEBRTC_NAT1TO1=${tailnet ? `127.0.0.1 ${tailnet.ip}` : '127.0.0.1'}`,
+            // The phone app (served by the agent) talks to neko's API from its own origin.
+            ...(tailnet ? [`NEKO_SERVER_CORS=${phoneAppOrigin(tailnet, this.config.port)}`] : []),
             ...gpu.env,
           ],
           ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },
@@ -295,6 +308,11 @@ export class ProfileService {
         await container.putArchive(configArchive(profile, proxy), { path: '/' });
         await container.start();
         await this.waitUntilReady(name, webPort);
+        if (tailnet && this.phone) {
+          relayed = webPort;
+          await this.phone.serveHttps(webPort);
+          await this.phone.serveTcp(muxPort);
+        }
 
         profile.status = {
           state: 'running',
@@ -306,10 +324,16 @@ export class ProfileService {
         await this.store.save(profile);
         this.lastViewerAt.set(id, Date.now());
         this.nekoTokens.delete(id);
-        await this.store.log(id, 'started', { webPort, muxPort, exitIp: raw.exitIp });
+        await this.store.log(id, 'started', {
+          webPort,
+          muxPort,
+          exitIp: raw.exitIp,
+          phone: Boolean(tailnet),
+        });
         return { stream: streamInfo(webPort, stream) };
       } catch (e) {
         await this.runtime.stopAndRemove(name, 5).catch(() => {});
+        await this.stopRelays(relayed);
         const message = e instanceof Error ? e.message : String(e);
         const proxyProblem = e instanceof AgentError && e.code.startsWith('PROXY_');
         await this.setStatus(profile, {
@@ -338,6 +362,7 @@ export class ProfileService {
       }
       await this.runtime.stopAndRemove(containerName(id));
       await this.runtime.removeNetwork(networkName(id));
+      await this.stopRelays(profile.status.streamPort);
       const secrets = await this.store.getSecrets(id);
       delete secrets.stream;
       await this.store.saveSecrets(id, secrets);
@@ -364,6 +389,7 @@ export class ProfileService {
           this.lastViewerAt.set(profile.id, Date.now());
         } else {
           await this.runtime.stopAndRemove(containerName(profile.id), 5);
+          await this.stopRelays(profile.status.streamPort);
           await this.setStatus(profile, { state: 'stopped', containerId: null, streamPort: null });
           await this.store.log(profile.id, 'reconciled', { was: profile.status.state });
         }
@@ -401,6 +427,7 @@ export class ProfileService {
         streamPort: null,
         lastError: 'The browser stopped unexpectedly.',
       });
+      await this.stopRelays(profile.status.streamPort);
       await this.store.log(id, 'exited', { exitCode: info?.State.ExitCode ?? null });
       this.forget(id);
       return;
@@ -605,6 +632,13 @@ export class ProfileService {
     throw new Error(`the browser wasn't ready after ${START_TIMEOUT_MS / 1000} s`);
   }
 
+  /** Removes a profile's tailnet relays (web port, and the mux port right after it). */
+  private async stopRelays(webPort: number | null): Promise<void> {
+    if (!this.phone || !webPort) return;
+    await this.phone.stopHttps(webPort);
+    await this.phone.stopTcp(webPort + 1);
+  }
+
   private async setStatus(profile: Profile, patch: Partial<ProfileStatus>): Promise<void> {
     profile.status = { ...profile.status, ...patch };
     await this.store.save(profile);
@@ -674,9 +708,15 @@ function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): vo
 function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>): StreamInfo {
   return {
     url: `http://127.0.0.1:${port}/`,
+    ...(stream.phoneHost ? { phoneUrl: `https://${stream.phoneHost}:${port}/` } : {}),
     password: stream.userPassword,
     expiresAt: stream.expiresAt,
   };
+}
+
+/** Where the phone app is served: the agent's port, relayed to the tailnet over HTTPS. */
+export function phoneAppOrigin(tailnet: TailnetAddress, agentPort: number): string {
+  return `https://${tailnet.host}:${agentPort}`;
 }
 
 /** /config for the container (images/browser/README.md). proxy.json holds the password: root-only. */

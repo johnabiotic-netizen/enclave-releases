@@ -1,6 +1,10 @@
 // The local API (specs/agent-api.md). Binds 127.0.0.1 only and requires the bearer token.
+// It also serves the phone app's files (packages/mobile), which hold no secrets: the app asks
+// for the token itself and sends it on every API call.
 
 import { timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   API_BASE_PATH,
@@ -15,15 +19,28 @@ import type { DockerRuntime } from './docker/runtime.js';
 export const AGENT_VERSION = '0.1.0';
 const LOOPBACK = '127.0.0.1';
 
+const CONTENT_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+};
+
 export function buildServer(
   token: string,
   service: ProfileService,
   runtime: DockerRuntime,
+  mobileDir?: string,
 ): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
   const expected = Buffer.from(`Bearer ${token}`);
 
   app.addHook('onRequest', async (req, reply) => {
+    // Only the phone app's static files go without the token. Decided by the route that
+    // matched, not the raw URL, so an encoded path can't reach the API around the check.
+    if (mobileDir && req.routeOptions.url === '/*') return;
     const given = Buffer.from(req.headers.authorization ?? '');
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
       await reply
@@ -96,6 +113,23 @@ export function buildServer(
     },
     { prefix: API_BASE_PATH },
   );
+
+  if (mobileDir) {
+    app.get('/*', async (req, reply) => {
+      const wanted = decodeURIComponent((req.params as { '*': string })['*'] || 'index.html');
+      const file = path.resolve(mobileDir, wanted);
+      if (!file.startsWith(path.resolve(mobileDir) + path.sep)) return reply.code(404).send();
+      try {
+        const body = await readFile(file);
+        return reply
+          .type(CONTENT_TYPES[path.extname(file)] ?? 'application/octet-stream')
+          .header('Cache-Control', 'no-cache')
+          .send(body);
+      } catch {
+        return reply.code(404).send();
+      }
+    });
+  }
 
   return app;
 }

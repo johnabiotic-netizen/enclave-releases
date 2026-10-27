@@ -14,10 +14,12 @@ Base: `http://127.0.0.1:<port>/v1`
 | DELETE | `/profiles/:id?confirm=true` | - | `{ ok }` (stops container, removes data; refused without `confirm=true`) |
 | POST | `/profiles/:id/start` | - | `{ stream }` after health passes; errors if safety check fails |
 | POST | `/profiles/:id/stop` | - | `{ ok }` |
-| GET | `/profiles/:id/stream` | - | `{ url, password, expiresAt }` for the viewer |
+| GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2) |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
 | GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt }` |
+
+Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this API and each running profile's stream to the owner's tailnet over HTTPS; the server still binds 127.0.0.1 only. Paths outside `/v1` serve the phone app's static files without a token.
 
 ## Behaviors
 - `POST /profiles` runs the proxy safety check first; on failure returns 422 with details and creates nothing.

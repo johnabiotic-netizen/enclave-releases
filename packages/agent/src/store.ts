@@ -14,7 +14,13 @@ import { AgentError } from './errors.js';
 export interface ProfileSecrets {
   proxyPassword?: string;
   /** neko logins for the running container; replaced at every start. */
-  stream?: { userPassword: string; adminPassword: string; expiresAt: string };
+  stream?: {
+    userPassword: string;
+    adminPassword: string;
+    expiresAt: string;
+    /** Phone mode: the PC's tailnet name the stream is relayed at. */
+    phoneHost?: string;
+  };
 }
 
 export const PROXY_SECRET_REF = 'file:secrets.json#proxyPassword';

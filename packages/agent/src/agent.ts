@@ -5,7 +5,8 @@ import type { FastifyInstance } from 'fastify';
 import type { AgentConfig } from './config.js';
 import { connectDocker, type DockerConnection } from './docker/connect.js';
 import { DockerRuntime } from './docker/runtime.js';
-import { ProfileService } from './profiles.js';
+import { phoneAppOrigin, ProfileService } from './profiles.js';
+import { Tailscale } from './tailscale.js';
 import { buildServer, listen } from './server.js';
 import { ProfileStore } from './store.js';
 
@@ -13,6 +14,8 @@ export interface RunningAgent {
   service: ProfileService;
   app: FastifyInstance;
   dockerMode: string;
+  /** Phone mode: where the phone app is, or undefined when phone mode is off or Tailscale is down. */
+  phoneApp: string | undefined;
   close(): Promise<void>;
 }
 
@@ -28,16 +31,27 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
     : undefined;
 
   const runtime = new DockerRuntime(connection.docker, config.image);
-  const service = new ProfileService(config, new ProfileStore(config.home), runtime);
+  const phone = config.phone === 'tailscale' ? new Tailscale() : undefined;
+  const service = new ProfileService(config, new ProfileStore(config.home), runtime, phone);
   await service.startMonitor();
-  const app = buildServer(config.token, service, runtime);
+  const app = buildServer(config.token, service, runtime, config.mobileDir);
   await listen(app, config.port);
+
+  // Phone mode: the agent itself (API and phone app) is relayed to the tailnet over HTTPS.
+  let phoneApp: string | undefined;
+  const tailnet = phone ? await phone.address() : null;
+  if (phone && tailnet) {
+    await phone.serveHttps(config.port);
+    phoneApp = phoneAppOrigin(tailnet, config.port);
+  }
 
   return {
     service,
     app,
     dockerMode: connection.mode,
+    phoneApp,
     close: async () => {
+      if (phone && phoneApp) await phone.stopHttps(config.port);
       service.stopMonitor();
       await app.close();
       await connection.close();

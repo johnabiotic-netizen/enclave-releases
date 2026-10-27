@@ -7,8 +7,8 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "build": "tsc -b packages/shared packages/agent",
-    "typecheck": "tsc -b packages/shared packages/agent",
+    "build": "tsc -b packages/shared packages/agent && node packages/mobile/build.mjs",
+    "typecheck": "tsc -b packages/shared packages/agent && tsc -p packages/mobile",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
