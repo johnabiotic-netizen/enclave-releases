@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 1, Local core. In progress (tasks A to E done, all acceptance tests pass).
+**Current stage:** Stage 2, Phone access. Not started (waiting for the owner's go-ahead). Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
