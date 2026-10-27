@@ -36,7 +36,9 @@ Notes / evidence:
 - Test 5, fixed fingerprint (2026-10-26, owner, same profile, before/after stop and start): canvas signature 3406796772e6374c6d90be480aee81de both times; unmasked WebGL vendor/renderer Google Inc. (NVIDIA) / ANGLE (NVIDIA, NVIDIA GeForce GTX 980 Direct3D11 vs_5_0 ps_5_0), matching the saved fingerprint. PASS.
 - Test 6, fail closed: verified with the dev test proxy (task C and D notes above); start with the proxy down is refused, and with the proxy stopped mid-session the browser loads nothing.
 - Test 7, idle stop: verified with the dev test proxy (task D note above).
-- Tests 1 and 4 (create/start with the PC browser; persistence across a PC restart) and test 3 (two profiles, two proxies) still to run.
+- Test 1, create and start (2026-10-27, owner): Profile 1 (ea427e56) and Profile 2 (88c2fbfe) created with real proxies and opened in the owner's PC browser via `enclave open`. PASS.
+- Test 3, two isolated profiles (2026-10-27, owner; proxies from one provider, ports 10006 and 10050, both checked sticky twice): Profile 1 62.192.100.40 Germany, Europe/Berlin, Accept-Language de-DE; Profile 2 198.145.172.41 USA, America/New_York, en-US. Canvas signatures dfcf5c103131b3f020f6ae85cea99cfb vs b2ee72212d771e72c4ae674df271afbf. Cookies: Profile 2 set httpbin owner=profile2 at 09:44:45; Profile 1 still showed owner=profile1 at 09:45:19 (checked in each profile's own history). WebGL vendor/renderer the same by design (one PC). PASS.
+- Test 4 (persistence across a PC restart) still to run.
 
 ## Fixed after acceptance found fingerprint gaps (2026-10-27, owner chose option A)
 Verified on the owner's PC with two profiles running side by side (test proxy):
