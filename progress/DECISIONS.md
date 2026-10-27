@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-27  Phone access: tailscale serve, not binding to the Tailscale interface
+Context: Stage 2 "verify first" asks whether to expose streams with `tailscale serve` or by binding neko's ports to the Tailscale interface. On the owner's PC Docker runs inside WSL, whose published ports reach Windows on 127.0.0.1 only, so they cannot be bound to the Tailscale IP.
+Decision: Streams stay bound to 127.0.0.1. In phone mode (`ENCLAVE_PHONE=tailscale`) the agent runs `tailscale serve --bg` for each running profile (`--https=<web port>` and `--tcp=<mux port>`) and for itself (`--https=<agent port>`, which also serves the phone app), and removes them on stop. Verified: HTTPS on custom ports works with Tailscale's certificate; TCP relay reachable from the tailnet. neko advertises a single address (the PC's Tailscale IP in phone mode, else 127.0.0.1): with two, pion keeps only the first ("overlapping address rewrite rule"), which left the phone with 127.0.0.1. The PC reaches its own Tailscale IP through the same relay. neko's CORS allows only the phone app's origin.
+Reason: Works the same on Docker Desktop and on Docker Engine in WSL, never listens beyond loopback, and gives HTTPS (needed to install the app and, in Stage 4, for camera and microphone).
+
 ## 2026-10-26  Profiles render on the PC's GPU and behave as Firefox Strict (owner: option A)
 Context: Acceptance found (1) the plain WebGL RENDERER showed the container's "llvmpipe" while the unmasked one claimed another GPU, and (2) canvas and WebGL output was identical for all profiles and rare (software rendering). Camoufox removed canvas noise on purpose (#528, #860: noise is something stock Firefox never shows) and covers the canvas with random data whenever the identity's GPU differs from the rendering one. Nothing available gives a canvas that is genuine, different per profile and stable across restarts at once; a stable seed would need patching and rebuilding Firefox (not feasible on the owner's PC). The owner chose option A.
 Decision:

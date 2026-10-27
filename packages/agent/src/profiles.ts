@@ -280,9 +280,10 @@ export class ProfileService {
             `NEKO_WEBRTC_TCPMUX=${muxPort}`,
             `NEKO_WEBRTC_UDPMUX=${muxPort}`,
             'NEKO_WEBRTC_ICELITE=true',
-            // The addresses WebRTC tells viewers to reach the mux port at: the PC itself,
-            // and in phone mode the PC's Tailscale IP (tailscale serve relays that port).
-            `NEKO_WEBRTC_NAT1TO1=${tailnet ? `127.0.0.1 ${tailnet.ip}` : '127.0.0.1'}`,
+            // The address WebRTC tells viewers to reach the mux port at. One only: with two,
+            // pion keeps the first ("overlapping address rewrite rule"). In phone mode that is
+            // the PC's Tailscale IP, which tailscale serve relays and the PC reaches too.
+            `NEKO_WEBRTC_NAT1TO1=${tailnet ? tailnet.ip : '127.0.0.1'}`,
             // The phone app (served by the agent) talks to neko's API from its own origin.
             ...(tailnet ? [`NEKO_SERVER_CORS=${phoneAppOrigin(tailnet, this.config.port)}`] : []),
             ...gpu.env,

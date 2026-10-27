@@ -119,13 +119,7 @@ async function main(): Promise<void> {
       const id = await api.resolveId(arg);
       const stream = await api.call<StreamInfo>('GET', `/profiles/${id}/stream`);
       printStream(stream);
-      if (process.platform === 'win32') {
-        spawn('cmd.exe', ['/c', 'start', '""', stream.url], {
-          stdio: 'ignore',
-          detached: true,
-          windowsHide: true,
-        }).unref();
-      }
+      openInBrowser(stream.url);
       break;
     }
     case 'stop': {
@@ -202,13 +196,21 @@ main{text-align:center;max-width:460px;padding:24px}svg{background:#fff;padding:
 <p>The code lets a phone open your profiles, so don't share it. This page closes itself in 90 seconds.</p></main>`;
   const file = path.join(os.tmpdir(), `enclave-pair-${randomBytes(6).toString('hex')}.html`);
   await writeFile(file, page, { encoding: 'utf8', mode: 0o600 });
-  if (process.platform === 'win32') {
-    spawn('cmd.exe', ['/c', 'start', '""', file], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
-  }
-  console.log('Scan the QR code in your browser with your phone. It is removed in 90 seconds.');
+  openInBrowser(file);
+  console.log('A page with the QR code opened in your browser. Scan it with your phone.');
+  console.log(`If no page opened, open this file in your browser: ${file}`);
+  console.log('It is removed in 90 seconds.');
   await new Promise((r) => setTimeout(r, 90_000));
   await rm(file, { force: true });
   console.log('Pairing page removed.');
+}
+
+/** Opens a URL or a local file in the default browser (Windows). */
+function openInBrowser(target: string): void {
+  if (process.platform !== 'win32') return;
+  // explorer.exe hands it to the default browser. (cmd's `start "" x` breaks: Node quotes
+  // the empty title argument so cmd never sees it.)
+  spawn('explorer.exe', [target], { stdio: 'ignore', detached: true, windowsHide: true }).unref();
 }
 
 function printStream(stream: StreamInfo): void {
