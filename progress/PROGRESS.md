@@ -59,4 +59,4 @@ Still true (not fixable in software):
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 
 ## Next action
-Owner: run the Stage 1 acceptance tests with real proxies. Tests 3 (two isolated profiles) needs two different proxies, and tests 2, 6 should be repeated with a real one. Then `/verify-stage`.
+Owner is running acceptance test 4 (2026-10-27): logged into a throwaway account in Profile 1 (ea427e56), stopped it, restarting the PC. After the restart: `serve`, then `start ea42` / `open ea42`, check still logged in and history (Ctrl+H). If it passes, Stage 1 is done; run `/verify-stage`. Proxies: one provider, ports 10001-10100 (60 US, 10 DE, 10 ES, 10 UK, 10 FR, 3 AU per the owner), all sticky; Profile 1 = 10006, Profile 2 = 10050.
