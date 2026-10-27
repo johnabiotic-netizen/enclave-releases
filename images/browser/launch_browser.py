@@ -57,6 +57,17 @@ USER_PREFS = {
 # Set by the agent when the container has the PC's GPU (/dev/dxg, WSL's D3D12 driver).
 GPU = os.environ.get("ENCLAVE_GPU") == "1"
 
+# Where Camoufox (a Linux build) keeps a Linux default that a page can see, Windows
+# Firefox's own default instead (modules/libpref/init/all.js, XP_WIN). Applied over the
+# saved prefs on every launch, so existing profiles get them without a new fingerprint.
+WINDOWS_DEFAULT_PREFS = {
+    # Emoji drawn with Segoe UI Emoji, as on Windows 10/11 (Linux: Noto Color Emoji first).
+    "font.name-list.emoji": "Segoe UI Emoji, Twemoji Mozilla",
+    # Ask before sharing the location, as stock Firefox does. Camoufox grants it to every
+    # site (1); permissions.query() then reports "granted" on a fresh profile.
+    "permissions.default.geo": 0,
+}
+
 
 def main() -> None:
     with open(PROFILE_JSON, encoding="utf-8") as f:
@@ -75,7 +86,9 @@ def main() -> None:
     # Render on the GPU (Camoufox's settings for a real GPU display). Without it Firefox
     # falls back to Mesa's software rasterizer, whose output no Windows PC produces.
     gpu_prefs = GPU_PREFS if GPU else {}
-    env.update(get_pref_env_vars({**raw.get("prefs", {}), **gpu_prefs, **RUNTIME_PREFS}))
+    env.update(
+        get_pref_env_vars({**raw.get("prefs", {}), **WINDOWS_DEFAULT_PREFS, **gpu_prefs, **RUNTIME_PREFS})
+    )
 
     binary = str(camoufox_path(download_if_missing=False) / "camoufox-bin")
     os.makedirs(PROFILE_DIR, exist_ok=True)
