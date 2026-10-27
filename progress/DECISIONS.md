@@ -12,9 +12,19 @@ Reason: ...
 
 ---
 
+## 2026-10-27  Reference for "looks like Windows": real Firefox on the owner's PC
+Context: Recorded values (Camoufox's device recordings, CreepJS's known lists) disagreed with each other and with what a current Windows Firefox reports (stencil masks, extension list).
+Decision: The reference is the same Firefox version as Camoufox's base, official Mozilla build (checksum-verified), unpacked (not installed) and run headless with a throwaway profile on the owner's PC, which has the GPU the profiles claim. Compare with scripts/fingerprint/probe.html and CreepJS; per-machine values (screen, timezone, fonts the PC happens to have) are excluded.
+Reason: It is what a real visitor with this hardware shows, value for value.
+
+## 2026-10-27  Unhinted text rendering for Windows profiles
+Context: Camoufox's Windows fontconfig sets full hinting, which rounds glyph advances to pixels (Windows uses exact advances) and broke one emoji's bounds.
+Decision: The image switches hinting off (hinting false, hintnone) in the bundled Windows fonts.conf before Camoufox writes its runtime copy.
+Reason: Widths then equal Windows Firefox's exactly in 9 of 10 fonts tested; the emoji bounds anomaly disappears.
+
 ## 2026-10-27  GL shim for Windows stencil masks, instead of waiting for Camoufox
 Context: CreepJS flagged WebGL "suspicious capabilities": four stencil masks read 255 (Mesa) next to a Windows GPU, where Windows Firefox (ANGLE) reads 2147483647, confirmed on this PC's own Windows Firefox. Firefox takes them from the driver at context setup, outside Camoufox's override.
-Decision: A small preloaded library (`images/browser/gl_shim.c`, built in its own Dockerfile stage with pinned gcc, set as LD_PRELOAD by launch_browser.py) wraps glGetIntegerv, found through dlsym/eglGetProcAddress, and answers all-ones masks as ANGLE does. It must not make any extra GL call (a GL error makes Firefox refuse WebGL). The Camoufox issue is not filed.
+Decision: A small preloaded library (`images/browser/gl_shim.c`, built in its own Dockerfile stage with pinned gcc, set as LD_PRELOAD by launch_browser.py) wraps glGetIntegerv, found through dlsym/eglGetProcAddress, and answers all-ones masks as Windows Firefox 158 reports them (4294967295; see the reference entry above). It must not make any extra GL call (a GL error makes Firefox refuse WebGL). The Camoufox issue is not filed.
 Reason: Fixes the flag now, for all profiles, without a Firefox rebuild; values a page sets itself are cached by Firefox and unaffected.
 
 ## 2026-10-27  Every new profile has one built-in camera
