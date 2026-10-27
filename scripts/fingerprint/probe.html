@@ -65,8 +65,7 @@
       vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : null,
       renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : null,
       params,
-      extensions: exts.length,
-      extensionsHash: hash(exts.join(',')),
+      extensions: exts,
     };
   }
 

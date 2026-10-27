@@ -73,7 +73,7 @@ docker(
   ],
   probe,
 );
-docker(['exec', container, 'sh', '-c', 'rm -f /home/neko/Downloads/enclave-baseline*.json']);
+docker(['exec', container, 'sh', '-c', 'rm -f /data/downloads/enclave-baseline*.json']);
 
 // 2. Open it in a new tab: Ctrl+T, type the address, Enter.
 const user = await login(stream.userPassword);
@@ -105,7 +105,7 @@ for (let i = 0; i < 40 && !text; i++) {
     container,
     'sh',
     '-c',
-    'cat /home/neko/Downloads/enclave-baseline.json 2>/dev/null || true',
+    'cat /data/downloads/enclave-baseline.json 2>/dev/null || true',
   ]);
 }
 // Close the probe tab and give control back.
@@ -120,7 +120,7 @@ docker([
   container,
   'sh',
   '-c',
-  'rm -f /home/neko/Downloads/enclave-baseline*.json /tmp/enclave-probe.html',
+  'rm -f /data/downloads/enclave-baseline*.json /tmp/enclave-probe.html',
 ]);
 if (!text) throw new Error('The probe page gave no result within 40 seconds.');
 
