@@ -285,7 +285,12 @@ export class ProfileService {
             // the PC's Tailscale IP, which tailscale serve relays and the PC reaches too.
             `NEKO_WEBRTC_NAT1TO1=${tailnet ? tailnet.ip : '127.0.0.1'}`,
             // The phone app (served by the agent) talks to neko's API from its own origin.
-            ...(tailnet ? [`NEKO_SERVER_CORS=${phoneAppOrigin(tailnet, this.config.port)}`] : []),
+            // With a CORS list neko checks every origin, the PC's own page included.
+            ...(tailnet
+              ? [
+                  `NEKO_SERVER_CORS=${phoneAppOrigin(tailnet, this.config.port)} http://127.0.0.1:${webPort}`,
+                ]
+              : []),
             ...gpu.env,
           ],
           ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },

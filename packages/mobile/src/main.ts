@@ -202,6 +202,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   detach.push(c.transport.attach(box));
   overlay = new Overlay(c);
   detach.push(overlay.attach(box));
+  detach.push(attachGestures(box, c));
 
   // Take control once the stream is up, and say so while it (re)connects.
   let asked = false;
@@ -237,6 +238,90 @@ function closeViewer(): void {
 function setStatus(text: string): void {
   statusLine.textContent = text;
   statusLine.classList.toggle('show', Boolean(text));
+}
+
+/**
+ * Phone gestures for a desktop browser. The profile is a PC without a touchscreen (its
+ * fingerprint says so), so neko's native touch input does nothing there, and its fallback (a
+ * held left button) selects text instead of scrolling. Instead: a drag scrolls with the
+ * mouse wheel, a tap clicks, a long press right-clicks. Touches are taken before the overlay
+ * sees them; the overlay still handles the keyboard.
+ */
+function attachGestures(box: HTMLElement, c: NekoClient): () => void {
+  const SCROLL_STEP = 40; // CSS px of finger travel per wheel notch
+  const TAP_SLOP = 10; // a touch that moves less than this is a tap
+  const LONG_PRESS_MS = 600;
+  let start = { x: 0, y: 0, t: 0 };
+  let last = { x: 0, y: 0 };
+  let carry = { x: 0, y: 0 };
+  let dragging = false;
+
+  const remote = (t: Touch) => {
+    const r = box.getBoundingClientRect();
+    const { width, height } = c.state.screen.size;
+    const clamp = (v: number, max: number) => Math.max(0, Math.min(Math.round(v), max));
+    return {
+      x: clamp((width / r.width) * (t.clientX - r.left), width),
+      y: clamp((height / r.height) * (t.clientY - r.top), height),
+    };
+  };
+  const take = (e: TouchEvent) => {
+    e.preventDefault(); // no page zoom, no synthetic mouse events
+    e.stopPropagation(); // the overlay below never sees the touch
+  };
+
+  const onStart = (e: TouchEvent) => {
+    take(e);
+    if (e.touches.length > 1) return;
+    if (!c.controlling) c.request();
+    const t = e.changedTouches[0]!;
+    start = { x: t.clientX, y: t.clientY, t: e.timeStamp };
+    last = { x: t.clientX, y: t.clientY };
+    carry = { x: 0, y: 0 };
+    dragging = false;
+    const p = remote(t);
+    c.input.move(p.x, p.y);
+  };
+  const onMove = (e: TouchEvent) => {
+    take(e);
+    if (e.touches.length > 1) return;
+    const t = e.changedTouches[0]!;
+    if (!dragging && Math.hypot(t.clientX - start.x, t.clientY - start.y) < TAP_SLOP) return;
+    dragging = true;
+    carry.x += t.clientX - last.x;
+    carry.y += t.clientY - last.y;
+    last = { x: t.clientX, y: t.clientY };
+    // The page follows the finger: moving it up scrolls down.
+    const steps = (v: number) => Math.trunc(v / SCROLL_STEP);
+    const sx = steps(carry.x);
+    const sy = steps(carry.y);
+    if (sx || sy) {
+      c.input.scroll(-sx, -sy, false);
+      carry.x -= sx * SCROLL_STEP;
+      carry.y -= sy * SCROLL_STEP;
+    }
+  };
+  const onEnd = (e: TouchEvent) => {
+    take(e);
+    if (dragging || e.touches.length > 0) return;
+    const button = e.timeStamp - start.t >= LONG_PRESS_MS ? 3 : 1; // X11: 1 left, 3 right
+    const p = remote(e.changedTouches[0]!);
+    c.input.move(p.x, p.y);
+    c.input.button(button, true);
+    c.input.button(button, false);
+  };
+
+  const opts = { capture: true, passive: false } as const;
+  box.addEventListener('touchstart', onStart, opts);
+  box.addEventListener('touchmove', onMove, opts);
+  box.addEventListener('touchend', onEnd, opts);
+  box.addEventListener('touchcancel', take, opts);
+  return () => {
+    box.removeEventListener('touchstart', onStart, opts);
+    box.removeEventListener('touchmove', onMove, opts);
+    box.removeEventListener('touchend', onEnd, opts);
+    box.removeEventListener('touchcancel', take, opts);
+  };
 }
 
 // X11 keysyms for the toolbar: what Firefox on Windows uses for back, forward and reload.

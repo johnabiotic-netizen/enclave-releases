@@ -167,9 +167,15 @@ async function main(): Promise<void> {
  * Opens a page on this PC with a QR code for the phone app, carrying the agent token in the
  * URL fragment (never sent to a server). The page file is deleted again after 90 seconds.
  */
-async function showPairingCode(port: number, token: string, phone: string | undefined): Promise<void> {
+async function showPairingCode(
+  port: number,
+  token: string,
+  phone: string | undefined,
+): Promise<void> {
   if (!phone) {
-    throw new UsageError('Phone access is off. Add ENCLAVE_PHONE=tailscale to .env and restart the agent.');
+    throw new UsageError(
+      'Phone access is off. Add ENCLAVE_PHONE=tailscale to .env and restart the agent.',
+    );
   }
   const tailnet = await new Tailscale().address();
   if (!tailnet) {
@@ -182,7 +188,9 @@ async function showPairingCode(port: number, token: string, phone: string | unde
     const res = await fetch(app, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(String(res.status));
   } catch {
-    throw new UsageError(`The phone app isn't reachable at ${app}. Is the agent running with ENCLAVE_PHONE=tailscale?`);
+    throw new UsageError(
+      `The phone app isn't reachable at ${app}. Is the agent running with ENCLAVE_PHONE=tailscale?`,
+    );
   }
   const link = `${app}#pair=${token}`;
   const qr = qrcode(0, 'M');
