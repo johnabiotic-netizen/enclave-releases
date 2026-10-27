@@ -24,7 +24,7 @@ from importlib.metadata import version
 
 os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("ENCLAVE_CAMOUFOX_CACHE", "/opt/camoufox-cache"))
 
-from camoufox.fingerprints import Screen  # noqa: E402
+from camoufox.fingerprints import Screen, _load_media_devices  # noqa: E402
 from camoufox.geolocation import get_geolocation  # noqa: E402
 from camoufox.pkgman import camoufox_path  # noqa: E402
 from camoufox.utils import launch_options  # noqa: E402
@@ -97,6 +97,24 @@ def strict_screen(config: dict) -> None:
     config["screen.availHeight"] = config["screen.height"] - WINDOWS_STRICT_TASKBAR
     config["screen.availLeft"] = 0
     config["screen.availTop"] = 0
+
+
+def ensure_webcam(config: dict) -> None:
+    """Give the machine a built-in camera when Camoufox drew none.
+
+    Camera passthrough (Stage 4) needs a camera in the device list, and adding one to a
+    profile later would change its fingerprint. The label comes from Camoufox's own
+    Windows catalogue, weighted as Camoufox weights it; the IR camera is left out (it is
+    the Windows Hello sensor, not the one a site would use).
+    """
+    if config.get("mediaDevices:webcams"):
+        return
+    cams = [c for c in _load_media_devices()["win"]["cameras"] if not c.get("mic") and "IR" not in c["cam"]]
+    cam = random.choices(cams, weights=[c["w"] for c in cams])[0]["cam"]
+    groups = config.get("mediaDevices:microphoneGroups", []) + config.get("mediaDevices:speakerGroups", [])
+    config["mediaDevices:webcams"] = 1
+    config["mediaDevices:webcamLabels"] = [cam]
+    config["mediaDevices:webcamGroups"] = [f"hw-{max((int(g[3:]) for g in groups), default=0) + 1}"]
 
 
 def summarize(args: argparse.Namespace, config: dict, prefs: dict) -> dict:
@@ -197,6 +215,7 @@ def main() -> None:
     # way, and Firefox (Strict included) adds no audio noise, so a per-profile audio hash
     # would be something no real Firefox has. Seed 0 is Camoufox's "no noise".
     config["audio:seed"] = 0
+    ensure_webcam(config)
 
     fingerprint = summarize(args, config, prefs)
     validate(args, fingerprint, screen, gpu)
