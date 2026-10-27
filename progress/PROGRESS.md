@@ -47,8 +47,15 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 - [x] Screen, timezone, Intl, WebRTC (proxy IP and mDNS only): consistent (CreepJS).
 - [ ] CreepJS WebGL flagged "suspicious capabilities": 43 of 47 parameters it reads come from the recorded real Windows device, but STENCIL_VALUE_MASK, STENCIL_WRITEMASK and the back masks report 255 (from the D3D12 driver) instead of the recorded 2147483647. Firefox answers these from its client-side state, so Camoufox's override does not apply. Needs a Camoufox fix; candidate upstream issue.
 - [ ] CreepJS audio sum 35.749972093850374 is not one of its known sums for this gain (35.749960/35.749968): Firefox's audio math on Linux differs slightly from Windows. Not flagged as a lie. Needs an engine-level change.
-- [ ] Notification.permission reads "granted" on a local test page; recheck on a website.
-- [ ] Pixelscan, amiunique, BrowserLeaks pages; three profiles; baselines under profiles/<id>/baselines/.
+- [x] Notification: websites see "prompt" (permissions.query, all three profiles); "granted" was only on file:// pages.
+- [x] Media devices: Camoufox draws a Windows machine's devices at creation (Realtek/Intel SST mics, speakers, matching groups). New profiles always get one built-in camera (`ensure_webcam` in gen_fingerprint.py) for Stage 4 passthrough; Profiles 1 and 2 were made before this and have none. Websites see one mic and, where present, one camera before permission, as in Firefox.
+- [x] WebRTC (BrowserLeaks): no leak, only the proxy IP, no local IP, no IPv6.
+- [~] Pixelscan (Profile 2): browser "Firefox 158 on Windows", location, "No masking detected", "No automated behavior detected" all pass; verdict "inconsistent" only because of "Proxy detected": its IP database classes 198.145.172.41 (RCN) as "hosting". IP reputation, not the browser; choose proxies by that if it matters.
+- [x] amiunique: Windows, Firefox, en, UTC-04:00; "unique", as for nearly every real browser.
+- [x] Three profiles (1 DE port 10006, 2 US 10050, 3 US 10075, created 2026-10-27): BrowserLeaks canvas A1A35A2B..., 3157A6A5..., 7910C9B4... (acceptance test 5).
+- [x] Baselines: `node --env-file=.env scripts/fingerprint/baseline.mjs <id> [--save]` opens a probe page in the profile and saves/compares `profiles/<id>/baselines/baseline.json` (canvas excepted). Saved for all three. Profile 3 stopped and started: matches (acceptance test 4).
+- Acceptance tests 1, 2, 4, 5, 6 pass. Test 3 passes except the WebGL stencil masks (Camoufox issue, draft ready for the owner). Open, outside our code: stencil masks, Linux audio sum, proxy IP reputation. Owner decides whether Stage 3 is complete with these.
+- Found: browser downloads go to /home/neko/Downloads inside the container, not the /data volume, so they are lost when the container is recreated. Fix before real use (map Downloads to the volume, later to Windows).
 
 ## Stage 4: Camera and mic passthrough  [ ]
 ## Stage 5: Windows app  [ ]

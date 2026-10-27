@@ -12,6 +12,16 @@ Reason: ...
 
 ---
 
+## 2026-10-27  Every new profile has one built-in camera
+Context: Stage 3 asks for a consistent device list with a camera. Camoufox draws a Windows machine's devices from its own catalogue and gives it a built-in camera about 78% of the time, so some profiles have none. Stage 4 passes the phone camera through, which needs a camera in the list; adding one later would change a saved fingerprint (hard rule 2).
+Decision: gen_fingerprint.py keeps Camoufox's draw and, when it has no camera, adds one built-in camera picked from Camoufox's Windows list by its weights (IR camera excluded), in its own device group. Profiles 1 and 2 predate this and have no camera; Stage 4 decides for them.
+Reason: A camera stays realistic (most Windows laptops have one) and keeps camera passthrough possible without changing fingerprints later.
+
+## 2026-10-27  Fingerprint baselines from a probe page
+Context: The checklist asks for per-profile baselines and a regression check after relaunch or image upgrade. A page in the sealed container cannot reach the host.
+Decision: `scripts/fingerprint/baseline.mjs` copies `probe.html` into the container, opens it through the stream's control API, and reads the JSON the page downloads (then deletes it). It saves `profiles/<id>/baselines/baseline.json` and compares later runs with it, canvas excepted. Canvas uniqueness is checked on a website (BrowserLeaks), because Firefox Strict does not randomize the canvas on file:// pages.
+Reason: Needs nothing new in the image or the agent, and does not touch the profile's network.
+
 ## 2026-10-27  Phone app: home-screen shortcut, not a WebAPK install
 Context: Android Chrome's "Install" hung at "Installing". Chrome turns an installed web app into a WebAPK on a Google server, which fetches the manifest and icons from the site; the app is reachable only inside the owner's tailnet.
 Decision: Keep the app private and use Chrome's "Add to home screen → Create shortcut" (works). Do not expose the app publicly (e.g. Tailscale Funnel) to make WebAPK minting work.
