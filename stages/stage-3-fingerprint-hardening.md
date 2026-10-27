@@ -10,9 +10,9 @@
 
 ## Build tasks
 - [ ] Install a complete Windows 10/11 font set in the image and restrict the browser's exposed fonts to that set. Remove Linux only fonts from exposure.
-- [ ] Canvas: ensure per profile deterministic noise from the saved seed; identical across launches, different across profiles.
-- [ ] WebGL: vendor and renderer from the saved fingerprint, a real Windows GPU combo; parameters and extensions consistent with it. No "Mesa", "llvmpipe", or software renderer strings.
-- [ ] AudioContext: per profile deterministic noise from the saved seed.
+- [ ] Canvas: drawn on the PC's real GPU and randomized by Firefox's Strict fingerprinting protection: different per profile and per site, new each browser start, as for every Firefox Strict user (owner decision 2026-10-26, option A; replaces the per-profile seed).
+- [ ] WebGL: vendor and renderer are the PC's real GPU as Windows Firefox names it (all profiles on one PC share it, as on one real PC); parameters and extensions consistent with it. No "Mesa", "llvmpipe", or software renderer strings.
+- [ ] AudioContext: stock, no noise (every x86 PC renders the standard probe the same; Firefox adds none). Replaces the per-profile seed (option A).
 - [ ] Screen and window: container display and neko size match the fingerprint's screen; `devicePixelRatio`, color depth, available size all consistent.
 - [ ] Timezone, locale, languages, geolocation all driven by proxy location; verify no UTC leak from the container.
 - [ ] Media devices: expose a consistent desktop set (one mic, one camera, one speaker) with generic Windows style labels decided at creation. (Real passthrough comes in Stage 4; here just the device list is consistent.)
@@ -25,8 +25,8 @@ Run each profile through CreepJS, BrowserLeaks (all pages), Pixelscan, and amiun
 1. **OS consistency:** everything says Windows. No Linux strings anywhere.
 2. **No automation tells:** no headless, no webdriver, no neko or Xvfb artifacts.
 3. **Internal consistency:** timezone matches IP; languages match region; GPU is a plausible Windows GPU; screen values agree with each other.
-4. **Stability:** reload and relaunch; values stay identical to the saved baseline.
-5. **Uniqueness:** three profiles produce three distinct canvas, WebGL and audio fingerprints.
+4. **Stability:** reload and relaunch; values stay identical to the saved baseline, except the canvas, which Firefox Strict renews each start.
+5. **Uniqueness:** three profiles produce three distinct canvas fingerprints. WebGL and audio are the same across profiles on one PC by design (option A), and must match what a real Windows PC with this GPU reports.
 6. **No WebRTC leak:** BrowserLeaks WebRTC shows only the proxy IP or nothing, never the real IP.
 
 Save screenshots in `progress/PROGRESS.md` under Stage 3.

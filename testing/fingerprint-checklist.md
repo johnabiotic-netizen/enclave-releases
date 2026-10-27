@@ -16,12 +16,12 @@ Run per profile. Save screenshots and key values under `profiles/<id>/baselines/
 - [ ] No automation/headless markers (no webdriver, no neko/Xvfb traces).
 - [ ] Timezone matches IP country. Languages match region. Geolocation (if asked) matches proxy city.
 - [ ] WebGL vendor/renderer is a real Windows GPU; parameters agree with it.
-- [ ] Canvas and audio fingerprints are stable across relaunch, unique across profiles.
+- [ ] Canvas: unique across profiles, stable within a session, renewed each start (Firefox Strict). Audio: stock (same on every profile, stable).
 - [ ] Fonts look like a Windows set; no Linux only fonts exposed.
 - [ ] Screen, availHeight, colorDepth, devicePixelRatio all mutually consistent.
 - [ ] CreepJS shows no "lies" and a reasonable trust score.
 - [ ] Pixelscan verdict: consistent.
 
 ## Regression
-- [ ] After relaunch: every value matches the saved baseline.
+- [ ] After relaunch: every value matches the saved baseline (canvas excepted: Firefox Strict renews it each start).
 - [ ] After a Camoufox/image upgrade: values still match baseline for existing profiles, or the change is understood and the baseline is deliberately updated.
