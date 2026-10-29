@@ -278,8 +278,29 @@ export class ProfileService {
     this.proxyTester ??= new ProxyTester(
       (p) => this.runProxyCheck(p),
       path.join(this.config.home, 'reports'),
+      (p) => this.pixelscanProxy(p),
     );
-    return this.proxyTester.start(proxies, { stickyMinutes: minutes });
+    return this.proxyTester.start(proxies, {
+      stickyMinutes: minutes,
+      pixelscan: req.pixelscan === true,
+    });
+  }
+
+  /**
+   * Pixelscan's view of a proxy: a temporary profile on it (a fingerprint for its
+   * location), an audit of Pixelscan alone, then the profile is deleted.
+   */
+  private async pixelscanProxy(proxy: ProxyInput): Promise<{ verdict: string; proxy: string }> {
+    const temp = await this.create({ name: `proxy test ${proxy.host}:${proxy.port}`, proxy });
+    try {
+      const run = await this.audit(temp.id, ['pixelscan']);
+      const value = (item: string) =>
+        run.findings.find((f) => f.check === 'pixelscan' && f.item === item)?.value ??
+        '(not found)';
+      return { verdict: value('verdict'), proxy: value('proxy') };
+    } finally {
+      await this.delete(temp.id, true).catch(() => {});
+    }
   }
 
   proxyTestJob(jobId: string): ProxyTestJob {
@@ -1034,6 +1055,8 @@ export interface ProxyTestRequest {
   like?: { profileId: string; ports: [number, number] };
   /** Minutes before the sticky re-check (default 5, 0 skips it). */
   stickyMinutes?: number;
+  /** Also run Pixelscan per working proxy (about 1.5 minutes each). */
+  pixelscan?: boolean;
 }
 
 export interface AuditJob {

@@ -40,7 +40,7 @@ Runs in an audit container of the profile. Each check gives pass, fail or "look"
 - [x] D. Reference: save real Firefox 158 measurements; comparison rules.
 - [x] E. `enclave audit <id>`: report and summary.
 - [x] F. Proxy tester steps 1 to 5, `enclave proxy-test` (also `--like <profile> --ports A-B`). ip-api.com free tier is plain HTTP: the IP addresses travel unencrypted.
-- [ ] G. Proxy tester step 6 (Pixelscan per proxy).
+- [x] G. Proxy tester step 6 (Pixelscan per proxy, `--pixelscan`): temporary profile, Pixelscan-only audit, deleted; one retry. Port 10079 read "consistent", as by hand.
 - [ ] H. Agent API endpoints for the Windows app (specs/agent-api.md).
 
 ## Status (2026-10-29)

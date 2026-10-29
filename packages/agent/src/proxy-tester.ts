@@ -26,6 +26,9 @@ export interface ProxyTestResult {
   hosting?: boolean;
   proxyFlag?: boolean;
   mobile?: boolean;
+  /** Pixelscan in a temporary profile on this proxy: its verdict and proxy card. */
+  pixelscan?: string;
+  pixelscanProxy?: string;
   /** Lower is better: failing, flagged or unsticky proxies sort last. */
   score: number;
 }
@@ -49,9 +52,13 @@ export interface ProxyTestJob {
 export interface ProxyTestOptions {
   /** Minutes between the two checks; 0 skips the sticky check. */
   stickyMinutes: number;
+  /** Also run Pixelscan for every proxy that passes the other checks (about 1.5 min each). */
+  pixelscan: boolean;
 }
 
 type Check = (proxy: ProxyInput) => Promise<RawProxyCheck>;
+/** Pixelscan's verdict and proxy card for one proxy. */
+export type PixelscanCheck = (proxy: ProxyInput) => Promise<{ verdict: string; proxy: string }>;
 
 const PARALLEL = 5;
 const IP_API_BATCH = 100;
@@ -63,6 +70,7 @@ export class ProxyTester {
   constructor(
     private readonly check: Check,
     private readonly reportsDir: string,
+    private readonly pixelscan: PixelscanCheck,
   ) {}
 
   start(proxies: ProxyInput[], options: ProxyTestOptions): ProxyTestJob {
@@ -118,6 +126,32 @@ export class ProxyTester {
 
     job.phase = 'reputation';
     await addReputation(results);
+
+    if (options.pixelscan) {
+      // One at a time: each is a browser start and a page scan, about 1.5 minutes.
+      const candidates = results
+        .map((r, i) => ({ r, p: proxies[i]! }))
+        .filter((x) => x.r.ok && x.r.sticky !== false);
+      job.phase = 'pixelscan';
+      job.checked = 0;
+      job.total = candidates.length;
+      for (const { r, p } of candidates) {
+        // A second try after a pause: a busy line or a slow proxy moment is common.
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const v = await this.pixelscan(p);
+            r.pixelscan = v.verdict;
+            r.pixelscanProxy = v.proxy;
+            break;
+          } catch (e) {
+            r.pixelscan = `error: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200);
+            if (attempt === 1) await new Promise((res) => setTimeout(res, 15_000));
+          }
+        }
+        job.checked++;
+      }
+    }
+
     for (const r of results) r.score = score(r);
     results.sort((a, b) => a.score - b.score || (a.latencyMs ?? 1e9) - (b.latencyMs ?? 1e9));
 
@@ -206,7 +240,12 @@ async function addReputation(results: ProxyTestResult[]): Promise<void> {
 
 function score(r: ProxyTestResult): number {
   if (!r.ok) return 1000;
-  return (r.sticky === false ? 100 : 0) + (r.proxyFlag ? 10 : 0) + (r.hosting ? 10 : 0);
+  return (
+    (r.sticky === false ? 100 : 0) +
+    (r.pixelscan !== undefined && r.pixelscan !== 'consistent' ? 50 : 0) +
+    (r.proxyFlag ? 10 : 0) +
+    (r.hosting ? 10 : 0)
+  );
 }
 
 /** A plain-text table, best first. */
@@ -220,6 +259,11 @@ export function proxyTestTable(results: ProxyTestResult[]): string {
     r.sticky === undefined ? '-' : r.sticky ? 'sticky' : `changed to ${r.exitIpLater ?? '?'}`,
     r.proxyFlag === undefined ? '-' : r.proxyFlag ? 'PROXY' : 'clean',
     r.hosting === undefined ? '-' : r.hosting ? 'HOSTING' : 'clean',
+    r.pixelscan === undefined
+      ? '-'
+      : r.pixelscan === 'consistent'
+        ? 'consistent'
+        : `${r.pixelscan}${r.pixelscanProxy ? ` (${r.pixelscanProxy})` : ''}`,
     r.isp ?? r.problem ?? '-',
   ]);
   const head = [
@@ -231,6 +275,7 @@ export function proxyTestTable(results: ProxyTestResult[]): string {
     'sticky',
     'proxy flag',
     'hosting',
+    'pixelscan',
     'ISP',
   ];
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i]!.length)));

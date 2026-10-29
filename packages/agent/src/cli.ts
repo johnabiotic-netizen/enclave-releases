@@ -37,6 +37,7 @@ const HELP = `Usage: enclave <command>
   proxy-test <proxy>...          Test proxies: works, no leak, location, speed, sticky,
                                    reputation. Or with the login of a profile's proxy:
   proxy-test --like <id> --ports 10001-10100 [--sticky <minutes>] (default 5, 0 = skip)
+             [--pixelscan]       Also run Pixelscan per working proxy (about 1.5 min each)
   audit <id> [check...]          Run the check sites in a throwaway copy of the profile and
                                    save a report (testing/test-suite.md). Checks: probe,
                                    metrics, svg-emoji, pixelscan, creepjs, browserleaks-webrtc,
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
       like: { type: 'string' },
       ports: { type: 'string' },
       sticky: { type: 'string' },
+      pixelscan: { type: 'boolean' },
       'test-proxy': { type: 'boolean' },
       yes: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -164,6 +166,7 @@ async function main(): Promise<void> {
         };
       }
       if (values.sticky !== undefined) body.stickyMinutes = Number(values.sticky);
+      if (values.pixelscan) body.pixelscan = true;
       let job = await api.call<ProxyTestJobView>('POST', '/proxy-tests', body);
       console.log(`Testing ${job.total} proxies.`);
       let last = '';
