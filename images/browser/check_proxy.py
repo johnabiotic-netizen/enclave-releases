@@ -25,7 +25,14 @@ import xml.etree.ElementTree as ET  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import camoufox  # noqa: E402
+import camoufox.geolocation  # noqa: E402
 from camoufox.geolocation import get_geolocation  # noqa: E402
+
+# The GeoIP database is pinned in the image (Dockerfile geoip-dist). Camoufox would
+# re-download it once its data is 8 days old; in these containers that download hangs
+# (read-only install), which stopped every proxy check 8 days after the build. The
+# database is refreshed by rebuilding the image with a newer pin, never at run time.
+camoufox.geolocation.needs_update = lambda config=None: False
 
 # Languages Firefox ships in (its l10n locales, by language). Camoufox picks a country's
 # language at random by population, which can give one no Firefox build exists for
