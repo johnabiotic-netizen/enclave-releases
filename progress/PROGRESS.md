@@ -61,7 +61,9 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 - [ ] Firefox 159 is out; profiles say 158 (follow Camoufox updates).
 - [x] GeoIP time bomb (2026-10-29): Camoufox re-downloads its GeoIP database once the data is 8 days old; in our containers that hangs, so from 8 days after the image build every proxy check and profile start timed out ("timed out after 90 s"). Fixed: no run-time updates; the pinned database is refreshed by rebuilding the image. Rebuild the image at least every few weeks so location data stays current.
 - [ ] Profile 1 (DE, port 10006, 62.192.100.40): Pixelscan "Proxy detected", everything else consistent (WebRTC = IP, location within 100 m, Europe/Berlin, de-DE, IP type business). Ports 10001 to 10009 tested with temporary profiles (2026-10-29): all flagged (10007 did not load). US: 10075 and 10079 pass, 10048 and 10050 flagged. Pixelscan lists this provider's German IPs as proxies; a clean German IP needs another source (owner).
-- [~] Own Camoufox build (enclave-camoufox, private): first run started by the owner 2026-10-29.
+- [x] Own Camoufox build (enclave-camoufox, private, GitHub Actions run of 2026-10-29): camoufox-158.0-beta.40-lin.x86_64.zip, SHA-256 88d5d204...6c0c, pinned in the Dockerfile; supplied from the local download cache (no public URL). Audit of Profile 3 (2026-10-29): 57 failures to 3. Text metrics: 79 of 81 values equal Windows Firefox 158 exactly; left: Verdana width 744.1 vs 744.083 (1/60 px), SVG emoji bounds 757.372496 vs 757.372482. Everything else passes.
+- [x] Proxy tester and profile audit built (testing/test-suite.md, tasks A to G): `enclave audit <id>`, `enclave proxy-test`.
+- Disk (2026-10-29): C: filled to 281 MB during builds (WSL disk 31 GB), crashing WSL. Freed: build cache, old images, scratch files; then `fstrim` inside WSL. After every image build: `docker builder prune -af`, `docker image prune -f`, `fstrim /`.
 - [x] Downloads: now saved to /data/downloads on the profile volume (fixed 2026-10-27); Stage 5 exposes them in Windows.
 
 ## Stage 4: Camera and mic passthrough  [ ]
