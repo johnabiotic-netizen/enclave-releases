@@ -34,6 +34,9 @@ const HELP = `Usage: enclave <command>
   stop <id>                      Stop a profile
   check <id>                     Check a profile's proxy
   logs <id>                      Show a profile's log
+  proxy-test <proxy>...          Test proxies: works, no leak, location, speed, sticky,
+                                   reputation. Or with the login of a profile's proxy:
+  proxy-test --like <id> --ports 10001-10100 [--sticky <minutes>] (default 5, 0 = skip)
   audit <id> [check...]          Run the check sites in a throwaway copy of the profile and
                                    save a report (testing/test-suite.md). Checks: probe,
                                    metrics, svg-emoji, pixelscan, creepjs, browserleaks-webrtc,
@@ -48,6 +51,9 @@ async function main(): Promise<void> {
     allowPositionals: true,
     options: {
       proxy: { type: 'string' },
+      like: { type: 'string' },
+      ports: { type: 'string' },
+      sticky: { type: 'string' },
       'test-proxy': { type: 'boolean' },
       yes: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -144,6 +150,36 @@ async function main(): Promise<void> {
       console.log(
         `${r.ok ? 'Proxy OK' : 'Proxy failed the check'}. Exit IP ${r.exitIp ?? 'unknown'}, ${r.country ?? '?'}, ${r.timezone ?? '?'}, ${r.latencyMs ?? '?'} ms.`,
       );
+      break;
+    }
+    case 'proxy-test': {
+      const body: Record<string, unknown> = { proxies: positionals.slice(1) };
+      if (values.like) {
+        const m = /^(\d+)-(\d+)$/.exec(values.ports ?? '');
+        if (!m)
+          throw new UsageError('With --like, give --ports as a range, for example 10001-10100.');
+        body.like = {
+          profileId: await api.resolveId(values.like),
+          ports: [Number(m[1]), Number(m[2])],
+        };
+      }
+      if (values.sticky !== undefined) body.stickyMinutes = Number(values.sticky);
+      let job = await api.call<ProxyTestJobView>('POST', '/proxy-tests', body);
+      console.log(`Testing ${job.total} proxies.`);
+      let last = '';
+      while (job.state === 'running') {
+        await new Promise((r) => setTimeout(r, 5_000));
+        job = await api.call<ProxyTestJobView>('GET', `/proxy-tests/${job.id}`);
+        const now = `${job.phase}: ${job.checked}/${job.total}`;
+        if (now !== last) console.log(`  ${now}`);
+        last = now;
+      }
+      if (job.state === 'failed')
+        throw new UsageError(`The proxy test didn't finish: ${job.error}`);
+      console.log('');
+      console.log(job.table ?? '');
+      console.log('');
+      console.log(`Report saved in ${job.reportDir}`);
       break;
     }
     case 'audit': {
@@ -258,6 +294,17 @@ function printStream(stream: StreamInfo): void {
 }
 
 class UsageError extends Error {}
+
+interface ProxyTestJobView {
+  id: string;
+  state: 'running' | 'done' | 'failed';
+  total: number;
+  checked: number;
+  phase: string;
+  table?: string;
+  reportDir?: string;
+  error?: string;
+}
 
 interface AuditJobView {
   id: string;

@@ -13,7 +13,7 @@ import {
   type UpdateProfileRequest,
 } from '@enclave/shared';
 import { AgentError, InputError } from './errors.js';
-import type { ProfileService } from './profiles.js';
+import type { ProfileService, ProxyTestRequest } from './profiles.js';
 import type { DockerRuntime } from './docker/runtime.js';
 
 export const AGENT_VERSION = '0.1.0';
@@ -115,6 +115,15 @@ export function buildServer(
       );
       v1.get<{ Params: { jobId: string } }>('/audits/:jobId', async (req) =>
         service.auditJob(req.params.jobId),
+      );
+      // Proxy tester: starts in the background, then poll the job.
+      v1.post<{ Body: ProxyTestRequest }>('/proxy-tests', async (req, reply) => {
+        const job = await service.startProxyTest(req.body ?? {});
+        reply.code(202);
+        return job;
+      });
+      v1.get<{ Params: { jobId: string } }>('/proxy-tests/:jobId', async (req) =>
+        service.proxyTestJob(req.params.jobId),
       );
       v1.get<{ Params: { id: string }; Querystring: { tail?: string } }>(
         '/profiles/:id/logs',

@@ -39,7 +39,7 @@ Runs in an audit container of the profile. Each check gives pass, fail or "look"
 - [x] C. Page readers: probe, text metrics, Pixelscan, CreepJS, BrowserLeaks, amiunique.
 - [x] D. Reference: save real Firefox 158 measurements; comparison rules.
 - [x] E. `enclave audit <id>`: report and summary.
-- [ ] F. Proxy tester steps 1 to 5, `enclave proxy-test`.
+- [x] F. Proxy tester steps 1 to 5, `enclave proxy-test` (also `--like <profile> --ports A-B`). ip-api.com free tier is plain HTTP: the IP addresses travel unencrypted.
 - [ ] G. Proxy tester step 6 (Pixelscan per proxy).
 - [ ] H. Agent API endpoints for the Windows app (specs/agent-api.md).
 

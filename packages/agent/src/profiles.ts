@@ -23,6 +23,7 @@ import { makeTar, type TarEntry } from './docker/tar.js';
 import { detectGpu, gpuContainerSettings } from './gpu.js';
 import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
+import { ProxyTester, type ProxyTestJob } from './proxy-tester.js';
 import { AgentError, InputError } from './errors.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
@@ -55,6 +56,7 @@ export class ProfileService {
   private readonly nekoTokens = new Map<string, string>();
   /** Audit runs started through the API, kept until the agent restarts. */
   private readonly auditJobs = new Map<string, AuditJob>();
+  private proxyTester: ProxyTester | undefined;
   private monitor: NodeJS.Timeout | undefined;
 
   constructor(
@@ -240,6 +242,50 @@ export class ProfileService {
       });
       return profile.proxy.lastCheck;
     });
+  }
+
+  // ---------------------------------------------------------------- proxy tester
+
+  /**
+   * Tests many proxies (testing/test-suite.md): either given outright, or "like" an
+   * existing profile's proxy (its host and login) on a range of ports, so the password
+   * never has to be typed again.
+   */
+  async startProxyTest(req: ProxyTestRequest): Promise<ProxyTestJob> {
+    const proxies = [...(req.proxies ?? []).map((p) => parseProxy(p))];
+    if (req.like) {
+      const profile = await this.store.get(req.like.profileId);
+      const base = proxyInput(profile, await this.store.getSecrets(profile.id));
+      const [first, last] = req.like.ports;
+      if (
+        !Number.isInteger(first) ||
+        !Number.isInteger(last) ||
+        first < 1 ||
+        last > 65535 ||
+        first > last
+      ) {
+        throw new InputError('Give the ports as a range, for example 10001-10100.');
+      }
+      if (last - first >= 1000) throw new InputError('At most 1000 ports at once.');
+      for (let port = first; port <= last; port++) proxies.push({ ...base, port });
+    }
+    if (!proxies.length) throw new InputError('No proxies to test.');
+    const minutes = req.stickyMinutes ?? 5;
+    if (!Number.isFinite(minutes) || minutes < 0 || minutes > 120) {
+      throw new InputError('The sticky check waits 0 to 120 minutes.');
+    }
+    await this.runtime.assertReady();
+    this.proxyTester ??= new ProxyTester(
+      (p) => this.runProxyCheck(p),
+      path.join(this.config.home, 'reports'),
+    );
+    return this.proxyTester.start(proxies, { stickyMinutes: minutes });
+  }
+
+  proxyTestJob(jobId: string): ProxyTestJob {
+    const job = this.proxyTester?.get(jobId);
+    if (!job) throw new InputError('No such proxy test.');
+    return job;
   }
 
   // ---------------------------------------------------------------- audit
@@ -981,6 +1027,13 @@ export interface AuditReport {
   finishedAt: string;
   checks: AuditCheckResult[];
   error?: string;
+}
+
+export interface ProxyTestRequest {
+  proxies?: string[];
+  like?: { profileId: string; ports: [number, number] };
+  /** Minutes before the sticky re-check (default 5, 0 skips it). */
+  stickyMinutes?: number;
 }
 
 export interface AuditJob {
