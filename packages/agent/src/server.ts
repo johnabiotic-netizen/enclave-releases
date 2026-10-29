@@ -103,6 +103,19 @@ export function buildServer(
       v1.post<{ Params: { id: string } }>('/profiles/:id/check-proxy', async (req) =>
         service.checkProfileProxy(req.params.id),
       );
+      // Audit (testing/test-suite.md): starts in the background, then poll the job.
+      v1.post<{ Params: { id: string }; Body: { checks?: string[] } }>(
+        '/profiles/:id/audit',
+        async (req, reply) => {
+          await service.get(req.params.id);
+          const checks = Array.isArray(req.body?.checks) ? req.body.checks.map(String) : [];
+          reply.code(202);
+          return service.startAudit(req.params.id, checks);
+        },
+      );
+      v1.get<{ Params: { jobId: string } }>('/audits/:jobId', async (req) =>
+        service.auditJob(req.params.jobId),
+      );
       v1.get<{ Params: { id: string }; Querystring: { tail?: string } }>(
         '/profiles/:id/logs',
         async (req) => {

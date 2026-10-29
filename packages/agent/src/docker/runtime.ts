@@ -164,6 +164,23 @@ export class DockerRuntime {
     }
   }
 
+  /** Runs `cmd` in a running container and returns its stdout and exit code. */
+  async execOutput(
+    name: string,
+    cmd: string[],
+    user: string,
+  ): Promise<{ code: number; stdout: string }> {
+    const exec = await this.docker
+      .getContainer(name)
+      .exec({ Cmd: cmd, User: user, AttachStdout: true, AttachStderr: true });
+    const stream = await exec.start({});
+    const chunks: Buffer[] = [];
+    stream.on('data', (c: Buffer) => chunks.push(c));
+    await new Promise<void>((resolve) => stream.on('end', () => resolve()));
+    const { stdout } = demuxLogs(Buffer.concat(chunks));
+    return { code: (await exec.inspect()).ExitCode ?? -1, stdout };
+  }
+
   async exec(name: string, cmd: string[], user: string): Promise<number> {
     const exec = await this.docker
       .getContainer(name)

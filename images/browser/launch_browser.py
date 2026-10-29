@@ -74,7 +74,10 @@ WINDOWS_DEFAULT_PREFS = {
 }
 
 
-def main() -> None:
+def prepare_launch() -> tuple[str, dict]:
+    """The browser binary and its environment for this profile, with the profile
+    directory and user.js in place. Shared by the normal start (main) and the audit
+    (audit.py), so an audit measures what a normal start shows."""
     with open(PROFILE_JSON, encoding="utf-8") as f:
         profile = json.load(f)
 
@@ -116,6 +119,11 @@ def main() -> None:
     with open(os.path.join(PROFILE_DIR, "user.js"), "w", encoding="utf-8") as f:
         for name, value in USER_PREFS.items():
             f.write(f"user_pref({json.dumps(name)}, {json.dumps(value)});\n")
+    return binary, env
+
+
+def main() -> None:
+    binary, env = prepare_launch()
     os.execve(binary, [binary, "--no-remote", "--profile", PROFILE_DIR], env)
 
 

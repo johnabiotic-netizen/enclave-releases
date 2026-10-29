@@ -59,7 +59,15 @@ const login = async (password) => {
 
 // 1. Put the probe page in the container, clear any earlier result.
 const probe = readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), 'probe.html'),
+  path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..',
+    '..',
+    'images',
+    'browser',
+    'audit',
+    'probe.html',
+  ),
   'utf8',
 );
 docker(

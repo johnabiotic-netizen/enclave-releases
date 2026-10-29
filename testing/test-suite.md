@@ -34,14 +34,20 @@ Runs in an audit container of the profile. Each check gives pass, fail or "look"
 `%LOCALAPPDATA%\Enclave\reports\<date>-<kind>-<name>\`: `report.json`, `summary.txt`, screenshots. CLI: `enclave proxy-test ...`, `enclave audit <id>`. Windows app screen in Stage 5.
 
 ## Build order
-- [ ] A. Audit container: start a profile copy in audit mode, run `audit.py` (Playwright, Camoufox's own launcher path), return JSON, remove it.
-- [ ] B. Self-check: probe values in audit mode equal a normal launch.
-- [ ] C. Page readers: probe, text metrics, Pixelscan, CreepJS, BrowserLeaks, amiunique.
-- [ ] D. Reference: save real Firefox 158 measurements; comparison rules.
-- [ ] E. `enclave audit <id>`: report and summary.
+- [x] A. Audit container: start a profile copy in audit mode, run `audit.py` (Playwright, Camoufox's own launcher path), return JSON, remove it.
+- [x] B. Self-check: probe values in audit mode equal a normal launch.
+- [x] C. Page readers: probe, text metrics, Pixelscan, CreepJS, BrowserLeaks, amiunique.
+- [x] D. Reference: save real Firefox 158 measurements; comparison rules.
+- [x] E. `enclave audit <id>`: report and summary.
 - [ ] F. Proxy tester steps 1 to 5, `enclave proxy-test`.
 - [ ] G. Proxy tester step 6 (Pixelscan per proxy).
 - [ ] H. Agent API endpoints for the Windows app (specs/agent-api.md).
+
+## Status (2026-10-29)
+- Self-check: the probe in audit mode equals a normal launch of Profile 3 in all 88 values (webdriver false in both).
+- Full audit of Profile 3: 8 checks in about 3 minutes; 24 pass, 57 fail (text metrics: Linux FreeType vs Windows DirectWrite, the enclave-camoufox build targets them), BrowserLeaks WebRTC now read correctly.
+- Readers have unit tests built from captured page text (`packages/agent/src/audit-readers.test.ts`).
+- Audit containers use Playwright's regular launch (a temporary profile), as Camoufox's launcher does; the persistent-profile launch hung in Juggler.
 
 ## Third-party sites
 The real-site checks depend on Pixelscan, CreepJS, BrowserLeaks and amiunique keeping their pages; a reader that no longer finds its fields reports "look", not pass. Check each site's terms before the product ships these checks; prefer an official API where one exists (docs/08).

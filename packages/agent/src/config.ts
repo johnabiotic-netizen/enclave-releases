@@ -20,6 +20,8 @@ export interface AgentConfig {
   phone: 'tailscale' | undefined;
   /** The built phone app (packages/mobile/dist), served by the agent. */
   mobileDir: string;
+  /** Real Windows Firefox measurements the audit compares with (testing/reference/). */
+  referenceDir: string;
 }
 
 const MIN_TOKEN_LENGTH = 24;
@@ -49,6 +51,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
     mobileDir:
       env.ENCLAVE_MOBILE_DIR ||
       path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../mobile/dist'),
+    referenceDir:
+      env.ENCLAVE_REFERENCE_DIR ||
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../../testing/reference/windows-firefox-158',
+      ),
   };
 }
 

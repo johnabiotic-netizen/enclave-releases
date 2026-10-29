@@ -1,8 +1,10 @@
 // Profile lifecycle: create (safety check + fingerprint), start, stop, delete, idle stop.
 
 import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
+import path from 'node:path';
 import {
   DEFAULT_IDLE_STOP_MINUTES,
   type CreateProfileRequest,
@@ -17,9 +19,10 @@ import {
 } from '@enclave/shared';
 import type { AgentConfig } from './config.js';
 import { PROFILE_LABEL, type DockerRuntime } from './docker/runtime.js';
-import { makeTar } from './docker/tar.js';
+import { makeTar, type TarEntry } from './docker/tar.js';
 import { detectGpu, gpuContainerSettings } from './gpu.js';
 import type { TailnetAddress, Tailscale } from './tailscale.js';
+import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
 import { AgentError, InputError } from './errors.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
@@ -39,11 +42,19 @@ const containerName = (id: string) => `enclave-${id}`;
 const networkName = (id: string) => `enclave-${id}`;
 const volumeName = (id: string) => `enclave-${id}-data`;
 const randomPassword = () => randomBytes(18).toString('base64url');
+const auditContainerName = (id: string) => `enclave-audit-${id}`;
+/** Marks audit containers (testing/test-suite.md); not PROFILE_LABEL, so nothing mistakes one for the profile. */
+const AUDIT_LABEL = 'enclave.audit';
+/** The longest an audit run may take: every check's own timeout plus start-up. */
+const AUDIT_TIMEOUT_MS = 20 * 60_000;
+const AUDIT_POLL_MS = 5_000;
 
 export class ProfileService {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly lastViewerAt = new Map<string, number>();
   private readonly nekoTokens = new Map<string, string>();
+  /** Audit runs started through the API, kept until the agent restarts. */
+  private readonly auditJobs = new Map<string, AuditJob>();
   private monitor: NodeJS.Timeout | undefined;
 
   constructor(
@@ -231,6 +242,167 @@ export class ProfileService {
     });
   }
 
+  // ---------------------------------------------------------------- audit
+
+  /**
+   * Runs check pages in a throwaway copy of the profile (testing/test-suite.md): the
+   * same image, fingerprint and proxy, an in-memory /data, no published ports. The real
+   * profile is never driven by automation and may be running meanwhile. Saves the
+   * result and screenshots under <home>/reports/ and returns them.
+   */
+  async audit(id: string, checks: string[]): Promise<AuditRun> {
+    const profile = await this.store.get(id);
+    await this.runtime.assertReady();
+    const secrets = await this.store.getSecrets(id);
+    const proxy = proxyInput(profile, secrets);
+    const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
+    assertLocationMatches(profile.fingerprint, raw);
+    const gpu = gpuContainerSettings(await this.requireSameGpu(profile.fingerprint));
+
+    const name = auditContainerName(id);
+    await this.runtime.stopAndRemove(name, 1).catch(() => {});
+    await this.runtime.ensureNetwork(networkName(id), id);
+    const startedAt = new Date();
+    await this.store.log(id, 'audit-started', { checks });
+    try {
+      const container = await this.runtime.docker.createContainer({
+        name,
+        Image: this.runtime.image,
+        Labels: { [AUDIT_LABEL]: id },
+        Env: [
+          'ENCLAVE_AUDIT=1',
+          'NEKO_MEMBER_PROVIDER=multiuser',
+          `NEKO_MEMBER_MULTIUSER_USER_PASSWORD=${randomPassword()}`,
+          `NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD=${randomPassword()}`,
+          ...gpu.env,
+          ...exitEnv(raw),
+        ],
+        HostConfig: {
+          NetworkMode: networkName(id),
+          // A fresh browser profile each run, gone with the container.
+          Tmpfs: { '/data': 'size=2g' },
+          Mounts: gpu.mounts,
+          Devices: gpu.devices,
+          CapAdd: ['NET_ADMIN'],
+          SecurityOpt: ['no-new-privileges'],
+          ShmSize: SHM_BYTES,
+          Memory: CONTAINER_MEMORY_BYTES,
+          ExtraHosts: ['host.docker.internal:host-gateway'],
+        },
+      });
+      await container.putArchive(
+        makeTar([
+          ...configFiles(profile, proxy),
+          { name: 'config/audit.json', mode: 0o644, content: JSON.stringify({ checks }) },
+        ]),
+        { path: '/' },
+      );
+      await container.start();
+
+      const report = await this.waitForAuditResult(name);
+      const dir = path.join(
+        this.config.home,
+        'reports',
+        `${startedAt.toISOString().replace(/[:.]/g, '-')}-audit-${slug(profile.name)}`,
+      );
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, 'result.json'), JSON.stringify(report, null, 2));
+      for (const check of report.checks ?? []) {
+        if (!check.screenshot || !/^[\w.-]+\.png$/.test(check.screenshot)) continue;
+        const shot = await this.runtime.execOutput(
+          name,
+          ['base64', '-w0', `/data/audit/${check.screenshot}`],
+          'root',
+        );
+        if (shot.code === 0) {
+          await writeFile(path.join(dir, check.screenshot), Buffer.from(shot.stdout, 'base64'));
+        }
+      }
+      const findings = evaluateAudit(report, {
+        exitIp: raw.exitIp ?? null,
+        baseline: await readJson(
+          path.join(this.config.home, 'profiles', id, 'baselines', 'baseline.json'),
+        ),
+        reference: await this.loadReference(),
+      });
+      const summary = summarize(profile.name, raw.exitIp ?? null, findings);
+      await writeFile(path.join(dir, 'findings.json'), JSON.stringify(findings, null, 2));
+      await writeFile(path.join(dir, 'summary.txt'), `${summary}\n`);
+      await this.store.log(id, 'audit-finished', {
+        reportDir: dir,
+        fail: findings.filter((f) => f.verdict === 'fail').length,
+      });
+      return { reportDir: dir, exitIp: raw.exitIp ?? null, report, findings, summary };
+    } finally {
+      await this.runtime.stopAndRemove(name, 2).catch(() => {});
+    }
+  }
+
+  /**
+   * Starts an audit in the background; an audit takes minutes, longer than an HTTP
+   * request should wait. Poll auditJob() for the outcome. One audit per profile at once.
+   */
+  startAudit(id: string, checks: string[]): AuditJob {
+    const running = [...this.auditJobs.values()].find(
+      (j) => j.profileId === id && j.state === 'running',
+    );
+    if (running) return running;
+    const job: AuditJob = {
+      id: randomBytes(8).toString('hex'),
+      profileId: id,
+      checks,
+      state: 'running',
+      startedAt: new Date().toISOString(),
+    };
+    this.auditJobs.set(job.id, job);
+    this.audit(id, checks).then(
+      (run) => Object.assign(job, { state: 'done', finishedAt: new Date().toISOString(), run }),
+      (e: unknown) =>
+        Object.assign(job, {
+          state: 'failed',
+          finishedAt: new Date().toISOString(),
+          error: e instanceof Error ? e.message : String(e),
+        }),
+    );
+    return job;
+  }
+
+  auditJob(jobId: string): AuditJob {
+    const job = this.auditJobs.get(jobId);
+    if (!job) throw new InputError('No such audit.');
+    return job;
+  }
+
+  private async loadReference(): Promise<Reference> {
+    const dir = this.config.referenceDir;
+    return {
+      probe: await readJson(path.join(dir, 'probe.json')),
+      metrics: await readJson(path.join(dir, 'metrics.json')),
+      svgEmojiCurrentFont: await readJson(path.join(dir, 'svg-emoji-current-font.json')),
+      creepjs: await readJson(path.join(dir, 'creepjs.json')),
+    };
+  }
+
+  private async waitForAuditResult(name: string): Promise<AuditReport> {
+    const deadline = Date.now() + AUDIT_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const info = await this.runtime.inspect(name);
+      if (!info?.State.Running) {
+        const logs = await this.runtime.logsTail(name, 20);
+        throw new AgentError(
+          'INTERNAL',
+          `The audit container stopped early: ${logs.trim().slice(-500)}`,
+        );
+      }
+      const out = await this.runtime
+        .execOutput(name, ['cat', '/data/audit/result.json'], 'root')
+        .catch(() => null);
+      if (out?.code === 0 && out.stdout.trim()) return JSON.parse(out.stdout) as AuditReport;
+      await new Promise((r) => setTimeout(r, AUDIT_POLL_MS));
+    }
+    throw new AgentError('INTERNAL', 'The audit took longer than 20 minutes and was stopped.');
+  }
+
   // ---------------------------------------------------------------- start / stop
 
   async start(id: string): Promise<{ stream: StreamInfo }> {
@@ -293,15 +465,7 @@ export class ProfileService {
                 ]
               : []),
             ...gpu.env,
-            // The address WebRTC reports as the profile's public IP: the exit IP this start's
-            // check just saw, not the one saved at creation, so it stays equal to the IP
-            // websites see after a proxy change or a new sticky IP.
-            ...(raw.exitIp ? [`ENCLAVE_EXIT_IP=${raw.exitIp}`] : []),
-            // Likewise the browser's location: where that IP is now (same country and
-            // timezone, checked above), in case a sticky IP was renewed elsewhere.
-            ...(raw.lat !== undefined && raw.lon !== undefined
-              ? [`ENCLAVE_EXIT_LAT=${raw.lat}`, `ENCLAVE_EXIT_LON=${raw.lon}`]
-              : []),
+            ...exitEnv(raw),
           ],
           ExposedPorts: { '8080/tcp': {}, [`${muxPort}/tcp`]: {}, [`${muxPort}/udp`]: {} },
           HostConfig: {
@@ -722,6 +886,22 @@ function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): vo
 }
 
 /**
+ * The address WebRTC reports as the profile's public IP: the exit IP this start's check
+ * just saw, not the one saved at creation, so it stays equal to the IP websites see
+ * after a proxy change or a new sticky IP. Likewise the browser's location: where that
+ * IP is now (same country and timezone, checked before), in case a sticky IP was renewed
+ * elsewhere.
+ */
+function exitEnv(raw: RawProxyCheck): string[] {
+  return [
+    ...(raw.exitIp ? [`ENCLAVE_EXIT_IP=${raw.exitIp}`] : []),
+    ...(raw.lat !== undefined && raw.lon !== undefined
+      ? [`ENCLAVE_EXIT_LAT=${raw.lat}`, `ENCLAVE_EXIT_LON=${raw.lon}`]
+      : []),
+  ];
+}
+
+/**
  * A new proxy in the same country and timezone can exit in another city. The browser's
  * location follows it (hard rule 3), as "Update location" allows; nothing else changes.
  */
@@ -750,12 +930,76 @@ export function phoneAppOrigin(tailnet: TailnetAddress, agentPort: number): stri
 }
 
 /** /config for the container (images/browser/README.md). proxy.json holds the password: root-only. */
-function configArchive(profile: Profile, proxy: ProxyInput): Buffer {
-  return makeTar([
+/** A JSON file's content, or undefined when it is missing or unreadable. */
+async function readJson<T>(file: string): Promise<T | undefined> {
+  try {
+    return JSON.parse(await readFile(file, 'utf8')) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function slug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'profile'
+  );
+}
+
+function configFiles(profile: Profile, proxy: ProxyInput): TarEntry[] {
+  return [
     { name: 'config/', mode: 0o755 },
     { name: 'config/profile.json', mode: 0o644, content: JSON.stringify(profile) },
     { name: 'config/proxy.json', mode: 0o600, content: JSON.stringify(proxy) },
-  ]);
+  ];
+}
+
+function configArchive(profile: Profile, proxy: ProxyInput): Buffer {
+  return makeTar(configFiles(profile, proxy));
+}
+
+/** One check page's outcome, as audit.py records it. */
+export interface AuditCheckResult {
+  name: string;
+  url: string;
+  status: 'ok' | 'error';
+  error?: string;
+  /** Our own pages: their JSON. */
+  data?: unknown;
+  /** Third-party pages: the page text. */
+  text?: string;
+  screenshot?: string;
+  /** Facts read from markup (e.g. CreepJS's lie marks). */
+  extra?: unknown;
+  seconds: number;
+}
+
+export interface AuditReport {
+  startedAt: string;
+  finishedAt: string;
+  checks: AuditCheckResult[];
+  error?: string;
+}
+
+export interface AuditJob {
+  id: string;
+  profileId: string;
+  checks: string[];
+  state: 'running' | 'done' | 'failed';
+  startedAt: string;
+  finishedAt?: string;
+  run?: AuditRun;
+  error?: string;
+}
+
+export interface AuditRun {
+  reportDir: string;
+  exitIp: string | null;
+  report: AuditReport;
+  findings: Finding[];
+  summary: string;
 }
 
 function portFree(port: number): Promise<boolean> {

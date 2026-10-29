@@ -34,6 +34,10 @@ const HELP = `Usage: enclave <command>
   stop <id>                      Stop a profile
   check <id>                     Check a profile's proxy
   logs <id>                      Show a profile's log
+  audit <id> [check...]          Run the check sites in a throwaway copy of the profile and
+                                   save a report (testing/test-suite.md). Checks: probe,
+                                   metrics, svg-emoji, pixelscan, creepjs, browserleaks-webrtc,
+                                   browserleaks-canvas, amiunique (default: all)
   delete <id> --yes              Delete a profile and all its data
   phone                          Show a QR code that connects your phone (phone mode)
 
@@ -142,6 +146,32 @@ async function main(): Promise<void> {
       );
       break;
     }
+    case 'audit': {
+      const id = await api.resolveId(arg);
+      const checks = positionals.slice(2);
+      let job = await api.call<AuditJobView>('POST', `/profiles/${id}/audit`, { checks });
+      console.log(
+        'Running the audit in a throwaway copy of the profile. This takes a few minutes.',
+      );
+      while (job.state === 'running') {
+        await new Promise((r) => setTimeout(r, 5_000));
+        job = await api.call<AuditJobView>('GET', `/audits/${job.id}`);
+      }
+      if (job.state === 'failed' || !job.run) {
+        throw new UsageError(`The audit didn't finish: ${job.error ?? 'no result'}`);
+      }
+      for (const c of job.run.report.checks) {
+        console.log(
+          `  ${c.status === 'ok' ? 'done ' : 'error'}  ${c.name} (${c.seconds} s)${c.error ? `: ${c.error}` : ''}`,
+        );
+      }
+      if (job.run.report.error) console.log(`The audit run reported: ${job.run.report.error}`);
+      console.log('');
+      console.log(job.run.summary);
+      console.log('');
+      console.log(`Report saved in ${job.run.reportDir}`);
+      break;
+    }
     case 'logs': {
       const id = await api.resolveId(arg);
       const { lines } = await api.call<{ lines: string[] }>('GET', `/profiles/${id}/logs?tail=200`);
@@ -228,6 +258,20 @@ function printStream(stream: StreamInfo): void {
 }
 
 class UsageError extends Error {}
+
+interface AuditJobView {
+  id: string;
+  state: 'running' | 'done' | 'failed';
+  error?: string;
+  run?: {
+    reportDir: string;
+    summary: string;
+    report: {
+      error?: string;
+      checks: { name: string; status: string; error?: string; seconds: number }[];
+    };
+  };
+}
 
 class ApiClient {
   private readonly base: string;

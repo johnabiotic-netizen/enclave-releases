@@ -181,7 +181,9 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*; \
     command -v capsh
 
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py /opt/enclave/
+COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py /opt/enclave/
+# Check pages for audit runs (audit.py, testing/test-suite.md).
+COPY audit/ /opt/enclave/audit/
 # Windows line endings break the shebang ("required file not found"): refuse them.
 RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
     && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf

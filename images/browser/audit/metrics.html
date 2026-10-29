@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8" /><title>Text metrics</title>
+<!-- Enclave audit: canvas measureText, span box and SVG bbox of one string in common Windows fonts at 100px. -->
+<pre id="out">...</pre>
+<div id="box" style="position: absolute; left: -9999px"></div>
+<svg style="position: absolute; left: -9999px"><g id="g"></g></svg>
+<script>
+  const fonts = [
+    'Arial',
+    'Segoe UI',
+    'Times New Roman',
+    'Calibri',
+    'Consolas',
+    'Tahoma',
+    'Verdana',
+    'Georgia',
+    'Segoe UI Emoji',
+    'Cambria',
+  ];
+  const s = 'Hxgjpq Àé 123';
+  const c = document.createElement('canvas').getContext('2d');
+  const res = {};
+  for (const f of fonts) {
+    c.font = `100px "${f}"`;
+    const m = c.measureText(s);
+    const sp = document.createElement('span');
+    sp.style.font = `100px "${f}"`;
+    sp.textContent = s;
+    document.getElementById('box').appendChild(sp);
+    const r = sp.getBoundingClientRect();
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('style', `font:100px "${f}"`);
+    t.textContent = s;
+    document.getElementById('g').appendChild(t);
+    const b = t.getBBox();
+    res[f] = [
+      m.width,
+      m.actualBoundingBoxAscent,
+      m.actualBoundingBoxDescent,
+      m.fontBoundingBoxAscent,
+      m.fontBoundingBoxDescent,
+      r.width,
+      r.height,
+      b.y,
+      b.height,
+    ].map((x) => +x.toFixed(3));
+  }
+  const text = JSON.stringify(res);
+  document.getElementById('out').textContent = text;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = 'enclave-baseline.json';
+  a.click();
+</script>

@@ -1,0 +1,10 @@
+{
+  "webglParams": "94e7c936",
+  "webglParamsCount": 78,
+  "webglExts": "71e0d43d",
+  "webglExtsCount": 45,
+  "audioSum": "35.749972093850374",
+  "domRectElems": "0.4950627700024415",
+  "fontsVerdict": "Like Windows 11",
+  "note": "From CreepJS in real Firefox 158.0 on the owner's PC. Headless scores are not comparable (the reference ran headless). Text metrics, SVGRect and font counts depend on the PC's own fonts (older Segoe UI Emoji, HoloLens MDL2 Assets)."
+}

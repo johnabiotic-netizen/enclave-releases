@@ -1,0 +1,138 @@
+<!doctype html><meta charset="utf-8" /><title>SVG emoji bounds</title>
+<!-- Enclave audit: getBBox and text length of CreepJS's SVGRect emoji set (its EMOJIS and font stack), per emoji and for the group. -->
+<pre id="out">...</pre>
+<div style="position: absolute; left: -9999px">
+  <svg><g id="g"></g></svg>
+</div>
+<script>
+  const EM = [
+    [128512],
+    [9786],
+    [129333, 8205, 9794, 65039],
+    [9832],
+    [9784],
+    [9895],
+    [8265],
+    [8505],
+    [127987, 65039, 8205, 9895, 65039],
+    [129394],
+    [9785],
+    [9760],
+    [129489, 8205, 129456],
+    [129487, 8205, 9794, 65039],
+    [9975],
+    [129489, 8205, 129309, 8205, 129489],
+    [9752],
+    [9968],
+    [9961],
+    [9972],
+    [9992],
+    [9201],
+    [9928],
+    [9730],
+    [9969],
+    [9731],
+    [9732],
+    [9976],
+    [9823],
+    [9937],
+    [9000],
+    [9993],
+    [9999],
+
+    [128105, 8205, 10084, 65039, 8205, 128139, 8205, 128104],
+    [128104, 8205, 128105, 8205, 128103, 8205, 128102],
+    [128104, 8205, 128105, 8205, 128102],
+
+    [128512],
+    [169],
+    [174],
+    [8482],
+    [128065, 65039, 8205, 128488, 65039],
+
+    [10002],
+    [9986],
+    [9935],
+    [9874],
+    [9876],
+    [9881],
+    [9939],
+    [9879],
+    [9904],
+    [9905],
+    [9888],
+    [9762],
+    [9763],
+    [11014],
+    [8599],
+    [10145],
+    [11013],
+    [9883],
+    [10017],
+    [10013],
+    [9766],
+    [9654],
+    [9197],
+    [9199],
+    [9167],
+    [9792],
+    [9794],
+    [10006],
+    [12336],
+    [9877],
+    [9884],
+    [10004],
+    [10035],
+    [10055],
+    [9724],
+    [9642],
+    [10083],
+    [10084],
+    [9996],
+    [9757],
+    [9997],
+    [10052],
+    [9878],
+    [8618],
+    [9775],
+    [9770],
+    [9774],
+    [9745],
+    [10036],
+    [127344],
+    [127359],
+  ].map((c) => String.fromCodePoint(...c));
+  const g = document.getElementById('g');
+  const rows = [];
+  for (const e of EM) {
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', 32);
+    t.setAttribute('y', 32);
+    t.setAttribute(
+      'style',
+      "font-family:'Segoe Fluent Icons', 'Ink Free', 'Bahnschrift', 'Segoe MDL2 Assets', 'HoloLens MDL2 Assets', 'Leelawadee UI', 'Javanese Text', 'Segoe UI Emoji', 'Aldhabi', 'Gadugi', 'Myanmar Text', 'Nirmala UI', 'Lucida Console', 'Cambria Math', 'Bai Jamjuree', 'Chakra Petch', 'Charmonman', 'Fahkwang', 'K2D', 'Kodchasan', 'KoHo', 'Sarabun', 'Srisakdi', 'Galvji', 'MuktaMahee Regular', 'InaiMathi Bold', 'American Typewriter Semibold', 'Futura Bold', 'SignPainter-HouseScript Semibold', 'PingFang HK Light', 'Kohinoor Devanagari Medium', 'Luminari', 'Geneva', 'Helvetica Neue', 'Droid Sans Mono', 'Dancing Script', 'Roboto', 'Ubuntu', 'Liberation Mono', 'Source Code Pro', 'DejaVu Sans', 'OpenSymbol', 'Chilanka', 'Cousine', 'Arimo', 'Jomolhari', 'MONO', 'Noto Color Emoji', sans-serif !important;font-size:200px;transform:scale(1.000999)",
+    );
+    t.textContent = e;
+    g.appendChild(t);
+  }
+  const els = [...g.children];
+  els.forEach((t, i) => {
+    const b = t.getBBox();
+    rows.push([
+      EM[i].codePointAt(0).toString(16),
+      +b.x.toFixed(2),
+      +b.y.toFixed(2),
+      +b.width.toFixed(2),
+      +b.height.toFixed(2),
+      +t.getComputedTextLength().toFixed(3),
+    ]);
+  });
+  const gb = g.getBBox();
+  const sum = Math.abs(gb.x) + Math.abs(gb.y) + gb.width + gb.height;
+  const text = JSON.stringify({ groupSum: sum, group: [gb.x, gb.y, gb.width, gb.height], rows });
+  document.getElementById('out').textContent = text;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = 'enclave-baseline.json';
+  a.click();
+</script>
