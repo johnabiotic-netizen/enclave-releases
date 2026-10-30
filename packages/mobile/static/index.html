@@ -151,6 +151,32 @@
         background: var(--danger);
         vertical-align: middle;
       }
+      #preview {
+        position: absolute;
+        top: calc(10px + env(safe-area-inset-top));
+        right: 10px;
+        width: 128px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 0 0 2px var(--danger);
+      }
+      #preview[hidden] {
+        display: none;
+      }
+      #preview video {
+        display: block;
+        width: 100%;
+      }
+      #flip {
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        min-height: 32px;
+        padding: 0 10px;
+        font-size: 13px;
+        background: rgba(13, 16, 22, 0.8);
+      }
       #status {
         position: absolute;
         top: calc(10px + env(safe-area-inset-top));
@@ -173,12 +199,17 @@
     <div id="viewer">
       <div id="stage"></div>
       <div id="status"></div>
+      <div id="preview" hidden>
+        <video id="preview-video" muted playsinline autoplay></video>
+        <button id="flip" aria-label="Switch between the front and back camera">Flip</button>
+      </div>
       <div id="bar">
         <button id="back" aria-label="Back">Back</button>
         <button id="forward" aria-label="Forward">Forward</button>
         <button id="reload" aria-label="Reload">Reload</button>
         <button id="keyboard" aria-label="Keyboard">Keyboard</button>
         <button id="mic" aria-label="Share the phone microphone" aria-pressed="false">Mic</button>
+        <button id="camera" aria-label="Share the phone camera" aria-pressed="false">Camera</button>
         <button id="close" aria-label="Close">Close</button>
       </div>
     </div>

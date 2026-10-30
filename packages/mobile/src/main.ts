@@ -183,6 +183,12 @@ const open = (p: Profile) =>
 let client: NekoClient | null = null;
 /** The phone microphone the profile is hearing, while it is shared (Stage 4). */
 let mic: { stream: MediaStream; stop: (() => void) | null } | null = null;
+/** The phone camera the profile is seeing, while it is shared (Stage 4). */
+let camera: {
+  stream: MediaStream;
+  stop: (() => void) | null;
+  facing: 'user' | 'environment';
+} | null = null;
 let overlay: Overlay | null = null;
 const detach: (() => void)[] = [];
 
@@ -219,6 +225,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
         }
         // A reconnect is a new connection: share the microphone again.
         if (status === 'connected' && mic) mic.stop = c.shareMedia(mic.stream);
+        if (status === 'connected' && camera) camera.stop = c.shareMedia(camera.stream);
       },
       { fireImmediately: true },
     ),
@@ -228,6 +235,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
 
 function closeViewer(): void {
   stopMic();
+  stopCamera();
   for (const off of detach.splice(0)) off();
   if (client) {
     client.release();
@@ -377,6 +385,65 @@ micButton.onclick = async () => {
     setStatus('The phone did not allow the microphone. Allow it for this app and try again.');
   }
   showMic();
+};
+
+// The phone camera, shared into the profile: what a site sees when it uses the profile's
+// camera. A small preview shows exactly what is being sent, with a front/back switch.
+const cameraButton = document.getElementById('camera')!;
+const preview = document.getElementById('preview')!;
+const previewVideo = document.getElementById('preview-video') as HTMLVideoElement;
+
+function showCamera(): void {
+  cameraButton.classList.toggle('live', Boolean(camera));
+  cameraButton.setAttribute('aria-pressed', String(Boolean(camera)));
+  cameraButton.textContent = camera ? 'Camera on' : 'Camera';
+  preview.hidden = !camera;
+  previewVideo.srcObject = camera?.stream ?? null;
+  // The front camera is shown mirrored, as phones do; the profile gets it unmirrored.
+  previewVideo.style.transform = camera?.facing === 'user' ? 'scaleX(-1)' : '';
+}
+
+function stopCamera(): void {
+  if (!camera) return;
+  camera.stop?.();
+  for (const t of camera.stream.getTracks()) t.stop();
+  camera = null;
+  showCamera();
+}
+
+async function startCamera(facing: 'user' | 'environment'): Promise<void> {
+  if (!client) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: facing,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
+      },
+    });
+    camera = {
+      stream,
+      facing,
+      stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
+    };
+    for (const t of stream.getTracks()) t.onended = () => stopCamera();
+  } catch {
+    setStatus('The phone did not allow the camera. Allow it for this app and try again.');
+  }
+  showCamera();
+}
+
+cameraButton.onclick = async () => {
+  if (camera) return stopCamera();
+  await startCamera('user');
+};
+
+document.getElementById('flip')!.onclick = async () => {
+  if (!camera) return;
+  const next = camera.facing === 'user' ? 'environment' : 'user';
+  stopCamera();
+  await startCamera(next);
 };
 
 document.getElementById('close')!.onclick = () => {

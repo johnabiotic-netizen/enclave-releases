@@ -186,7 +186,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*; \
     command -v capsh
 
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py /opt/enclave/
+COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py camfeed.py /opt/enclave/
 # Check pages for audit runs (audit.py, testing/test-suite.md).
 COPY audit/ /opt/enclave/audit/
 # Windows line endings break the shebang ("required file not found"): refuse them.
@@ -194,5 +194,12 @@ RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
     && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf
 
 COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
+
+# Stage 4: the phone camera. neko receives it and (Enclave's neko build) writes the
+# decoded frames into camfeed.py's pipe; the browser's camera reads them from there.
+ENV NEKO_CAPTURE_WEBCAM_ENABLED=true \
+    NEKO_CAPTURE_WEBCAM_DEVICE=fifo:/tmp/enclave-camera.fifo \
+    NEKO_CAPTURE_WEBCAM_WIDTH=1280 \
+    NEKO_CAPTURE_WEBCAM_HEIGHT=720
 
 ENTRYPOINT ["/opt/enclave/entrypoint.sh"]
