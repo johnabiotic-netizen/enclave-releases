@@ -30,6 +30,12 @@ ADD --checksum=sha256:e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0b
     https://github.com/go-gost/gost/releases/download/v3.3.1/gost_3.3.1_linux_amd64.tar.gz \
     /gost.tar.gz
 
+# neko v3.2.0's server with Enclave's patches (the webcam goes to a named pipe), built
+# by the private repo enclave-camoufox (workflow "Enclave neko build", run of
+# 2026-10-30). No public URL: scripts/build-image.sh supplies it from
+# $ENCLAVE_DIST_CACHE/neko/; without it this stage is empty and the checksum below fails.
+FROM scratch AS neko-dist
+
 # --- GL shim (gl_shim.c), built apart so the image carries no compiler ----------
 
 FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647c57cf5b9695a90234a0edaa446 AS gl-shim
@@ -194,6 +200,12 @@ RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
     && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf
 
 COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
+
+ARG NEKO_SHA256=60abac1a19bcad76f70d7f12f666721d575f5063f3e8a6fcb9c3fbb38c5ae54f
+RUN --mount=type=bind,from=neko-dist,target=/dist/neko \
+    set -eux; \
+    echo "${NEKO_SHA256}  /dist/neko/neko" | sha256sum -c -; \
+    install -m 0755 /dist/neko/neko /usr/bin/neko
 
 # Stage 4: the phone camera. neko receives it and (Enclave's neko build) writes the
 # decoded frames into camfeed.py's pipe; the browser's camera reads them from there.
