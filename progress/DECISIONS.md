@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-30  Fonts only from fontconfig; one WebGL recording per GPU
+Context: Kerned text in Verdana and Tahoma differed from Windows by 1/60 px; Firefox's bundled fonts (activated by Camoufox for a foreign OS) added every OS group on Linux, and the macOS Verdana won. Separately, Camoufox picks a WebGL recording at random; one of the three for Intel HD Graphics 400 reports MAX_SAMPLES 8, the real GPU 16.
+Decision: gfx.bundled-fonts.activate=0 (fonts come only from Camoufox's Windows fontconfig file). gen_fingerprint uses the most common recording for the GPU and always 0 touch points. Existing profiles keep their saved values; Profile 1 (MAX_SAMPLES 8, touch 5) is left for the owner.
+Reason: Every audit check now equals Windows Firefox 158 on this PC; all profiles on one PC report the same real GPU.
+
 ## 2026-10-27  Own Camoufox build for Windows text metrics (owner: yes, private repo)
 Context: Linux Firefox measures text with FreeType rules (whole-pixel glyph heights, hhea line metrics, outward rounding); Windows Firefox with DirectWrite rules. Sites can measure the difference; no setting changes it. The owner's PC cannot build Firefox (WSL unsupported upstream, ~9.5 GB free).
 Decision: A private GitHub repo `enclave-camoufox` (Camoufox at tag v158.0-beta.40, branch `enclave`) adds browser/patches/enclave-windows-font-metrics.patch: in gfxFT2FontBase, when ENCLAVE_FONT_METRICS=dwrite, HarfBuzz scales design advances, font metrics follow gfxDWriteFont::ComputeMetrics, glyph bounds are the design box. Built by a manual GitHub Actions workflow (Camoufox's own release steps, Linux x86_64 only). The image takes the zip from the local cache with its SHA-256 pinned. Camoufox's release/test workflows are removed from the copy.
