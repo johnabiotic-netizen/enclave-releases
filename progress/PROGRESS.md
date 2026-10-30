@@ -73,8 +73,9 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 ## Stage 4: Camera and mic passthrough  [~]
 Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-30.
 - [x] Verify first (2026-10-30): no v4l2loopback in WSL; neko mic upstream works into PulseAudio, neko webcam needs v4l2loopback; Camoufox serves identity devices from the fake engine.
-- [ ] Mic: phone mic -> neko audio_input -> identity microphone (Camoufox patch).
-- [ ] Camera: phone camera -> neko -> shared-memory frames -> identity camera (neko patch + Camoufox patch).
+- [~] Mic: phone mic -> neko audio_input -> identity microphone (Camoufox patch). Built (Camoufox ceeb8e34, 2026-10-30); the first test crashed the tab on any microphone request (wrong track type, DECISIONS 2026-10-31). Fix in Camoufox build run 41143868785.
+- [~] Camera: phone camera -> neko -> shared-memory frames -> identity camera (neko patch + Camoufox patch). Works end to end (2026-10-31, simulated phone: the profile's "HD Webcam" shows the phone's picture at 1280x720; black when the phone stops). Too slow and blurry at first (320x180 sent, 2 to 78 fps out); fix in neko build run 41145786572.
+- Test rig (2026-10-31): a simulated phone (Edge headless with Chromium's fake camera and mic, driving the real phone app over Tailscale) plus a test page in a throwaway profile ("Phone test", test proxy) that records what the profile's camera and mic deliver. Scripts in the session scratchpad; to be moved into `scripts/` with the stage's acceptance tests.
 - [ ] Phone PWA: share camera and mic, preview, front/back, live indicator.
 - [ ] Clipboard and file passthrough; no-phone message.
 ## Stage 5: Windows app  [ ]
