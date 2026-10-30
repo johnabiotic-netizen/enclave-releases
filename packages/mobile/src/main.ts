@@ -181,6 +181,8 @@ const open = (p: Profile) =>
 // ------------------------------------------------------------------ the viewer
 
 let client: NekoClient | null = null;
+/** The phone microphone the profile is hearing, while it is shared (Stage 4). */
+let mic: { stream: MediaStream; stop: (() => void) | null } | null = null;
 let overlay: Overlay | null = null;
 const detach: (() => void)[] = [];
 
@@ -215,6 +217,8 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
           asked = true;
           c.request();
         }
+        // A reconnect is a new connection: share the microphone again.
+        if (status === 'connected' && mic) mic.stop = c.shareMedia(mic.stream);
       },
       { fireImmediately: true },
     ),
@@ -223,6 +227,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
 }
 
 function closeViewer(): void {
+  stopMic();
   for (const off of detach.splice(0)) off();
   if (client) {
     client.release();
@@ -337,6 +342,43 @@ document.getElementById('back')!.onclick = () => press(XK.Alt_L, XK.Left);
 document.getElementById('forward')!.onclick = () => press(XK.Alt_L, XK.Right);
 document.getElementById('reload')!.onclick = () => press(XK.F5);
 document.getElementById('keyboard')!.onclick = () => overlay?.mobileKeyboardToggle();
+// The phone microphone, shared into the profile: what a site hears when it uses the
+// profile's microphone. Only while the button shows it live.
+const micButton = document.getElementById('mic')!;
+
+function showMic(): void {
+  micButton.classList.toggle('live', Boolean(mic));
+  micButton.setAttribute('aria-pressed', String(Boolean(mic)));
+  micButton.textContent = mic ? 'Mic on' : 'Mic';
+}
+
+function stopMic(): void {
+  if (!mic) return;
+  mic.stop?.();
+  for (const t of mic.stream.getTracks()) t.stop();
+  mic = null;
+  showMic();
+}
+
+micButton.onclick = async () => {
+  if (mic) return stopMic();
+  if (!client) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    mic = {
+      stream,
+      stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
+    };
+    // The phone (or the user in its settings) can end the capture; follow it.
+    for (const t of stream.getTracks()) t.onended = () => stopMic();
+  } catch {
+    setStatus('The phone did not allow the microphone. Allow it for this app and try again.');
+  }
+  showMic();
+};
+
 document.getElementById('close')!.onclick = () => {
   closeViewer();
   void refresh();

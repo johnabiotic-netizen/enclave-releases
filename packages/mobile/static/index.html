@@ -138,6 +138,19 @@
         background: transparent;
         font-size: 15px;
       }
+      #bar button.live {
+        color: var(--danger);
+      }
+      #bar button.live::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 5px;
+        border-radius: 50%;
+        background: var(--danger);
+        vertical-align: middle;
+      }
       #status {
         position: absolute;
         top: calc(10px + env(safe-area-inset-top));
@@ -165,6 +178,7 @@
         <button id="forward" aria-label="Forward">Forward</button>
         <button id="reload" aria-label="Reload">Reload</button>
         <button id="keyboard" aria-label="Keyboard">Keyboard</button>
+        <button id="mic" aria-label="Share the phone microphone" aria-pressed="false">Mic</button>
         <button id="close" aria-label="Close">Close</button>
       </div>
     </div>

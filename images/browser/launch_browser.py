@@ -120,6 +120,9 @@ def prepare_launch() -> tuple[str, dict]:
     # Text measured with Windows Firefox's DirectWrite numbers (enclave-camoufox's
     # enclave-windows-font-metrics.patch; an unpatched Camoufox ignores it).
     env["ENCLAVE_FONT_METRICS"] = "dwrite"
+    # The profile's microphone hears the phone's (enclave-camoufox's
+    # zz-enclave-phone-media.patch; neko plays the phone mic into the default input).
+    env["ENCLAVE_PHONE_MEDIA"] = "1"
     binary = str(camoufox_path(download_if_missing=False) / "camoufox-bin")
     os.makedirs(PROFILE_DIR, exist_ok=True)
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
