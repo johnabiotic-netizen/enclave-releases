@@ -9,15 +9,15 @@
 - Whether the neko display size can be set per container to match each profile's screen fingerprint.
 
 ## Build tasks
-- [ ] Install a complete Windows 10/11 font set in the image and restrict the browser's exposed fonts to that set. Remove Linux only fonts from exposure.
-- [ ] Canvas: drawn on the PC's real GPU and randomized by Firefox's Strict fingerprinting protection: different per profile and per site, new each browser start, as for every Firefox Strict user (owner decision 2026-10-26, option A; replaces the per-profile seed).
-- [ ] WebGL: vendor and renderer are the PC's real GPU as Windows Firefox names it (all profiles on one PC share it, as on one real PC); parameters and extensions consistent with it. No "Mesa", "llvmpipe", or software renderer strings.
-- [ ] AudioContext: stock, no noise (every x86 PC renders the standard probe the same; Firefox adds none). Replaces the per-profile seed (option A).
-- [ ] Screen and window: container display and neko size match the fingerprint's screen; `devicePixelRatio`, color depth, available size all consistent.
-- [ ] Timezone, locale, languages, geolocation all driven by proxy location; verify no UTC leak from the container.
+- [x] Install a complete Windows 10/11 font set in the image and restrict the browser's exposed fonts to that set. Remove Linux only fonts from exposure.
+- [x] Canvas: drawn on the PC's real GPU and randomized by Firefox's Strict fingerprinting protection: different per profile and per site, new each browser start, as for every Firefox Strict user (owner decision 2026-10-26, option A; replaces the per-profile seed).
+- [x] WebGL: vendor and renderer are the PC's real GPU as Windows Firefox names it (all profiles on one PC share it, as on one real PC); parameters and extensions consistent with it. No "Mesa", "llvmpipe", or software renderer strings.
+- [x] AudioContext: stock, no noise (every x86 PC renders the standard probe the same; Firefox adds none). Replaces the per-profile seed (option A).
+- [x] Screen and window: container display and neko size match the fingerprint's screen; `devicePixelRatio`, color depth, available size all consistent.
+- [x] Timezone, locale, languages, geolocation all driven by proxy location; verify no UTC leak from the container.
 - [x] Media devices: expose a consistent desktop set (one mic, one camera, one speaker) with generic Windows style labels decided at creation. (Real passthrough comes in Stage 4; here just the device list is consistent.)
 - [x] WebRTC: disabled or proxy only; no local/real IP via WebRTC.
-- [ ] Fonts, plugins, mimeTypes, navigator properties: no headless or automation markers.
+- [x] Fonts, plugins, mimeTypes, navigator properties: no headless or automation markers.
 - [x] Save a baseline per profile under `profiles/<id>/baselines/` for regression checks.
 
 ## Acceptance tests
