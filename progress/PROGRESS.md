@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 3, Fingerprint hardening. In progress (2026-10-27). Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
+**Current stage:** Stage 4, Camera and mic passthrough. Stage 3, Fingerprint hardening: complete 2026-10-30. Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -36,7 +36,7 @@ Stage 2 acceptance evidence (2026-10-27, owner, Android phone V2318, Profile 1 o
 - Test 3 no logout: test account still logged in on the phone, no verification prompt (owner). PASS.
 - Test 4 input: tap, type, back/forward/reload work; drag scrolls after the gesture fix (owner). PASS.
 - Test 5 reconnect: four phone reconnects 12:10 to 12:15 UTC, Camoufox uptime unbroken since 12:08 (log). PASS.
-## Stage 3: Fingerprint hardening  [~]
+## Stage 3: Fingerprint hardening  [x]
 
 Spec and checklist updated to option A (canvas by Firefox Strict, stock audio, the PC's GPU).
 Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
@@ -58,7 +58,8 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 - [x] Text widths and emoji: Camoufox's full hinting rounded every glyph advance (Arial 100px: 660 vs Windows 656.017) and gave the family emoji 71 million px of getBBox bounds (CreepJS SVGRect bBox 7165 vs ~0.08). Hinting off: 9 of 10 test fonts have exactly Windows' width, emoji bounds normal (sum 810.8; Windows 158 with the same emoji font 757.4). Segoe UI Emoji is the current Windows 11 version (12 MB), newer than the owner's PC's (2023); with that font, Windows 158 lays the emoji out normally.
 - [x] Text metrics vs Windows DirectWrite: fixed by the enclave-camoufox build (2026-10-29) and gfx.bundled-fonts.activate=0 (2026-10-30); see the entries below.
 - [x] Profile 2 moved (owner, 2026-10-27) from port 10050 to 10079 (72.245.64.165, RCN, New York): Pixelscan "consistent", no proxy detected. On the way: 10048 (198.145.81.104, clean in ip-api) was still flagged by Pixelscan, and the move showed a bug: WebRTC kept the old IP. Fixed: each start passes the current exit IP and its location to the browser, and a proxy change moves the saved geolocation. Pixelscan's "hosting" label alone does not fail it (10079 has it too); ip-api does not predict Pixelscan, so a port is proven only by a Pixelscan run.
-- [ ] Firefox 159 is out; profiles say 158 (follow Camoufox updates).
+- [x] Done (2026-10-30, owner chose a third clean profile): Profiles 2, 3 and 4 pass all audit checks (`enclave audit`), baselines saved, Profile 4 matched its baseline after a fresh launch; website canvases differ (0B94..., 1B4A..., 632D...). Profile 4: port 10069 (12.12.118.237, AT&T, New York), picked with `enclave proxy-test --pixelscan`: 10085, 10069, 10045 consistent; 10074, 10076, 10080 flagged.
+- Carried over: Firefox 159 is out, profiles say 158 (rebuild with our patch when Camoufox moves to 159, then audit again). Profile 1: MAX_SAMPLES 8, 5 touch points, German IP flagged; the owner decides later.
 - [x] GeoIP time bomb (2026-10-29): Camoufox re-downloads its GeoIP database once the data is 8 days old; in our containers that hangs, so from 8 days after the image build every proxy check and profile start timed out ("timed out after 90 s"). Fixed: no run-time updates; the pinned database is refreshed by rebuilding the image. Rebuild the image at least every few weeks so location data stays current.
 - [ ] Profile 1 (DE, port 10006, 62.192.100.40): Pixelscan "Proxy detected", everything else consistent (WebRTC = IP, location within 100 m, Europe/Berlin, de-DE, IP type business). Ports 10001 to 10009 tested with temporary profiles (2026-10-29): all flagged (10007 did not load). US: 10075 and 10079 pass, 10048 and 10050 flagged. Pixelscan lists this provider's German IPs as proxies; a clean German IP needs another source (owner).
 - [x] Own Camoufox build (enclave-camoufox, private, GitHub Actions run of 2026-10-29): camoufox-158.0-beta.40-lin.x86_64.zip, SHA-256 88d5d204...6c0c, pinned in the Dockerfile; supplied from the local download cache (no public URL). Audit of Profile 3 (2026-10-29): 57 failures to 3. Text metrics: 79 of 81 values equal Windows Firefox 158 exactly; left: Verdana width 744.1 vs 744.083 (1/60 px), SVG emoji bounds 757.372496 vs 757.372482. Everything else passes.
