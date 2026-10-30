@@ -5,13 +5,14 @@
 # Each stage can be swapped for a local folder holding the same file with
 # --build-context <stage>=<dir>; the checksums are re-checked below either way.
 
-# Camoufox v158.0-beta.40 built with Enclave's patches (Windows text metrics) by the
-# private repo enclave-camoufox (workflow "Enclave build", run of 2026-10-29). It has no
-# public URL: scripts/build-image.sh supplies it from $ENCLAVE_DIST_CACHE/camoufox/.
+# Camoufox v158.0-beta.40 built with Enclave's patches (Windows text metrics; phone
+# camera and mic) by the private repo enclave-camoufox (workflow "Enclave build", run of
+# 2026-10-30). It has no public URL: scripts/build-image.sh supplies it from
+# $ENCLAVE_DIST_CACHE/camoufox/.
 # The URL below is the stock release, kept only as the stage's source; its checksum
 # differs, so a build without our zip in the cache fails rather than using stock Camoufox.
 FROM scratch AS camoufox-dist
-ADD --checksum=sha256:88d5d204d03ac98c15e7070c085e610ff5ee1049a92d5adcab2a467757976c0c \
+ADD --checksum=sha256:ceeb8e34d28fce45c549da4be100a889551ac60e66c6c7b83c88cad20f2564a4 \
     https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-lin.x86_64.zip \
     /camoufox.zip
 
@@ -51,8 +52,8 @@ FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647
 
 # Camoufox browser build. The folder suffix is the first 8 hex chars of the zip's sha256,
 # which is how the camoufox package names its installs.
-ARG CAMOUFOX_INSTALL=browsers/official/158.0-beta.40-88d5d204
-ARG CAMOUFOX_SHA256=88d5d204d03ac98c15e7070c085e610ff5ee1049a92d5adcab2a467757976c0c
+ARG CAMOUFOX_INSTALL=browsers/official/158.0-beta.40-ceeb8e34
+ARG CAMOUFOX_SHA256=ceeb8e34d28fce45c549da4be100a889551ac60e66c6c7b83c88cad20f2564a4
 ARG GEOIP_SHA256=1823c162efe356bb8a588f10f027c41bd19d742cd00b4696d8f74ea0a3856358
 ARG UBLOCK_SHA256=5b74415860456370644bd80f16125e865b0e6c356bb5dfcfb84069967eaa5287
 ARG GOST_SHA256=e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0bcae37c
