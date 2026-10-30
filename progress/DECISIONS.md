@@ -12,6 +12,11 @@ Reason: ...
 
 ---
 
+## 2026-10-30  Stage 4 design: camera and mic through Camoufox's media engine
+Context (verify first): WSL kernel 6.18.33.2 has V4L2 only as modules and no v4l2loopback, no /dev/video. neko 3.2.0 receives the viewer's mic into a PulseAudio source (audio_input, works without kernel modules) but writes the webcam only to a v4l2loopback device (v4l2sink, hard-coded; VP8 tested). Camoufox serves the identity's cameras and mics from Firefox's fake media engine (media-device-spoofing.patch), which outputs a test pattern and tone. The neko client library shares any local track over the existing WebRTC connection.
+Decision: Browser-level route, as the stage spec prefers. Phone PWA shares camera and mic over the viewer's neko WebRTC connection. Mic: neko's audio_input source; an enclave-camoufox patch makes the identity's microphone capture from it. Camera: a neko patch writes the decoded frames to a shared-memory file instead of v4l2sink; an enclave-camoufox patch makes the identity's camera show those frames. The device list stays the one saved in the profile.
+Reason: Works on any Windows PC (no kernel module), keeps the Stage 3 device list, and keeps the real person's live camera as the only source (hard rule 6: nothing aimed at identity or liveness checks).
+
 ## 2026-10-30  Fonts only from fontconfig; one WebGL recording per GPU
 Context: Kerned text in Verdana and Tahoma differed from Windows by 1/60 px; Firefox's bundled fonts (activated by Camoufox for a foreign OS) added every OS group on Linux, and the macOS Verdana won. Separately, Camoufox picks a WebGL recording at random; one of the three for Intel HD Graphics 400 reports MAX_SAMPLES 8, the real GPU 16.
 Decision: gfx.bundled-fonts.activate=0 (fonts come only from Camoufox's Windows fontconfig file). gen_fingerprint uses the most common recording for the GPU and always 0 touch points. Existing profiles keep their saved values; Profile 1 (MAX_SAMPLES 8, touch 5) is left for the owner.

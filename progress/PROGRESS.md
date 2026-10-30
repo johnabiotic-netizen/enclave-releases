@@ -70,7 +70,13 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 - Disk (2026-10-29): C: filled to 281 MB during builds (WSL disk 31 GB), crashing WSL. Freed: build cache, old images, scratch files; then `fstrim` inside WSL. After every image build: `docker builder prune -af`, `docker image prune -f`, `fstrim /`.
 - [x] Downloads: now saved to /data/downloads on the profile volume (fixed 2026-10-27); Stage 5 exposes them in Windows.
 
-## Stage 4: Camera and mic passthrough  [ ]
+## Stage 4: Camera and mic passthrough  [~]
+Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-30.
+- [x] Verify first (2026-10-30): no v4l2loopback in WSL; neko mic upstream works into PulseAudio, neko webcam needs v4l2loopback; Camoufox serves identity devices from the fake engine.
+- [ ] Mic: phone mic -> neko audio_input -> identity microphone (Camoufox patch).
+- [ ] Camera: phone camera -> neko -> shared-memory frames -> identity camera (neko patch + Camoufox patch).
+- [ ] Phone PWA: share camera and mic, preview, front/back, live indicator.
+- [ ] Clipboard and file passthrough; no-phone message.
 ## Stage 5: Windows app  [ ]
 ## Stage 6: Phone linking  [ ]
 ## Stage 7: Launch  [ ]
