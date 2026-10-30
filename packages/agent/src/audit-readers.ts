@@ -47,6 +47,8 @@ const NOT_COMPARABLE_WITH_REFERENCE = [
   'time.',
   'canvas.',
   'mediaDevices',
+  // The profile's language decides which Windows voices exist (German: Hedda, Katja, Stefan).
+  'voices',
 ];
 
 export function evaluateAudit(report: AuditReport, ctx: AuditContext): Finding[] {

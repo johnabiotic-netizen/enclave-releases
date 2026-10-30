@@ -104,13 +104,15 @@ export function buildServer(
         service.checkProfileProxy(req.params.id),
       );
       // Audit (testing/test-suite.md): starts in the background, then poll the job.
-      v1.post<{ Params: { id: string }; Body: { checks?: string[] } }>(
+      v1.post<{ Params: { id: string }; Body: { checks?: string[]; saveBaseline?: boolean } }>(
         '/profiles/:id/audit',
         async (req, reply) => {
           await service.get(req.params.id);
           const checks = Array.isArray(req.body?.checks) ? req.body.checks.map(String) : [];
           reply.code(202);
-          return service.startAudit(req.params.id, checks);
+          return service.startAudit(req.params.id, checks, {
+            saveBaseline: req.body?.saveBaseline === true,
+          });
         },
       );
       v1.get<{ Params: { jobId: string } }>('/audits/:jobId', async (req) =>

@@ -35,6 +35,7 @@ from camoufox.geolocation import get_geolocation  # noqa: E402
 camoufox.geolocation.needs_update = lambda config=None: False
 from camoufox.pkgman import camoufox_path  # noqa: E402
 from camoufox.utils import launch_options  # noqa: E402
+from camoufox.webgl import recorded_devices  # noqa: E402
 from windows_gpu import windows_webgl_pair  # noqa: E402
 
 # Common Windows desktop sizes at 100% scaling, weighted by how often they occur, up to
@@ -80,6 +81,22 @@ def pick_screen(arg: str | None) -> tuple[int, int]:
 def decode_chunks(env: dict, prefix: str) -> dict:
     chunks = sorted((int(k.rsplit("_", 1)[1]), v) for k, v in env.items() if k.startswith(prefix))
     return json.loads("".join(v for _, v in chunks)) if chunks else {}
+
+
+def common_webgl(config: dict, gpu: tuple[str, str]) -> None:
+    """The WebGL values of the most common device recorded for this GPU, for every profile.
+
+    Camoufox draws one of the devices fpgen recorded behind the GPU name at random. They
+    can differ (for "Intel(R) HD Graphics 400": MAX_SAMPLES 16 in two recordings, 8 in
+    one), but every profile renders on the same real GPU, so all report the same values,
+    and the common one is the PC's (the owner's HD 620 reports 16 in Windows Firefox).
+    """
+    devices = recorded_devices("win", gpu[0], gpu[1])
+    if not devices:
+        return
+    keyed = [json.dumps(d, sort_keys=True) for d in devices]
+    best = devices[max(range(len(keyed)), key=lambda i: (keyed.count(keyed[i]), -i))]
+    config.update(best)
 
 
 def maximize_window(config: dict) -> None:
@@ -216,8 +233,10 @@ def main() -> None:
     maximize_window(config)
     # A desktop without a touchscreen, stated explicitly: otherwise the page sees neko's
     # touch input device (Firefox reports it as 10 points, Strict collapses that to 5).
-    # 0 also turns off window.TouchEvent, as on such a PC.
-    config["navigator.maxTouchPoints"] = config.get("navigator.maxTouchPoints") or 0
+    # 0 also turns off window.TouchEvent, as on such a PC. Always 0: a touch count
+    # Camoufox drew is a touchscreen the PC does not have (Profile 1 got 5).
+    config["navigator.maxTouchPoints"] = 0
+    common_webgl(config, gpu)
     # Stock Web Audio. Every x86 PC renders the standard OfflineAudioContext probe the same
     # way, and Firefox (Strict included) adds no audio noise, so a per-profile audio hash
     # would be something no real Firefox has. Seed 0 is Camoufox's "no noise".

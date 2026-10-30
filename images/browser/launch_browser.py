@@ -71,6 +71,13 @@ WINDOWS_DEFAULT_PREFS = {
     # Ask before sharing the location, as stock Firefox does. Camoufox grants it to every
     # site (1); permissions.query() then reports "granted" on a fresh profile.
     "permissions.default.geo": 0,
+    # Fonts only from Camoufox's fontconfig file, which lists the Windows font groups.
+    # With bundled fonts on (Camoufox turns them on when the claimed OS is not the
+    # host's), Firefox on Linux also adds the whole fonts/ folder, macOS groups
+    # included: Verdana was then drawn from the macOS file, whose GPOS has no
+    # features, so its kerning differed from Windows by 1/60 px (measured 2026-10-30).
+    # Read at startup, which CAMOU_PREFS (camoufox.cfg) is in time for.
+    "gfx.bundled-fonts.activate": 0,
 }
 
 

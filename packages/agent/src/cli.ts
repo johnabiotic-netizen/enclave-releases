@@ -41,7 +41,8 @@ const HELP = `Usage: enclave <command>
   audit <id> [check...]          Run the check sites in a throwaway copy of the profile and
                                    save a report (testing/test-suite.md). Checks: probe,
                                    metrics, svg-emoji, pixelscan, creepjs, browserleaks-webrtc,
-                                   browserleaks-canvas, amiunique (default: all)
+                                   browserleaks-canvas, amiunique (default: all).
+                                   --save-baseline: keep this run's probe as the baseline
   delete <id> --yes              Delete a profile and all its data
   phone                          Show a QR code that connects your phone (phone mode)
 
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
       ports: { type: 'string' },
       sticky: { type: 'string' },
       pixelscan: { type: 'boolean' },
+      'save-baseline': { type: 'boolean' },
       'test-proxy': { type: 'boolean' },
       yes: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -188,7 +190,10 @@ async function main(): Promise<void> {
     case 'audit': {
       const id = await api.resolveId(arg);
       const checks = positionals.slice(2);
-      let job = await api.call<AuditJobView>('POST', `/profiles/${id}/audit`, { checks });
+      let job = await api.call<AuditJobView>('POST', `/profiles/${id}/audit`, {
+        checks,
+        saveBaseline: values['save-baseline'] === true,
+      });
       console.log(
         'Running the audit in a throwaway copy of the profile. This takes a few minutes.',
       );

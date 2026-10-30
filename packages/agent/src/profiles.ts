@@ -317,7 +317,11 @@ export class ProfileService {
    * profile is never driven by automation and may be running meanwhile. Saves the
    * result and screenshots under <home>/reports/ and returns them.
    */
-  async audit(id: string, checks: string[]): Promise<AuditRun> {
+  async audit(
+    id: string,
+    checks: string[],
+    options: { saveBaseline?: boolean } = {},
+  ): Promise<AuditRun> {
     const profile = await this.store.get(id);
     await this.runtime.assertReady();
     const secrets = await this.store.getSecrets(id);
@@ -385,13 +389,27 @@ export class ProfileService {
           await writeFile(path.join(dir, check.screenshot), Buffer.from(shot.stdout, 'base64'));
         }
       }
+      const baselineFile = path.join(
+        this.config.home,
+        'profiles',
+        id,
+        'baselines',
+        'baseline.json',
+      );
       const findings = evaluateAudit(report, {
         exitIp: raw.exitIp ?? null,
-        baseline: await readJson(
-          path.join(this.config.home, 'profiles', id, 'baselines', 'baseline.json'),
-        ),
+        baseline: await readJson(baselineFile),
         reference: await this.loadReference(),
       });
+      // The audit's probe is what a normal start shows (same image, same launch
+      // settings), so it can stand in for scripts/fingerprint/baseline.mjs without
+      // opening anything in the real profile.
+      const probe = report.checks?.find((c) => c.name === 'probe' && c.status === 'ok');
+      if (options.saveBaseline && probe?.data) {
+        await mkdir(path.dirname(baselineFile), { recursive: true });
+        await writeFile(baselineFile, JSON.stringify(probe.data, null, 2));
+        await this.store.log(id, 'baseline-saved', { from: dir });
+      }
       const summary = summarize(profile.name, raw.exitIp ?? null, findings);
       await writeFile(path.join(dir, 'findings.json'), JSON.stringify(findings, null, 2));
       await writeFile(path.join(dir, 'summary.txt'), `${summary}\n`);
@@ -409,7 +427,7 @@ export class ProfileService {
    * Starts an audit in the background; an audit takes minutes, longer than an HTTP
    * request should wait. Poll auditJob() for the outcome. One audit per profile at once.
    */
-  startAudit(id: string, checks: string[]): AuditJob {
+  startAudit(id: string, checks: string[], options: { saveBaseline?: boolean } = {}): AuditJob {
     const running = [...this.auditJobs.values()].find(
       (j) => j.profileId === id && j.state === 'running',
     );
@@ -422,7 +440,7 @@ export class ProfileService {
       startedAt: new Date().toISOString(),
     };
     this.auditJobs.set(job.id, job);
-    this.audit(id, checks).then(
+    this.audit(id, checks, options).then(
       (run) => Object.assign(job, { state: 'done', finishedAt: new Date().toISOString(), run }),
       (e: unknown) =>
         Object.assign(job, {
