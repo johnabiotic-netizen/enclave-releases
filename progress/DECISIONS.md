@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Screen encoder: one VP8 thread at the fastest speed
+Context: The owner felt slowness on the real phone. neko's default screen pipeline (VP8, threads=4, cpu-used=4) took about 250% CPU on the owner's i5-7300U (2 cores, 4 threads; load 9 to 11) and still delivered only 11 to 13 fps at the viewer, with 70 to 125 ms jitter. Per-thread profiling showed the 4 encoder threads using most of it; changing cpu-used or quality limits alone barely moved it (libvpx VP8 worker threads spin while waiting).
+Decision: Ship /etc/neko/neko.yaml with neko's default pipeline except threads=1 and cpu-used=16 (same bitrate, same quantizer limits, same keyframe distance, 25 fps, 1920x1080).
+Reason: Measured with a simulated phone watching the same page: about 80% CPU, 25 to 26 fps received, jitter 10 to 17 ms. threads=1 with cpu-used=4 reached only 22 to 23 fps at 118%; cpu-used=8 23 to 24 fps at 101%. The freed CPU also leaves room for the phone camera's decode and the browser.
+
 ## 2026-10-31  A short gap in the phone camera holds the last frame instead of going black
 Context: On the real phone the owner still saw one blackout in a few minutes; measured, the phone's frames paused 2.8 s once (network). The browser shows black when the last frame is over 2 s old, so any hiccup over 2 s blacked out the camera, which no real webcam does.
 Decision: camfeed.py, while neko still has the pipe open (the phone is sharing), republishes the last frame every 0.5 s when no new one arrives, for up to 10 s. When the phone stops sharing (pipe closed) nothing is republished and the camera goes black after 2 s as before. No browser rebuild.

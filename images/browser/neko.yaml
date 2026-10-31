@@ -1,0 +1,22 @@
+# neko's config (read from /etc/neko/neko.yaml). Only the screen encoder differs from neko
+# 3.2.0's default VP8 pipeline: threads=1 and cpu-used=16 instead of threads=4 and cpu-used=4.
+# libvpx's VP8 worker threads spin while they wait; on a 2-core PC that is already busy they
+# took about 250% CPU and still delivered only 11 to 13 fps to the phone. One thread at the
+# fastest speed takes about 80% and holds 25 fps at 1920x1080, with the same quality limits
+# (DECISIONS 2026-10-31).
+capture:
+  video:
+    codec: vp8
+    ids: [main]
+    pipelines:
+      main:
+        gst_pipeline: >-
+          ximagesrc display-name=:99.0 show-pointer=false use-damage=false
+          ! capsfilter caps=video/x-raw,framerate=2500/100 name=framerate
+          ! videoconvert
+          ! queue max-size-buffers=1 max-size-time=0 max-size-bytes=0 leaky=downstream
+          ! vp8enc name=encoder threads=1 cpu-used=16 deadline=1 end-usage=cbr
+          target-bitrate=1996800 buffer-size=12288 buffer-initial-size=6144
+          buffer-optimal-size=9216 min-quantizer=4 max-quantizer=20 undershoot=95
+          keyframe-max-dist=25
+          ! appsink name=appsink

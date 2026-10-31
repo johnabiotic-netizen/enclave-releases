@@ -186,6 +186,8 @@ RUN set -eux; \
 
 COPY openbox.xml /etc/neko/openbox.xml
 COPY supervisord.conf /etc/neko/supervisord/enclave.conf
+# Screen encoder settings that keep the stream at full frame rate on a 2-core PC (see the file).
+COPY neko.yaml /etc/neko/neko.yaml
 # Firewall for the egress lock (apply_egress_lock.sh). capsh (libcap2-bin) is in the base.
 RUN set -eux; \
     apt-get update; \
@@ -199,7 +201,7 @@ COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fin
 COPY audit/ /opt/enclave/audit/
 # Windows line endings break the shebang ("required file not found"): refuse them.
 RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
-    && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf
+    && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf /etc/neko/neko.yaml
 
 COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
 
