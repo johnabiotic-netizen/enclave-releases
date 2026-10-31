@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Stage 4 test 7: the "no phone" message is shown by the Windows app (Stage 5)
+Context: Acceptance test 7 asks that a page requesting the camera with no phone connected gets a clear message and nothing crashes. With no phone connected, nobody is looking at the phone, so the message has to appear on the PC. The PC viewer today is neko's web page; the Windows app (Stage 5) replaces it.
+Decision: Stage 4 delivers the safe behaviour (black camera, silence, no crash; verified) and the data: `GET /profiles/:id/media` says when a page wants the camera or mic and whether a phone is sharing. The Windows app shows the message in Stage 5. When a phone is connected but not sharing, the phone already says "This page wants your camera and microphone." Pending the owner's agreement to close Stage 4 on this basis.
+Reason: Building the message into neko's page would be thrown away in Stage 5.
+
 ## 2026-10-31  Browser camera keeps the last frame when a read catches it mid-write
 Context: The owner still saw single black flashes in the camera picture (only the camera, 19:09:12 and 19:09:27). A monitor in the container showed fresh, non-black frames reaching shared memory at about 30 per second at those exact times, with the phone's connection up. The browser's reader (enclave-camoufox zz-enclave-phone-media.patch) drew a black frame whenever its copy overlapped camfeed writing the next frame (sequence odd, or changed during the copy). A write usually takes 0.2 ms but measured up to 45 ms on the busy PC.
 Decision: The reader retries up to 4 times, 1 ms apart. If the frame is still mid-write it keeps the previous frame. It goes black only when there is no fresh frame (phone not sharing, or the last frame is over 2 s old). It also adds the acquire fence after the copy that the seqlock check needs. Built as enclave-camoufox commit 6edef23 (run 41228590512, zip 16556f40). Verified with a stand-in writer that holds every write for 4 ms at 50 frames per second: the old browser showed 269 of 1143 frames black, the new one 0 of 1153; with the writer stopped, all frames are black as before.
