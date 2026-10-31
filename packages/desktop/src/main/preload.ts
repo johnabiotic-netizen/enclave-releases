@@ -7,6 +7,7 @@ const bridge: EnclaveBridge = {
   request: (method, path, body) => ipcRenderer.invoke('agent:request', method, path, body),
   agentState: () => ipcRenderer.invoke('agent:state'),
   settings: () => ipcRenderer.invoke('settings:get'),
+  setupChecks: () => ipcRenderer.invoke('setup:check'),
   saveSettings: (change) => ipcRenderer.invoke('settings:set', change),
   openDataFolder: () => ipcRenderer.invoke('app:open-data'),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),

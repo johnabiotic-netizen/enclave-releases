@@ -7,6 +7,9 @@ import { Dashboard } from './Dashboard';
 import { ProfilesIcon, SettingsIcon, SetupIcon } from './icons';
 import { useProfiles } from './useProfiles';
 import { Settings } from './Settings';
+import { Setup } from './Setup';
+import { api } from './api';
+import type { SystemResponse } from '@enclave/shared';
 import { Viewer } from './Viewer';
 import { CreateWizard, EditProfile } from './Wizard';
 
@@ -32,16 +35,20 @@ export function App() {
   }, []);
 
   if (phoneApp === undefined) {
+    // Enclave's service could not start (Docker not running, for one): the setup checker says
+    // what is missing; once a Recheck gets the service up, the app opens as usual.
+    if (agent.status === 'failed') {
+      return (
+        <div className="shell no-rail">
+          <main className="main">
+            <Setup firstRun onReady={() => {}} />
+          </main>
+        </div>
+      );
+    }
     return (
       <div className="splash">
-        {agent.status === 'failed' ? (
-          <>
-            <h1>Enclave could not start</h1>
-            <p>{agent.message}</p>
-          </>
-        ) : (
-          <p>Starting Enclave.</p>
-        )}
+        <p>Starting Enclave.</p>
       </div>
     );
   }
@@ -63,6 +70,19 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
   const [view, setView] = useState<View>({ kind: 'profiles' });
   const [selected, setSelected] = useState<string | null>(null);
   const model = useProfiles();
+  // The setup checker comes first until the browser is set up on this PC.
+  const [firstRun, setFirstRun] = useState(false);
+  useEffect(() => {
+    void api<SystemResponse>('GET', '/system').then(
+      (s) => {
+        if (!s.imageBuilt) {
+          setFirstRun(true);
+          setView({ kind: 'setup' });
+        }
+      },
+      () => {},
+    );
+  }, []);
   const nav = (kind: 'profiles' | 'settings' | 'setup') => setView({ kind });
   const on = (kind: View['kind']) =>
     view.kind === kind || (kind === 'profiles' && ['viewer', 'create', 'edit'].includes(view.kind));
@@ -135,26 +155,18 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
           })()}
         {view.kind === 'settings' && <Settings profiles={model.profiles} />}
         {view.kind === 'setup' && (
-          <section className="page">
-            <h1>{TITLES[view.kind as keyof typeof TITLES]}</h1>
-            <p className="muted">This screen is being built.</p>
-            <button className="button" onClick={() => nav('profiles')}>
-              Back to profiles
-            </button>
-          </section>
+          <Setup
+            firstRun={firstRun}
+            onReady={() => {
+              setFirstRun(false);
+              nav('profiles');
+            }}
+          />
         )}
       </main>
     </div>
   );
 }
-
-const TITLES: Record<Exclude<View['kind'], 'profiles'>, string> = {
-  viewer: 'Profile',
-  create: 'Create profile',
-  edit: 'Edit profile',
-  settings: 'Settings',
-  setup: 'Setup',
-};
 
 function RailButton(props: {
   label: string;

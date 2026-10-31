@@ -25,7 +25,19 @@ export interface AppSettingsChange {
   phone?: boolean;
 }
 
+/** One row of the setup checker. */
+export interface SetupCheck {
+  id: 'virtualization' | 'wsl' | 'docker-installed' | 'docker-running' | 'image';
+  label: string;
+  ok: boolean;
+  detail: string;
+  /** The exact steps to fix it, in order. */
+  fix: string[];
+}
+
 export interface EnclaveBridge {
+  /** Runs every setup check (restarting Enclave's service first if it is not running). */
+  setupChecks(): Promise<SetupCheck[]>;
   settings(): Promise<AppSettingsView>;
   /** Saves; a change to phone access or the idle default restarts the agent inside the app. */
   saveSettings(change: AppSettingsChange): Promise<void>;

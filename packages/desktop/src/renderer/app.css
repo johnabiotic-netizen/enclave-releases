@@ -715,3 +715,63 @@ textarea:focus-visible {
   border-color: rgba(229, 96, 77, 0.45);
   color: #f2b3a9;
 }
+
+/* ---------------------------------------------------------------- setup */
+
+.shell.no-rail {
+  grid-template-columns: 1fr;
+}
+.setup {
+  max-width: 760px;
+}
+.lead {
+  margin: 8px 0 22px;
+  max-width: 64ch;
+}
+.checks {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checks > li {
+  padding: 14px 16px;
+  outline: 1px solid var(--line);
+  background: var(--bg-800);
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.check-text {
+  display: grid;
+  flex: 1;
+}
+.check-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--err);
+  box-shadow: 0 0 8px rgba(229, 96, 77, 0.4);
+}
+.checks .ok .check-mark {
+  background: var(--ok);
+  box-shadow: 0 0 8px rgba(53, 194, 122, 0.35);
+}
+.fix {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 2px 24px;
+  padding-left: 18px;
+  color: var(--text-300);
+  max-width: 64ch;
+}
+.setup-actions {
+  margin-top: 18px;
+}
+.ready {
+  color: var(--ok);
+  font-weight: 600;
+}

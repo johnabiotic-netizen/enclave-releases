@@ -21,11 +21,13 @@ import {
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
 import { SettingsFile, type AppSettings } from './settings.js';
+import { runSetupChecks } from './setup.js';
 import type {
   AgentReply,
   AgentState,
   AppSettingsChange,
   AppSettingsView,
+  SetupCheck,
 } from '../shared/bridge.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +40,11 @@ let agent: RunningAgent | null = null;
 let token = '';
 /** Enclave's data folder (profiles, app settings). */
 let home = '';
+/** The agent's configuration from the last start (image name, WSL distro). */
+let lastConfig: { image: string; wslDistro: string | undefined } = {
+  image: 'enclave-browser:dev',
+  wslDistro: undefined,
+};
 let state: AgentState = { status: 'starting' };
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -92,6 +99,7 @@ async function bootAgent(): Promise<void> {
         ? String(saved.idleMinutes)
         : process.env.ENCLAVE_IDLE_MINUTES,
     });
+    lastConfig = { image: config.image, wslDistro: config.wslDistro };
     agent = await startAgent(config, { sealer: safeStorageSealer });
     setState({ status: 'running', dockerMode: agent.dockerMode, phoneApp: agent.phoneApp ?? null });
   } catch (err) {
@@ -219,6 +227,19 @@ ipcMain.handle('settings:set', async (_e, change: AppSettingsChange) => {
   await file.write(saved);
   if (change.defaultProxy !== undefined) await file.setDefaultProxy(change.defaultProxy.trim());
   if (restart) await restartAgent();
+});
+
+ipcMain.handle('setup:check', async (): Promise<SetupCheck[]> => {
+  // Recheck after a fix: the service may start now (Docker came up).
+  if (!agent) await restartAgent();
+  const system = agent ? await agent.service.system().catch(() => null) : null;
+  return runSetupChecks({
+    dockerOk: system?.dockerOk ?? false,
+    imageBuilt: system?.imageBuilt ?? false,
+    image: lastConfig.image,
+    wslDistro: lastConfig.wslDistro,
+    agentError: state.status === 'failed' ? state.message : undefined,
+  });
 });
 
 ipcMain.handle('app:open-data', async () => {
