@@ -1,3 +1,4 @@
+/* global window */
 (() => {
   const P = window.RTCPeerConnection;
   window.__pcs = [];
@@ -7,6 +8,8 @@
     return pc;
   };
   window.RTCPeerConnection.prototype = P.prototype;
+  // phone-sim.mjs puts true or false in place of the flag below before this runs.
+  // eslint-disable-next-line no-undef
   if (__NO_TWCC__) {
     const srd = P.prototype.setRemoteDescription;
     P.prototype.setRemoteDescription = function (d) {

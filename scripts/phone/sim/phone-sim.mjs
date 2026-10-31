@@ -46,7 +46,9 @@ for (let i = 0; i < 50 && !target; i++) {
   try {
     const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
     target = list.find((t) => t.type === 'page');
-  } catch {}
+  } catch {
+    // Edge is still starting
+  }
 }
 if (!target) throw new Error('Edge did not start');
 const ws = new WebSocket(target.webSocketDebuggerUrl);

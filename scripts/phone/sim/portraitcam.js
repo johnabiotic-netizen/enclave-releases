@@ -1,3 +1,4 @@
+/* global document */
 // Test-only (phone-sim PORTRAITCAM=1): the phone camera films portrait, 720 x 1280, like a phone
 // held upright: a white circle of diameter 300 in the middle of black, so squashing shows.
 (() => {

@@ -1,3 +1,4 @@
+/* global document */
 // Test-only (phone-sim CLOCKCAM=1): the phone camera shows the phone's clock as 24 full-height
 // black/white columns (Date.now() mod 2^24, most significant bit first), so the delay through the
 // profile can be measured on the phone's clock alone. Audio stays Chromium's fake device.

@@ -1,3 +1,4 @@
+/* global window */
 (() => {
   const pc = (window.__pcs || []).at(-1);
   if (!pc) return 'none';

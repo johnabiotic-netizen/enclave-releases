@@ -1,3 +1,4 @@
+/* global document */
 // Test-only (phone-sim STALLCAM=1): portraitcam.js, but the camera sends nothing for 3 s of every 10.
 // held upright: a white circle of diameter 300 in the middle of black, so squashing shows.
 (() => {
