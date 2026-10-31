@@ -1,0 +1,55 @@
+/* Enclave design tokens (ui/design-system.md). One accent; status colours only for status. */
+:root {
+  --bg-900: #0e1420;
+  --bg-800: #141c2b;
+  --bg-700: #1c2638;
+  --line: #2a3647;
+  --text-100: #eaf0f7;
+  --text-300: #a7b4c6;
+  --text-500: #6b7a8f;
+  --accent: #4c8dff;
+  --ok: #35c27a;
+  --warn: #e8b13a;
+  --err: #e5604d;
+  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-900);
+  color: var(--text-100);
+  font: 14px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

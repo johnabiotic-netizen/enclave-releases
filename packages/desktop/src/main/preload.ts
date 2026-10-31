@@ -1,0 +1,16 @@
+// The window's only way to the app: a few calls, no Node, no token.
+
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { AgentState, EnclaveBridge } from '../shared/bridge.js';
+
+const bridge: EnclaveBridge = {
+  request: (method, path, body) => ipcRenderer.invoke('agent:request', method, path, body),
+  agentState: () => ipcRenderer.invoke('agent:state'),
+  onAgentState: (listener) => {
+    const handler = (_e: IpcRendererEvent, state: AgentState) => listener(state);
+    ipcRenderer.on('agent:state', handler);
+    return () => ipcRenderer.removeListener('agent:state', handler);
+  },
+};
+
+contextBridge.exposeInMainWorld('enclave', bridge);
