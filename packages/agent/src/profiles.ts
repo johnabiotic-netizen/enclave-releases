@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   DEFAULT_IDLE_STOP_MINUTES,
+  DESKTOP_APP_ORIGIN,
   type CheckNewProxyRequest,
   type CreateProfileRequest,
   type Fingerprint,
@@ -58,7 +59,13 @@ done
 src=$(pactl list short sources | awk '$2 == "microphone" { print $1 }')
 mic=$(pactl list short source-outputs | awk -v s="$src" '$2 == s && $4 == "protocol-native.c"' | wc -l)
 pick=$(DISPLAY=:99.0 xdotool search --onlyvisible --name '^File Upload' | wc -l)
-echo "$cam $mic $pick"`;
+# The phone's side: its mic plays into the audio_input sink; its camera frames are under 3 s old.
+in=$(pactl list short sinks | awk '$2 == "audio_input" { print $1 }')
+pmic=$(pactl list short sink-inputs | awk -v s="$in" '$2 == s' | wc -l)
+t=$(od -An -t u8 -j 24 -N 8 /dev/shm/enclave-camera 2>/dev/null | tr -d ' ')
+[ -n "$t" ] || t=0
+pcam=$(( t > 0 && $(date +%s%6N) - t < 3000000 ))
+echo "$cam $mic $pick $pmic $pcam"`;
 
 /**
  * Stage 4: types a file's path ($1) into Firefox's open file picker and confirms. Only while the
@@ -158,16 +165,27 @@ export class ProfileService {
       ['sh', '-c', MEDIA_IN_USE_SCRIPT],
       'neko',
     );
-    const [camera, microphone, pickers] = out.stdout.trim().split(/\s+/).map(Number);
+    const [camera, microphone, pickers, phoneMic, phoneCam] = out.stdout
+      .trim()
+      .split(/\s+/)
+      .map(Number);
     if (
       out.code !== 0 ||
       camera === undefined ||
       microphone === undefined ||
-      pickers === undefined
+      pickers === undefined ||
+      phoneMic === undefined ||
+      phoneCam === undefined
     ) {
       throw new AgentError('INTERNAL', "Couldn't read the profile's camera and microphone state.");
     }
-    return { camera: camera > 0, microphone: microphone > 0, filePicker: pickers > 0 };
+    return {
+      camera: camera > 0,
+      microphone: microphone > 0,
+      filePicker: pickers > 0,
+      phoneCamera: phoneCam > 0,
+      phoneMicrophone: phoneMic > 0,
+    };
   }
 
   /** Stage 4: puts a file from the phone into the profile and picks it in the open file picker. */
@@ -678,13 +696,13 @@ export class ProfileService {
             // pion keeps the first ("overlapping address rewrite rule"). In phone mode that is
             // the PC's Tailscale IP, which tailscale serve relays and the PC reaches too.
             `NEKO_WEBRTC_NAT1TO1=${tailnet ? tailnet.ip : '127.0.0.1'}`,
-            // The phone app (served by the agent) talks to neko's API from its own origin.
-            // With a CORS list neko checks every origin, the PC's own page included.
-            ...(tailnet
-              ? [
-                  `NEKO_SERVER_CORS=${phoneAppOrigin(tailnet, this.config.port)} http://127.0.0.1:${webPort}`,
-                ]
-              : []),
+            // Who may talk to neko: the PC's own page, the Windows app's viewer and, in phone
+            // mode, the phone app (served by the agent from its own origin).
+            `NEKO_SERVER_CORS=${[
+              `http://127.0.0.1:${webPort}`,
+              DESKTOP_APP_ORIGIN,
+              ...(tailnet ? [phoneAppOrigin(tailnet, this.config.port)] : []),
+            ].join(' ')}`,
             ...gpu.env,
             ...exitEnv(raw),
           ],

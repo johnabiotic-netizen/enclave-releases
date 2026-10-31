@@ -6,6 +6,7 @@ import type { AgentState } from '../shared/bridge';
 import { Dashboard } from './Dashboard';
 import { ProfilesIcon, SettingsIcon, SetupIcon } from './icons';
 import { useProfiles } from './useProfiles';
+import { Viewer } from './Viewer';
 import { CreateWizard, EditProfile } from './Wizard';
 
 type View =
@@ -38,10 +39,10 @@ export function App() {
       </div>
     );
   }
-  return <Shell />;
+  return <Shell phoneApp={agent.phoneApp} />;
 }
 
-function Shell() {
+function Shell({ phoneApp }: { phoneApp: string | null }) {
   const [view, setView] = useState<View>({ kind: 'profiles' });
   const [selected, setSelected] = useState<string | null>(null);
   const model = useProfiles();
@@ -100,7 +101,22 @@ function Shell() {
               />
             );
           })()}
-        {['viewer', 'settings', 'setup'].includes(view.kind) && (
+        {view.kind === 'viewer' &&
+          (() => {
+            const profile = model.profiles?.find((p) => p.id === view.id);
+            if (!profile) return null;
+            return (
+              <Viewer
+                profile={profile}
+                state={model.shownState(profile)}
+                phoneApp={phoneApp}
+                onBack={() => nav('profiles')}
+                onStart={() => void model.start(profile.id)}
+                onStop={() => void model.stop(profile.id)}
+              />
+            );
+          })()}
+        {['settings', 'setup'].includes(view.kind) && (
           <section className="page">
             <h1>{TITLES[view.kind as keyof typeof TITLES]}</h1>
             <p className="muted">This screen is being built.</p>

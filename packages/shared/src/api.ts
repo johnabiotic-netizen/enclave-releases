@@ -4,6 +4,8 @@ import type { Profile } from './profile.js';
 import type { ProxyCheckResult, ProxySpec } from './proxy.js';
 
 export const DEFAULT_AGENT_PORT = 8787;
+/** Where the Windows app's own pages come from (its app:// scheme); neko lets it in. */
+export const DESKTOP_APP_ORIGIN = 'app://enclave';
 export const API_BASE_PATH = '/v1';
 
 export const ERROR_CODES = [
@@ -90,6 +92,10 @@ export interface MediaInUse {
   camera: boolean;
   microphone: boolean;
   filePicker: boolean;
+  /** A phone is sharing its camera into the profile now (frames under 3 s old). */
+  phoneCamera: boolean;
+  /** A phone is sharing its microphone into the profile now. */
+  phoneMicrophone: boolean;
 }
 export type GetMediaResponse = MediaInUse;
 

@@ -6,6 +6,7 @@ import type { AgentState, EnclaveBridge } from '../shared/bridge.js';
 const bridge: EnclaveBridge = {
   request: (method, path, body) => ipcRenderer.invoke('agent:request', method, path, body),
   agentState: () => ipcRenderer.invoke('agent:state'),
+  copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
   onAgentState: (listener) => {
     const handler = (_e: IpcRendererEvent, state: AgentState) => listener(state);
     ipcRenderer.on('agent:state', handler);

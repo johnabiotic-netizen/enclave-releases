@@ -18,6 +18,8 @@ export interface EnclaveBridge {
     body?: unknown,
   ): Promise<AgentReply>;
   agentState(): Promise<AgentState>;
+  /** Puts text on the Windows clipboard (works while the window is not focused). */
+  copyText(text: string): Promise<void>;
   /** Called on every change; returns what stops listening. */
   onAgentState(listener: (state: AgentState) => void): () => void;
 }

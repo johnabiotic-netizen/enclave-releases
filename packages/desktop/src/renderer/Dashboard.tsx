@@ -15,6 +15,7 @@ import {
 } from './format';
 import { CloseIcon, MoreIcon, PlusIcon } from './icons';
 import type { ProfilesModel } from './useProfiles';
+import { PROXY_LOST } from './Viewer';
 
 interface Props {
   model: ProfilesModel;
@@ -134,6 +135,9 @@ function Tile({ profile: p, state, selected, error, ...on }: TileProps) {
         </span>
         <span className="tile-used muted">{lastUsed(p)}</span>
         {error && <span className="tile-error">{error}</span>}
+        {!error && state === 'running' && p.status.lastError === PROXY_LOST && (
+          <span className="tile-error">Proxy unreachable, pages will not load.</span>
+        )}
       </button>
       <div className="tile-actions">
         {state === 'running' ? (

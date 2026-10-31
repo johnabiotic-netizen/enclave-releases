@@ -777,7 +777,13 @@ document.getElementById('live-stop')!.onclick = () => {
 // sharing it, offer to; when it opens a file picker, offer a file from the phone. "Not now"
 // holds until the page lets go (or the picker closes) and asks again.
 const MEDIA_POLL_MS = 2000;
-const NOTHING_WANTED: MediaInUse = { camera: false, microphone: false, filePicker: false };
+const NOTHING_WANTED: MediaInUse = {
+  camera: false,
+  microphone: false,
+  filePicker: false,
+  phoneCamera: false,
+  phoneMicrophone: false,
+};
 const ask = document.getElementById('ask')!;
 const askText = document.getElementById('ask-text')!;
 const askShare = document.getElementById('ask-share')!;
