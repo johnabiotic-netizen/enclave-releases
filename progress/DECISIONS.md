@@ -4,9 +4,9 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
-## 2026-10-31  Stage 4 test 7: the "no phone" message is shown by the Windows app (Stage 5)
+## 2026-10-31  Stage 4 test 7: "switch to your phone" notice, shown by the Windows app (Stage 5)
 Context: Acceptance test 7 asks that a page requesting the camera with no phone connected gets a clear message and nothing crashes. With no phone connected, nobody is looking at the phone, so the message has to appear on the PC. The PC viewer today is neko's web page; the Windows app (Stage 5) replaces it.
-Decision: Stage 4 delivers the safe behaviour (black camera, silence, no crash; verified) and the data: `GET /profiles/:id/media` says when a page wants the camera or mic and whether a phone is sharing. The Windows app shows the message in Stage 5. When a phone is connected but not sharing, the phone already says "This page wants your camera and microphone." Pending the owner's agreement to close Stage 4 on this basis.
+Decision: Stage 4 delivers the safe behaviour (black camera, silence, no crash; verified) and the data: `GET /profiles/:id/media` says when a page wants the camera or mic and whether a phone is sharing. Owner (2026-10-31): the message is a "switch to your phone" notice. Stage 5: when a page wants the camera or mic and no phone is sharing, the Windows app shows a Windows notification and a banner on that profile ("This page wants your camera. Open <profile> on your phone to share it."). A connected phone already shows "This page wants your camera and microphone." with Share. Stage 6: a push notification to the phone when its app is closed, opening that profile; push goes through Google or Apple, so it carries only the profile name, never the page; owner to approve before it is turned on. Stage 4 closed on this basis.
 Reason: Building the message into neko's page would be thrown away in Stage 5.
 
 ## 2026-10-31  Browser camera keeps the last frame when a read catches it mid-write

@@ -1,6 +1,6 @@
 # Progress
 
-**Current stage:** Stage 4, Camera and mic passthrough. Stage 3, Fingerprint hardening: complete 2026-10-30. Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
+**Current stage:** Stage 5, Windows app. Stage 4, Camera and mic passthrough: complete 2026-10-31. Stage 3, Fingerprint hardening: complete 2026-10-30. Stage 2, Phone access: complete 2026-10-27. Stage 1, Local core: complete 2026-10-27 (tasks A to E, all seven acceptance tests pass).
 
 Update this at the end of every work session. Keep it short and current.
 
@@ -70,7 +70,7 @@ Findings so far (Profile 2, US proxy, Camoufox 158.0-beta.40):
 - Disk (2026-10-29): C: filled to 281 MB during builds (WSL disk 31 GB), crashing WSL. Freed: build cache, old images, scratch files; then `fstrim` inside WSL. After every image build: `docker builder prune -af`, `docker image prune -f`, `fstrim /`.
 - [x] Downloads: now saved to /data/downloads on the profile volume (fixed 2026-10-27); Stage 5 exposes them in Windows.
 
-## Stage 4: Camera and mic passthrough  [~]
+## Stage 4: Camera and mic passthrough  [x]
 Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-30.
 - [x] Verify first (2026-10-30): no v4l2loopback in WSL; neko mic upstream works into PulseAudio, neko webcam needs v4l2loopback; Camoufox serves identity devices from the fake engine.
 - [x] Mic: phone mic -> neko audio_input -> identity microphone (Camoufox patch). The first build crashed the tab on any microphone request (wrong track type, DECISIONS 2026-10-31); fixed in Camoufox build run 41143868785. Verified 2026-10-31 with the simulated phone: "Microphone Array (Realtek(R) Audio)" hears the phone's beep (~400 Hz bursts), echo cancellation, noise suppression and auto gain on, as Firefox's real microphone. Pinned in the image; owner confirmed on the real phone 2026-10-31: a page's mic level meter follows their voice.
@@ -85,7 +85,7 @@ Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-3
 - [x] Camera shape: an upright phone no longer looks squashed (owner saw it on the real phone 2026-10-31; DECISIONS 2026-10-31). Verified with the simulated phone filming portrait 720x1280: a round test circle stays round in the profile camera (534 x 534 px at 1280x720; squashed it would be about 534 x 169).
 - [x] File passthrough from the phone (DECISIONS 2026-10-31). Verified 2026-10-31 with the simulated phone: a page's upload field opened Firefox's picker; about 2 s later the phone showed "This page wants a file." with Choose file; the chosen file (IMG_2041.png, 63 399 bytes) reached the page with its name, size, type and content unchanged, and the picker closed. Names with accents work. Location (GPS) is removed from phone photos and videos first (DECISIONS 2026-10-31); verified 2026-10-31 on real JPEG (Exif and XMP), PNG, WebP, MP4 and MOV files given a location with exiftool: afterwards exiftool finds no location, camera, date and orientation remain, sizes are unchanged and decoded pixels are identical. HEIC uses the same Exif path but had no real sample. Owner confirmed on the real phone 2026-10-31: a gallery photo (3 869 686 bytes) reached the page; the agent logged that it carried a location and removed it.
 - [x] Latency (target under ~300 ms). Owner judged it on the real phone 2026-10-31 after the encoder change: delay feels fine, text clean and sharp. Measured 2026-10-31 with the simulated phone on this PC (Intel i5-7300U, 2 cores / 4 threads): the phone clock as a barcode through the camera, read by a page in the profile and drawn back on screen, read again on the phone: round trip ~1 s (median). Breakdown: the test phone encodes in ~4 ms and the network round trip is ~17 ms; frames reach the shared memory ~315 ms after the phone drew them; the rest is the screen stream back. The PC is saturated (load ~7 on 4 threads): the screen stream (VP8, 1920x1080, 25 fps, cpu-used 4) takes ~230% CPU even for a static page, and the simulated phone (Edge on the same PC, decoding 1080p and encoding 720p in software) adds more, so these numbers are pessimistic. H.264 with neko's default x264 settings was no better (~175% CPU, slower round trip). Next: measure with the real phone; options to cut CPU: GPU encoding through WSL (Mesa d3d12 VA-API, needs mesa-va-drivers in the image), or a cheaper screen encode. Done 2026-10-31: the screen encode now uses one VP8 thread at the fastest speed (DECISIONS 2026-10-31): about 70% CPU instead of 250%, 25 fps steady at the viewer. Next: the owner judges delay and text sharpness on the real phone.
-- [ ] No-phone message: with no phone sharing, a page gets a black camera and silence and nothing crashes (verified); the PC message belongs in the Windows app (Stage 5), which can read GET /profiles/:id/media.
+- [x] No-phone message: with no phone sharing, a page gets a black camera and silence and nothing crashes (verified). The "switch to your phone" notice is shown by the Windows app in Stage 5 from GET /profiles/:id/media (owner agreed 2026-10-31; DECISIONS 2026-10-31).
 ## Stage 5: Windows app  [ ]
 ## Stage 6: Phone linking  [ ]
 ## Stage 7: Launch  [ ]
@@ -102,7 +102,7 @@ Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-3
 - Test 4, latency: PASS. Owner, real phone: delay feels fine, text clean and sharp (after the screen encoder change).
 - Test 5, clipboard: PASS. Owner, real phone: a code copied in the profile pasted in another phone app; phone text pasted into the page with Paste.
 - Test 6, file: PASS. Owner, real phone: a gallery photo reached the page; its location was removed (agent log `locationRemoved: true`).
-- Test 7, no phone: the page gets a black camera and silence, nothing crashes (verified with the test page). The message on the PC belongs in the Windows app; carried to Stage 5 (DECISIONS 2026-10-31). Waiting for the owner to agree before marking Stage 4 complete.
+- Test 7, no phone: the page gets a black camera and silence, nothing crashes (verified with the test page). PASS for Stage 4; the "switch to your phone" notice on the PC is a Stage 5 task (owner agreed 2026-10-31; DECISIONS 2026-10-31).
 
 ## Stage 1 acceptance evidence
 - Test 2, proxy in effect (2026-10-26, owner, real HTTP proxy, profile 257c8d81): browserleaks.com/ip showed 62.192.100.40 (the proxy), Germany, Europe/Berlin, matching the fingerprint (de-DE, Europe/Berlin); Accept-Language de-DE; WebRTC public IP = proxy IP, no local IP; no IPv6. PASS.
@@ -133,4 +133,4 @@ Still true (not fixable in software):
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 
 ## Next action
-Stage 1 acceptance complete (2026-10-27). Next: owner's go-ahead for Stage 2 (phone access, `stages/stage-2-phone-access.md`); run its "Verify first" checks before building. Proxies: one provider, ports 10001-10100 (60 US, 10 DE, 10 ES, 10 UK, 10 FR, 3 AU per the owner), all sticky; Profile 1 = 10006, Profile 2 = 10050.
+Stage 4 complete (2026-10-31). Next: Stage 5, Windows app (`stages/stage-5-windows-app.md`): run its "Verify first" checks before building. Carry into Stage 5: the "switch to your phone" notice (DECISIONS 2026-10-31), our own PC viewer with input mode from real pointer events (notes above), and the agent embedded in the Electron main process. Still open from Stage 3 (owner): a clean German IP for Profile 1.
