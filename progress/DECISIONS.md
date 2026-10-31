@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Browser camera keeps the last frame when a read catches it mid-write
+Context: The owner still saw single black flashes in the camera picture (only the camera, 19:09:12 and 19:09:27). A monitor in the container showed fresh, non-black frames reaching shared memory at about 30 per second at those exact times, with the phone's connection up. The browser's reader (enclave-camoufox zz-enclave-phone-media.patch) drew a black frame whenever its copy overlapped camfeed writing the next frame (sequence odd, or changed during the copy). A write usually takes 0.2 ms but measured up to 45 ms on the busy PC.
+Decision: The reader retries up to 4 times, 1 ms apart. If the frame is still mid-write it keeps the previous frame. It goes black only when there is no fresh frame (phone not sharing, or the last frame is over 2 s old). It also adds the acquire fence after the copy that the seqlock check needs. Built as enclave-camoufox commit 6edef23 (run 41228590512, zip 16556f40). Verified with a stand-in writer that holds every write for 4 ms at 50 frames per second: the old browser showed 269 of 1143 frames black, the new one 0 of 1153; with the writer stopped, all frames are black as before.
+Reason: A real webcam never shows a black frame between two good ones. Keeping the last frame is what the hold in camfeed already does for network gaps.
+
 ## 2026-10-31  Screen encoder: one VP8 thread at the fastest speed
 Context: The owner felt slowness on the real phone. neko's default screen pipeline (VP8, threads=4, cpu-used=4) took about 250% CPU on the owner's i5-7300U (2 cores, 4 threads; load 9 to 11) and still delivered only 11 to 13 fps at the viewer, with 70 to 125 ms jitter. Per-thread profiling showed the 4 encoder threads using most of it; changing cpu-used or quality limits alone barely moved it (libvpx VP8 worker threads spin while waiting).
 Decision: Ship /etc/neko/neko.yaml with neko's default pipeline except threads=1 and cpu-used=16 (same bitrate, same quantizer limits, same keyframe distance, 25 fps, 1920x1080).
