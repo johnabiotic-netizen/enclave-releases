@@ -86,7 +86,19 @@ Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-3
 - [x] File passthrough from the phone (DECISIONS 2026-10-31). Verified 2026-10-31 with the simulated phone: a page's upload field opened Firefox's picker; about 2 s later the phone showed "This page wants a file." with Choose file; the chosen file (IMG_2041.png, 63 399 bytes) reached the page with its name, size, type and content unchanged, and the picker closed. Names with accents work. Location (GPS) is removed from phone photos and videos first (DECISIONS 2026-10-31); verified 2026-10-31 on real JPEG (Exif and XMP), PNG, WebP, MP4 and MOV files given a location with exiftool: afterwards exiftool finds no location, camera, date and orientation remain, sizes are unchanged and decoded pixels are identical. HEIC uses the same Exif path but had no real sample. Owner confirmed on the real phone 2026-10-31: a gallery photo (3 869 686 bytes) reached the page; the agent logged that it carried a location and removed it.
 - [x] Latency (target under ~300 ms). Owner judged it on the real phone 2026-10-31 after the encoder change: delay feels fine, text clean and sharp. Measured 2026-10-31 with the simulated phone on this PC (Intel i5-7300U, 2 cores / 4 threads): the phone clock as a barcode through the camera, read by a page in the profile and drawn back on screen, read again on the phone: round trip ~1 s (median). Breakdown: the test phone encodes in ~4 ms and the network round trip is ~17 ms; frames reach the shared memory ~315 ms after the phone drew them; the rest is the screen stream back. The PC is saturated (load ~7 on 4 threads): the screen stream (VP8, 1920x1080, 25 fps, cpu-used 4) takes ~230% CPU even for a static page, and the simulated phone (Edge on the same PC, decoding 1080p and encoding 720p in software) adds more, so these numbers are pessimistic. H.264 with neko's default x264 settings was no better (~175% CPU, slower round trip). Next: measure with the real phone; options to cut CPU: GPU encoding through WSL (Mesa d3d12 VA-API, needs mesa-va-drivers in the image), or a cheaper screen encode. Done 2026-10-31: the screen encode now uses one VP8 thread at the fastest speed (DECISIONS 2026-10-31): about 70% CPU instead of 250%, 25 fps steady at the viewer. Next: the owner judges delay and text sharpness on the real phone.
 - [x] No-phone message: with no phone sharing, a page gets a black camera and silence and nothing crashes (verified). The "switch to your phone" notice is shown by the Windows app in Stage 5 from GET /profiles/:id/media (owner agreed 2026-10-31; DECISIONS 2026-10-31).
-## Stage 5: Windows app  [ ]
+## Stage 5: Windows app  [~]
+Spec: `stages/stage-5-windows-app.md`
+- [x] Verify first (2026-10-31): Electron 45.2.1 (Node 24, Chromium 156), async safeStorage (sync calls removed in 46), viewer with neko's client library in the renderer (DECISIONS 2026-10-31). Closing the window keeps profiles running in the tray (owner, DECISIONS 2026-10-31).
+- [ ] A. Skeleton: packages/desktop (Electron, React, Vite, TypeScript), the agent inside the main process, the renderer reaching it over IPC only.
+- [ ] B. Secrets in safeStorage: agent token made on first run; proxy and stream passwords encrypted on disk; the CLI refuses app-protected profiles instead of reading them.
+- [ ] C. Dashboard: profile tiles with the status seam, exit IP, actions; empty state.
+- [ ] D. Create and edit wizard: name, proxy with Check, test proxy toggle, template, review.
+- [ ] E. Profile viewer: embedded stream (mouse, keyboard, sound), top bar, open on phone (Tailscale address), "switch to your phone" notice.
+- [ ] F. Settings: idle timeout, data location, default proxy, phone access, resource use, about.
+- [ ] G. Setup checker: Docker (Desktop or Engine in WSL), virtualization, WSL, image; exact fixes; Recheck; image step with progress.
+- [ ] H. Tray: close hides to tray, Quit stops profiles cleanly.
+- [ ] I. Packaging with electron-builder (unsigned installer).
+- [ ] J. Playwright smoke tests for the main flows.
 ## Stage 6: Phone linking  [ ]
 ## Stage 7: Launch  [ ]
 

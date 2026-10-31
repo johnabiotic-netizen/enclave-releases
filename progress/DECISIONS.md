@@ -4,6 +4,16 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Stage 5 verify first: Electron 45, async safeStorage, viewer with neko's client library
+Context: Stage 5 "Verify first". Checked npm, releases.electronjs.org and the Electron safeStorage docs on 2026-10-31.
+Decision: Electron 45.2.1 (Node 24.22.1, Chromium 156; the newest stable, three majors supported), React 19.3.1, Vite 8.3.5, @vitejs/plugin-react 6.1.2, electron-builder 26.18.0, @playwright/test 1.64.1; TypeScript stays at the repo's 6.0.3. Secrets use the async safeStorage API (isAsyncEncryptionAvailable, encryptStringAsync, decryptStringAsync): the sync calls are deprecated in 45 and removed in 46. On Windows it is DPAPI, which protects from other Windows users, not from other programs of the same user. The PC viewer uses @m1k1o/neko 3.2.0 (neko's official client library, as the phone app) directly in the renderer with mouse and keyboard input, not a webview or iframe of neko's page.
+Reason: Node 24 in Electron matches the agent, so the agent runs in the main process unchanged (startAgent). One client library for PC and phone; no second web app to keep in step.
+
+## 2026-10-31  Closing the window keeps profiles running in the tray
+Context: Stage 5 acceptance 4 leaves it to us: stop profiles on close, or keep them running. The phone can reach a profile only while the agent (inside the app) runs.
+Decision: Owner chose: closing the window hides Enclave to the system tray and profiles keep running. "Quit Enclave" in the tray menu stops every profile cleanly (tabs and logins kept) and exits.
+Reason: A phone session should not end because the PC window was closed.
+
 ## 2026-10-31  Stage 4 test 7: "switch to your phone" notice, shown by the Windows app (Stage 5)
 Context: Acceptance test 7 asks that a page requesting the camera with no phone connected gets a clear message and nothing crashes. With no phone connected, nobody is looking at the phone, so the message has to appear on the PC. The PC viewer today is neko's web page; the Windows app (Stage 5) replaces it.
 Decision: Stage 4 delivers the safe behaviour (black camera, silence, no crash; verified) and the data: `GET /profiles/:id/media` says when a page wants the camera or mic and whether a phone is sharing. Owner (2026-10-31): the message is a "switch to your phone" notice. Stage 5: when a page wants the camera or mic and no phone is sharing, the Windows app shows a Windows notification and a banner on that profile ("This page wants your camera. Open <profile> on your phone to share it."). A connected phone already shows "This page wants your camera and microphone." with Share. Stage 6: a push notification to the phone when its app is closed, opening that profile; push goes through Google or Apple, so it carries only the profile name, never the page; owner to approve before it is turned on. Stage 4 closed on this basis.
