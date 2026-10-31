@@ -19,7 +19,8 @@ Base: `http://127.0.0.1:<port>/v1`
 | POST | `/profiles/:id/files?name=<file name>` | the file, `application/octet-stream`, up to 100 MB | `{ ok }`: removes where a photo or video was taken (GPS, location), puts the file in the profile and picks it in the open file picker (Stage 4); `FILE_PICKER_CLOSED` if none is open |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
-| GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt }` |
+| GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt, testProxyAvailable }` |
+| POST | `/proxy-check` | `{ proxy?, useTestProxy? }` | `ProxyCheckResult`: the safety check for a proxy not in a profile yet (the create wizard's Check); same errors as a start, saves nothing |
 
 Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this API and each running profile's stream to the owner's tailnet over HTTPS; the server still binds 127.0.0.1 only. Paths outside `/v1` serve the phone app's static files without a token.
 

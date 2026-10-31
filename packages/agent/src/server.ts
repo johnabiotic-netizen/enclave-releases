@@ -8,6 +8,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   API_BASE_PATH,
+  type CheckNewProxyRequest,
   type CreateProfileRequest,
   type HealthResponse,
   MAX_PHONE_FILE_BYTES,
@@ -123,6 +124,9 @@ export function buildServer(
           await service.sendFile(req.params.id, String(req.query.name ?? ''), req.body);
           return { ok: true };
         },
+      );
+      v1.post<{ Body: CheckNewProxyRequest }>('/proxy-check', async (req) =>
+        service.checkNewProxy(req.body ?? {}),
       );
       v1.post<{ Params: { id: string } }>('/profiles/:id/check-proxy', async (req) =>
         service.checkProfileProxy(req.params.id),

@@ -127,4 +127,14 @@ export interface SystemResponse {
   dockerOk: boolean;
   virtualizationOk: boolean;
   imageBuilt: boolean;
+  /** A built-in test proxy is set up (TEST_PROXY), so profiles can be made without one. */
+  testProxyAvailable: boolean;
 }
+
+// POST /proxy-check: the safety check for a proxy not saved in a profile yet.
+export interface CheckNewProxyRequest {
+  /** Required unless `useTestProxy` is true. */
+  proxy?: ProxySpec;
+  useTestProxy?: boolean;
+}
+export type CheckNewProxyResponse = ProxyCheckResult;

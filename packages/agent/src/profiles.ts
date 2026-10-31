@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   DEFAULT_IDLE_STOP_MINUTES,
+  type CheckNewProxyRequest,
   type CreateProfileRequest,
   type Fingerprint,
   type MediaInUse,
@@ -14,6 +15,7 @@ import {
   type ProfileStatus,
   type ProxyCheckResult,
   type ProxyInput,
+  type ProxySpec,
   type StreamInfo,
   type SystemResponse,
   type UpdateProfileRequest,
@@ -222,7 +224,28 @@ export class ProfileService {
       dockerOk,
       virtualizationOk: dockerOk,
       imageBuilt: dockerOk && (await this.runtime.imageExists()),
+      testProxyAvailable: Boolean(this.config.testProxy),
     };
+  }
+
+  /**
+   * The safety check for a proxy that is not in a profile yet (the create wizard's Check):
+   * the same check a profile's start runs. Throws the same errors; saves nothing.
+   */
+  async checkNewProxy(req: CheckNewProxyRequest): Promise<ProxyCheckResult> {
+    const useTestProxy = req.useTestProxy === true;
+    const proxy = this.wizardProxy(req.proxy, useTestProxy);
+    await this.runtime.assertReady();
+    return checkResult(await this.checkProxy(proxy, useTestProxy), true);
+  }
+
+  private wizardProxy(spec: ProxySpec | undefined, useTestProxy: boolean): ProxyInput {
+    if (useTestProxy) {
+      if (!this.config.testProxy) throw new InputError('No test proxy is set up on this PC.');
+      return parseProxy(this.config.testProxy);
+    }
+    if (!spec) throw new InputError('A proxy is required (or use the test proxy).');
+    return parseProxy(spec);
   }
 
   // ---------------------------------------------------------------- create / update / delete
@@ -230,14 +253,7 @@ export class ProfileService {
   async create(req: CreateProfileRequest): Promise<Profile> {
     const name = validName(req.name);
     const useTestProxy = req.useTestProxy === true;
-    let proxy: ProxyInput;
-    if (useTestProxy) {
-      if (!this.config.testProxy) throw new InputError('TEST_PROXY is not set in .env.');
-      proxy = parseProxy(this.config.testProxy);
-    } else {
-      if (!req.proxy) throw new InputError('A proxy is required (or use the test proxy).');
-      proxy = parseProxy(req.proxy);
-    }
+    const proxy = this.wizardProxy(req.proxy, useTestProxy);
 
     await this.runtime.assertReady();
     const adapter = await this.requireGpu();

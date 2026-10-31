@@ -6,6 +6,7 @@ import type { AgentState } from '../shared/bridge';
 import { Dashboard } from './Dashboard';
 import { ProfilesIcon, SettingsIcon, SetupIcon } from './icons';
 import { useProfiles } from './useProfiles';
+import { CreateWizard, EditProfile } from './Wizard';
 
 type View =
   | { kind: 'profiles' }
@@ -73,9 +74,35 @@ function Shell() {
             onEdit={(id) => setView({ kind: 'edit', id })}
           />
         )}
-        {view.kind !== 'profiles' && (
+        {view.kind === 'create' && (
+          <CreateWizard
+            onDone={(id) => {
+              void model.refresh();
+              if (id) setSelected(id);
+              nav('profiles');
+            }}
+          />
+        )}
+        {view.kind === 'edit' &&
+          (() => {
+            const profile = model.profiles?.find((p) => p.id === view.id);
+            if (!profile) return null;
+            return (
+              <EditProfile
+                profile={profile}
+                running={
+                  model.shownState(profile) !== 'stopped' && model.shownState(profile) !== 'error'
+                }
+                onDone={() => {
+                  void model.refresh();
+                  nav('profiles');
+                }}
+              />
+            );
+          })()}
+        {['viewer', 'settings', 'setup'].includes(view.kind) && (
           <section className="page">
-            <h1>{TITLES[view.kind]}</h1>
+            <h1>{TITLES[view.kind as keyof typeof TITLES]}</h1>
             <p className="muted">This screen is being built.</p>
             <button className="button" onClick={() => nav('profiles')}>
               Back to profiles
