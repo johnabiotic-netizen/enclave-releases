@@ -7,12 +7,12 @@
 
 # Camoufox v158.0-beta.40 built with Enclave's patches (Windows text metrics; phone
 # camera and mic) by the private repo enclave-camoufox (workflow "Enclave build", run of
-# 2026-10-30). It has no public URL: scripts/build-image.sh supplies it from
+# 2026-10-31). It has no public URL: scripts/build-image.sh supplies it from
 # $ENCLAVE_DIST_CACHE/camoufox/.
 # The URL below is the stock release, kept only as the stage's source; its checksum
 # differs, so a build without our zip in the cache fails rather than using stock Camoufox.
 FROM scratch AS camoufox-dist
-ADD --checksum=sha256:ceeb8e34d28fce45c549da4be100a889551ac60e66c6c7b83c88cad20f2564a4 \
+ADD --checksum=sha256:d372cd345d15db5e73ca330df5ec40bf6b19596cfb55a9a2996f46b866f7da39 \
     https://github.com/daijro/camoufox/releases/download/v158.0-beta.40/camoufox-158.0-beta.40-lin.x86_64.zip \
     /camoufox.zip
 
@@ -31,9 +31,10 @@ ADD --checksum=sha256:e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0b
     https://github.com/go-gost/gost/releases/download/v3.3.1/gost_3.3.1_linux_amd64.tar.gz \
     /gost.tar.gz
 
-# neko v3.2.0's server with Enclave's patches (the webcam goes to a named pipe), built
-# by the private repo enclave-camoufox (workflow "Enclave neko build", run of
-# 2026-10-30). No public URL: scripts/build-image.sh supplies it from
+# neko v3.2.0's server with Enclave's patches (the webcam goes to a named pipe, every
+# frame; no transport-cc, so the phone camera reaches full size over TCP), built by the
+# private repo enclave-camoufox (workflow "Enclave neko build", run of 2026-10-31). No
+# public URL: scripts/build-image.sh supplies it from
 # $ENCLAVE_DIST_CACHE/neko/; without it this stage is empty and the checksum below fails.
 FROM scratch AS neko-dist
 
@@ -52,8 +53,8 @@ FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647
 
 # Camoufox browser build. The folder suffix is the first 8 hex chars of the zip's sha256,
 # which is how the camoufox package names its installs.
-ARG CAMOUFOX_INSTALL=browsers/official/158.0-beta.40-ceeb8e34
-ARG CAMOUFOX_SHA256=ceeb8e34d28fce45c549da4be100a889551ac60e66c6c7b83c88cad20f2564a4
+ARG CAMOUFOX_INSTALL=browsers/official/158.0-beta.40-d372cd34
+ARG CAMOUFOX_SHA256=d372cd345d15db5e73ca330df5ec40bf6b19596cfb55a9a2996f46b866f7da39
 ARG GEOIP_SHA256=1823c162efe356bb8a588f10f027c41bd19d742cd00b4696d8f74ea0a3856358
 ARG UBLOCK_SHA256=5b74415860456370644bd80f16125e865b0e6c356bb5dfcfb84069967eaa5287
 ARG GOST_SHA256=e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0bcae37c
@@ -202,7 +203,7 @@ RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
 
 COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
 
-ARG NEKO_SHA256=60abac1a19bcad76f70d7f12f666721d575f5063f3e8a6fcb9c3fbb38c5ae54f
+ARG NEKO_SHA256=16226fbf6c4e391abfded3386f0c3db0ae5b3c9d5b26ec2b2f1dbaa4f13e0d19
 RUN --mount=type=bind,from=neko-dist,target=/dist/neko \
     set -eux; \
     echo "${NEKO_SHA256}  /dist/neko/neko" | sha256sum -c -; \
