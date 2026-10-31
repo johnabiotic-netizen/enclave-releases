@@ -11,7 +11,7 @@
   --ok: #35c27a;
   --warn: #e8b13a;
   --err: #e5604d;
-  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
   color-scheme: dark;
 }

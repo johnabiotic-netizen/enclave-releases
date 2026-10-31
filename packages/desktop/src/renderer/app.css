@@ -1,0 +1,435 @@
+/* Screens. Tokens and base rules are in styles.css. */
+
+/* ---------------------------------------------------------------- type */
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-size: 20px;
+}
+h2 {
+  font-size: 16px;
+}
+p {
+  margin: 0;
+}
+.muted {
+  color: var(--text-500);
+}
+.small {
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- shell */
+
+.shell {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  height: 100%;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 0;
+  background: var(--bg-800);
+  border-right: 1px solid var(--line);
+}
+
+/* The mark: a sealed cell, a ring inside a rounded square. */
+.brand {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 20px;
+  border-radius: 7px;
+  border: 1.5px solid var(--text-300);
+  box-shadow:
+    inset 0 0 0 4px var(--bg-800),
+    inset 0 0 0 5.5px var(--text-500);
+}
+
+.rail-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 60px;
+  padding: 8px 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-500);
+  cursor: pointer;
+}
+.rail-button:hover {
+  color: var(--text-300);
+}
+.rail-button.active {
+  color: var(--text-100);
+  background: var(--bg-700);
+}
+.rail-label {
+  font-size: 11px;
+}
+
+.main {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.splash {
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-300);
+}
+.splash h1 {
+  color: var(--text-100);
+}
+
+.page {
+  height: 100%;
+  overflow: auto;
+  padding: 28px 32px;
+}
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.with-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg-700);
+  color: var(--text-100);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.button:hover:not(:disabled) {
+  border-color: #3a4a61;
+}
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06101f;
+  font-weight: 600;
+}
+.button.primary:hover:not(:disabled) {
+  background: #6aa0ff;
+}
+.button.quiet {
+  background: none;
+}
+.button.danger {
+  background: var(--err);
+  border-color: var(--err);
+  color: #1a0805;
+  font-weight: 600;
+}
+.button.small {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-300);
+  cursor: pointer;
+}
+.icon-button:hover {
+  background: var(--bg-700);
+  color: var(--text-100);
+}
+
+.notice {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg-800);
+  color: var(--text-300);
+  max-width: 72ch;
+}
+.notice.error {
+  border-color: rgba(229, 96, 77, 0.45);
+  color: #f2b3a9;
+}
+
+/* ---------------------------------------------------------------- empty state */
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  max-width: 46ch;
+  margin-top: 12vh;
+  color: var(--text-300);
+  font-size: 16px;
+}
+
+/* ---------------------------------------------------------------- the profile cell */
+
+/* Cells sit in the surface, separated by hairlines (each cell's outline overlaps its neighbours'). */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 300px));
+  gap: 1px;
+  margin: 0;
+  padding: 1px;
+  list-style: none;
+}
+
+.tile {
+  --seam: #3a4658;
+  --glow: transparent;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 150px;
+  outline: 1px solid var(--line);
+  background: linear-gradient(180deg, #172133 0%, var(--bg-800) 70%);
+}
+.tile.selected {
+  background: linear-gradient(180deg, #1b2840 0%, #172034 70%);
+}
+
+/* The seam: a thin sealed line down the cell, glowing quietly in its status colour. */
+.seam {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--seam);
+  box-shadow: 0 0 10px 1px var(--glow);
+  transition:
+    background-color 600ms ease,
+    box-shadow 600ms ease;
+}
+.seam-stopped {
+  --seam: #3a4658;
+  --glow: transparent;
+}
+.seam-busy {
+  --seam: var(--warn);
+  --glow: rgba(232, 177, 58, 0.35);
+}
+.seam-running {
+  --seam: var(--ok);
+  --glow: rgba(53, 194, 122, 0.35);
+}
+.seam-error {
+  --seam: var(--err);
+  --glow: rgba(229, 96, 77, 0.35);
+}
+
+.tile-body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  flex: 1;
+  padding: 16px 16px 8px 20px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tile-body:focus-visible {
+  outline-offset: -3px;
+}
+.tile-name {
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tile-state {
+  color: var(--seam);
+  font-size: 13px;
+  font-weight: 500;
+}
+.seam-stopped .tile-state {
+  color: var(--text-500);
+}
+.tile-ip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--text-300);
+  font-size: 13px;
+}
+.tile-used {
+  font-size: 12px;
+}
+.tile-error {
+  color: #f2b3a9;
+  font-size: 12px;
+}
+.tile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 12px 20px;
+}
+
+.flag {
+  width: 18px;
+  height: 13.5px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  vertical-align: -2px;
+}
+
+/* ---------------------------------------------------------------- menu */
+
+.menu {
+  position: relative;
+}
+.menu-list {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 5;
+  display: grid;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-700);
+}
+.menu-list button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-100);
+  text-align: left;
+  cursor: pointer;
+}
+.menu-list button:hover:not(:disabled) {
+  background: #253148;
+}
+.menu-list button:disabled {
+  color: var(--text-500);
+  cursor: default;
+}
+.menu-list .danger:not(:disabled) {
+  color: #f2a89c;
+}
+
+/* ---------------------------------------------------------------- detail panel */
+
+.panel {
+  width: 340px;
+  height: 100%;
+  overflow: auto;
+  padding: 24px 22px;
+  border-left: 1px solid var(--line);
+  background: var(--bg-800);
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  color: var(--text-300);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--seam);
+  box-shadow: 0 0 8px var(--glow);
+}
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 8px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 9px 12px;
+  margin: 18px 0 0;
+}
+.facts dt {
+  color: var(--text-500);
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notes {
+  margin-top: 18px;
+  color: var(--text-300);
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------- dialog */
+
+.dialog {
+  width: min(440px, 90vw);
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-800);
+  color: var(--text-100);
+}
+.dialog::backdrop {
+  background: rgba(5, 8, 14, 0.6);
+}
+.dialog p {
+  margin-top: 10px;
+  color: var(--text-300);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
