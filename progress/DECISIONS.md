@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  The phone frames its camera as a 16:9 webcam before sending
+Context: The profile's camera is a 1280x720 landscape webcam and neko scales whatever arrives to that size, ignoring shape. A phone held upright films portrait, so the owner saw faces squashed on the real phone.
+Decision: The phone app sends the middle 16:9 of its camera picture, drawn at 1280x720 frame by frame (canvas fed by requestVideoFrameCallback), and asks the camera for 1080p so the crop from a portrait picture stays sharp (1080x608 from 1080x1920). The preview shows exactly what is sent. Landscape pictures fill the frame whole.
+Reason: Fixing it on the phone needs no neko rebuild, works on Android and iPhone, and a centered 16:9 crop is how a laptop webcam frames a person; black side bars would look like no real webcam.
+
 ## 2026-10-31  Location is removed from phone photos and videos before they reach a profile
 Context: Phones often save where a photo or video was taken (GPS in Exif or XMP, ©xyz or QuickTime location in MP4/MOV). Uploaded through a profile whose proxy is in another country, that gives away the owner's real location and contradicts the proxy (hard rules 1 and 3). The owner chose stripping by default.
 Decision: The agent strips location from every file the phone sends (POST /profiles/:id/files) before it enters the container, in place: GPS tags leave every Exif block (JPEG incl. multi-picture, PNG eXIf, WebP, HEIC/AVIF), GPS fields in XMP become spaces, MP4/MOV location boxes become 'free' boxes. Size, picture and all other metadata (camera, date, orientation) stay byte for byte. Only those image and video formats are touched; other files (documents, archives) pass unchanged so their checksums never break. No option to turn it off yet.

@@ -192,7 +192,10 @@ let client: NekoClient | null = null;
 let mic: { stream: MediaStream; stop: (() => void) | null } | null = null;
 /** The phone camera the profile is seeing, while it is shared (Stage 4). */
 let camera: {
+  /** What the profile gets and the preview shows: the camera framed as a 16:9 webcam. */
   stream: MediaStream;
+  /** Stops the framing and the phone camera itself. */
+  end: () => void;
   stop: (() => void) | null;
   facing: 'user' | 'environment';
 } | null = null;
@@ -478,27 +481,98 @@ function showCamera(): void {
 function stopCamera(): void {
   if (!camera) return;
   camera.stop?.();
-  for (const t of camera.stream.getTracks()) t.stop();
+  camera.end();
   camera = null;
   showCamera();
   showAsk();
 }
 
+// 1080p, so the middle 16:9 of an upright phone's picture is still at least 1280 wide or
+// close to it (1080 x 608 from 1080 x 1920).
 const cameraConstraints = (facing: 'user' | 'environment') => ({
   facingMode: facing,
-  width: { ideal: 1280 },
-  height: { ideal: 720 },
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
   frameRate: { ideal: 30 },
 });
 
-function useCamera(stream: MediaStream, facing: 'user' | 'environment'): void {
-  if (!client) return;
+const WEBCAM_WIDTH = 1280;
+const WEBCAM_HEIGHT = 720;
+
+/**
+ * The profile's camera is a 16:9 landscape webcam (1280 x 720), and the PC scales whatever
+ * arrives to that size. A phone held upright films portrait, which would come out squashed, so
+ * the phone sends the middle 16:9 of its picture at 1280 x 720 instead, framed the way a laptop
+ * webcam would be. Each camera frame is drawn once, as it arrives.
+ */
+function asWebcam(source: MediaStream): { stream: MediaStream; end: () => void } {
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  // In the page (invisibly), or iPhones stop playing it.
+  video.style.cssText =
+    'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none';
+  video.srcObject = source;
+  document.body.append(video);
+  const canvas = document.createElement('canvas');
+  canvas.width = WEBCAM_WIDTH;
+  canvas.height = WEBCAM_HEIGHT;
+  const g = canvas.getContext('2d', { alpha: false })!;
+  const stream = canvas.captureStream();
+  let on = true;
+  let timer = 0;
+  const draw = () => {
+    if (!on) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (w && h) {
+      const cropW = Math.min(w, (h * 16) / 9);
+      const cropH = Math.min(h, (w * 9) / 16);
+      g.drawImage(
+        video,
+        (w - cropW) / 2,
+        (h - cropH) / 2,
+        cropW,
+        cropH,
+        0,
+        0,
+        WEBCAM_WIDTH,
+        WEBCAM_HEIGHT,
+      );
+    }
+    next();
+  };
+  const next = () => {
+    if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(draw);
+    else timer = window.setTimeout(draw, 1000 / 30);
+  };
+  void video.play().catch(() => {});
+  next();
+  return {
+    stream,
+    end: () => {
+      on = false;
+      window.clearTimeout(timer);
+      for (const t of [...source.getTracks(), ...stream.getTracks()]) t.stop();
+      video.srcObject = null;
+      video.remove();
+    },
+  };
+}
+
+function useCamera(source: MediaStream, facing: 'user' | 'environment'): void {
+  if (!client) {
+    for (const t of source.getTracks()) t.stop();
+    return;
+  }
+  const { stream, end } = asWebcam(source);
   camera = {
     stream,
+    end,
     facing,
     stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
   };
-  for (const t of stream.getTracks()) t.onended = () => stopCamera();
+  for (const t of source.getTracks()) t.onended = () => stopCamera();
   showCamera();
   showAsk();
 }
