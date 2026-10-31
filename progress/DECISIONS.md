@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Location is removed from phone photos and videos before they reach a profile
+Context: Phones often save where a photo or video was taken (GPS in Exif or XMP, ©xyz or QuickTime location in MP4/MOV). Uploaded through a profile whose proxy is in another country, that gives away the owner's real location and contradicts the proxy (hard rules 1 and 3). The owner chose stripping by default.
+Decision: The agent strips location from every file the phone sends (POST /profiles/:id/files) before it enters the container, in place: GPS tags leave every Exif block (JPEG incl. multi-picture, PNG eXIf, WebP, HEIC/AVIF), GPS fields in XMP become spaces, MP4/MOV location boxes become 'free' boxes. Size, picture and all other metadata (camera, date, orientation) stay byte for byte. Only those image and video formats are touched; other files (documents, archives) pass unchanged so their checksums never break. No option to turn it off yet.
+Reason: A photo without location is normal (screenshots, iPhone uploads, most sites strip it anyway); one with a location that contradicts the proxy is a leak. Removing only the location keeps the file looking like it came straight from a phone; no re-encode means no quality loss.
+
 ## 2026-10-31  Phone files go into the profile's open file picker through the agent
 Context: Stage 4 asks to hand a phone file (or a photo taken now) to the profile's file picker. neko 3.2 can take over Firefox's file picker (desktop.file_chooser_dialog), but its built-in PC client can't answer it, so PC users would lose file pickers until the Windows app.
 Decision: Leave neko's setting off. The agent reports an open picker (window "File Upload ...") in GET /profiles/:id/media; the phone offers "Choose file" (the phone's own chooser: camera, photos, files) and POSTs the file to /v1/profiles/:id/files; the agent copies it into the container (/tmp/from-phone/<random>/<name>, gone at stop) and types its path into the picker, only while the picker is the active window. The site sees the phone's file name.

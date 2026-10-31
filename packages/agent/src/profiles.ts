@@ -26,6 +26,7 @@ import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
 import { ProxyTester, type ProxyTestJob } from './proxy-tester.js';
 import { AgentError, InputError } from './errors.js';
+import { stripLocation } from './strip-location.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
 import { PROXY_SECRET_REF, type ProfileSecrets, type ProfileStore } from './store.js';
@@ -178,6 +179,8 @@ export class ProfileService {
     // A folder of its own per file, so two files with one name don't collide. Gone at stop.
     const dir = `tmp/from-phone/${randomBytes(4).toString('hex')}/`;
     const file = dir + phoneFileName(name);
+    // The phone's real location must not reach a profile whose proxy is elsewhere.
+    const locationRemoved = stripLocation(data) > 0;
     await this.runtime.putArchive(
       containerName(id),
       makeTar([
@@ -203,7 +206,7 @@ export class ProfileService {
         "Couldn't hand the file to the profile's file picker. Try again.",
       );
     }
-    await this.store.log(id, 'phone-file', { bytes: data.length });
+    await this.store.log(id, 'phone-file', { bytes: data.length, locationRemoved });
   }
 
   logs(id: string, tail: number): Promise<string[]> {

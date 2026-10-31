@@ -16,7 +16,7 @@ Base: `http://127.0.0.1:<port>/v1`
 | POST | `/profiles/:id/stop` | - | `{ ok }` |
 | GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2) |
 | GET | `/profiles/:id/media` | - | `{ camera, microphone, filePicker }`: whether a page in the running profile is using its camera or microphone now, and whether it has a file picker open (Stage 4; the phone app offers to share them, or a file) |
-| POST | `/profiles/:id/files?name=<file name>` | the file, `application/octet-stream`, up to 100 MB | `{ ok }`: puts the file in the profile and picks it in the open file picker (Stage 4); `FILE_PICKER_CLOSED` if none is open |
+| POST | `/profiles/:id/files?name=<file name>` | the file, `application/octet-stream`, up to 100 MB | `{ ok }`: removes where a photo or video was taken (GPS, location), puts the file in the profile and picks it in the open file picker (Stage 4); `FILE_PICKER_CLOSED` if none is open |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
 | GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt }` |
