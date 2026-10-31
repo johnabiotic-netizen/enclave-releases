@@ -192,7 +192,9 @@ let client: NekoClient | null = null;
 let mic: { stream: MediaStream; stop: (() => void) | null } | null = null;
 /** The phone camera the profile is seeing, while it is shared (Stage 4). */
 let camera: {
-  /** What the profile gets and the preview shows: the camera framed as a 16:9 webcam. */
+  /** The phone camera itself; the preview plays it. */
+  source: MediaStream;
+  /** What the profile gets: the camera framed as a 16:9 webcam. */
   stream: MediaStream;
   /** Stops the framing and the phone camera itself. */
   end: () => void;
@@ -473,7 +475,12 @@ function showCamera(): void {
   );
   showLive();
   preview.hidden = !camera;
-  previewVideo.srcObject = camera?.stream ?? null;
+  // The preview plays the camera itself, cut to the same middle 16:9 by CSS; the frames sent
+  // are drawn from it, as an element on screen is never paused by the phone.
+  if (previewVideo.srcObject !== (camera?.source ?? null)) {
+    previewVideo.srcObject = camera?.source ?? null;
+  }
+  if (camera) void previewVideo.play().catch(() => {});
   // The front camera is shown mirrored, as phones do; the profile gets it unmirrored.
   previewVideo.style.transform = camera?.facing === 'user' ? 'scaleX(-1)' : '';
 }
@@ -505,17 +512,11 @@ const WEBCAM_HEIGHT = 720;
  * The profile's camera is a 16:9 landscape webcam (1280 x 720), and the PC scales whatever
  * arrives to that size. A phone held upright films portrait, which would come out squashed, so
  * the phone sends the middle 16:9 of its picture at 1280 x 720 instead, framed the way a laptop
- * webcam would be. Each camera frame is drawn once, as it arrives.
+ * webcam would be. Each camera frame is drawn once, as it arrives, from `video`: the preview,
+ * which is on screen (a hidden player can be paused by the phone, and the profile's camera goes
+ * black after 2 seconds without frames).
  */
-function asWebcam(source: MediaStream): { stream: MediaStream; end: () => void } {
-  const video = document.createElement('video');
-  video.muted = true;
-  video.playsInline = true;
-  // In the page (invisibly), or iPhones stop playing it.
-  video.style.cssText =
-    'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none';
-  video.srcObject = source;
-  document.body.append(video);
+function asWebcam(video: HTMLVideoElement): { stream: MediaStream; end: () => void } {
   const canvas = document.createElement('canvas');
   canvas.width = WEBCAM_WIDTH;
   canvas.height = WEBCAM_HEIGHT;
@@ -523,6 +524,8 @@ function asWebcam(source: MediaStream): { stream: MediaStream; end: () => void }
   const stream = canvas.captureStream();
   let on = true;
   let timer = 0;
+  let callback = 0;
+  let lastFrame = performance.now();
   const draw = () => {
     if (!on) return;
     const w = video.videoWidth;
@@ -541,23 +544,33 @@ function asWebcam(source: MediaStream): { stream: MediaStream; end: () => void }
         WEBCAM_WIDTH,
         WEBCAM_HEIGHT,
       );
+      lastFrame = performance.now();
     }
     next();
   };
   const next = () => {
-    if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(draw);
+    if ('requestVideoFrameCallback' in video) callback = video.requestVideoFrameCallback(draw);
     else timer = window.setTimeout(draw, 1000 / 30);
   };
-  void video.play().catch(() => {});
   next();
+  // If the preview stops anyway (paused by the phone, or its callback lost), start it again.
+  const watchdog = window.setInterval(() => {
+    if (!on) return;
+    if (video.paused) void video.play().catch(() => {});
+    if (performance.now() - lastFrame > 1000 && 'requestVideoFrameCallback' in video) {
+      video.cancelVideoFrameCallback(callback);
+      lastFrame = performance.now();
+      next();
+    }
+  }, 500);
   return {
     stream,
     end: () => {
       on = false;
       window.clearTimeout(timer);
-      for (const t of [...source.getTracks(), ...stream.getTracks()]) t.stop();
-      video.srcObject = null;
-      video.remove();
+      window.clearInterval(watchdog);
+      if ('cancelVideoFrameCallback' in video) video.cancelVideoFrameCallback(callback);
+      for (const t of stream.getTracks()) t.stop();
     },
   };
 }
@@ -567,10 +580,14 @@ function useCamera(source: MediaStream, facing: 'user' | 'environment'): void {
     for (const t of source.getTracks()) t.stop();
     return;
   }
-  const { stream, end } = asWebcam(source);
+  const { stream, end } = asWebcam(previewVideo);
   camera = {
+    source,
     stream,
-    end,
+    end: () => {
+      end();
+      for (const t of source.getTracks()) t.stop();
+    },
     facing,
     stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
   };
