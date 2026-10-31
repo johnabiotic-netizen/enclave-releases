@@ -9,10 +9,14 @@ import {
   BrowserWindow,
   clipboard,
   ipcMain,
+  Menu,
+  nativeImage,
   net,
+  Notification,
   protocol,
   safeStorage,
   shell,
+  Tray,
 } from 'electron';
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
@@ -27,8 +31,13 @@ if (!app.isPackaged && existsSync(repoEnv)) process.loadEnvFile(repoEnv);
 
 let agent: RunningAgent | null = null;
 let token = '';
+/** Enclave's data folder (profiles, app settings). */
+let home = '';
 let state: AgentState = { status: 'starting' };
 let win: BrowserWindow | null = null;
+let tray: Tray | null = null;
+/** Set once Quit Enclave runs: the window may close for real then. */
+let quitting = false;
 
 // The window's pages come from app://enclave/, a real origin (file:// has none), which neko
 // is told to accept (DESKTOP_APP_ORIGIN).
@@ -44,6 +53,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showWindow());
   void app.whenReady().then(async () => {
     protocol.handle('app', serveRenderer);
+    createTray();
     createWindow();
     await bootAgent();
   });
@@ -63,7 +73,8 @@ async function bootAgent(): Promise<void> {
   setState({ status: 'starting' });
   try {
     const base = loadConfig({ ...process.env, AGENT_TOKEN: 'x'.repeat(32) });
-    const settings = new SettingsFile(base.home);
+    home = base.home;
+    const settings = new SettingsFile(home);
     const saved = await settings.read();
     await checkEncryption();
     token = await settings.agentToken(process.env.AGENT_TOKEN);
@@ -103,6 +114,7 @@ function createWindow(): void {
     title: 'Enclave',
     autoHideMenuBar: true,
     show: false,
+    icon: path.join(here, 'icon.png'),
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),
       contextIsolation: true,
@@ -125,6 +137,14 @@ function createWindow(): void {
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   void win.loadURL(`${DESKTOP_APP_ORIGIN}/index.html`);
+  // Closing the window keeps Enclave and its profiles running in the tray (DECISIONS
+  // 2026-10-31); Quit Enclave in the tray menu ends it.
+  win.on('close', (e) => {
+    if (quitting) return;
+    e.preventDefault();
+    win?.hide();
+    void hintTray();
+  });
   win.on('closed', () => (win = null));
 }
 
@@ -176,18 +196,74 @@ function parseBody(text: string): unknown {
   }
 }
 
+// ---------------------------------------------------------------- the tray
+
+function createTray(): void {
+  tray = new Tray(nativeImage.createFromPath(path.join(here, 'tray.png')));
+  tray.setToolTip('Enclave');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open Enclave', click: () => showWindow() },
+      { type: 'separator' },
+      { label: 'Quit Enclave', click: () => void quitAll() },
+    ]),
+  );
+  tray.on('click', () => showWindow());
+}
+
+/** The first time the window closes, say where Enclave went. Once per PC. */
+async function hintTray(): Promise<void> {
+  if (!home) return;
+  const settings = new SettingsFile(home);
+  const saved = await settings.read();
+  if (saved.trayHintShown) return;
+  await settings.write({ ...saved, trayHintShown: true });
+  new Notification({
+    title: 'Enclave is still running',
+    body: 'Your profiles keep running, so your phone can still reach them. Quit Enclave from its icon in the taskbar corner.',
+    icon: path.join(here, 'icon.png'),
+  }).show();
+}
+
 app.on('window-all-closed', () => {
-  // Tray behaviour comes with task H; until then closing the last window quits.
-  void shutdown();
+  // Hidden to the tray, not quit (see the window's close handler).
 });
 
-let quitting = false;
-async function shutdown(): Promise<void> {
+/** Quit Enclave: stops every running profile cleanly (tabs and logins kept), then exits. */
+async function quitAll(): Promise<void> {
   if (quitting) return;
   quitting = true;
-  await agent?.close().catch(() => {});
-  app.quit();
+  tray?.setToolTip('Enclave is stopping profiles');
+  if (agent) {
+    const running = (await agent.service.list().catch(() => [])).filter(
+      (p) => p.status.state === 'running' || p.status.state === 'starting',
+    );
+    await Promise.allSettled(running.map((p) => agent!.service.stop(p.id)));
+    await agent.close().catch(() => {});
+  }
+  tray?.destroy();
+  app.exit(0);
 }
+
+// Developer runs only: tests reach Quit Enclave through the debugger (no tray clicks).
+if (!app.isPackaged) {
+  Object.assign(globalThis, {
+    enclaveDev: {
+      quit: quitAll,
+      closeWindow: () => win?.close(),
+      windows: () =>
+        BrowserWindow.getAllWindows().map((w) => ({ visible: w.isVisible(), title: w.getTitle() })),
+      tray: () => (tray ? !tray.isDestroyed() : false),
+    },
+  });
+}
+
+// Windows ending the session, or app.quit() from elsewhere: the same clean stop.
+app.on('before-quit', (e) => {
+  if (quitting) return;
+  e.preventDefault();
+  void quitAll();
+});
 
 /** Profile passwords on disk, encrypted for this Windows user (DPAPI through safeStorage). */
 const safeStorageSealer: SecretSealer = {

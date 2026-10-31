@@ -13,6 +13,8 @@ export interface AppSettings {
   wslDistro?: string;
   /** Phone access over Tailscale. */
   phone?: 'tailscale';
+  /** The "still running in the tray" notice was shown once. */
+  trayHintShown?: boolean;
 }
 
 export class SettingsFile {
