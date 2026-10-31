@@ -306,33 +306,101 @@ function setStatus(text: string): void {
  * held left button) selects text instead of scrolling. Instead: a drag scrolls with the
  * mouse wheel, a tap clicks, a long press right-clicks. Touches are taken before the overlay
  * sees them; the overlay still handles the keyboard.
+ *
+ * Two fingers zoom the phone's view of the PC screen (pinch) and move around it (drag);
+ * tapping twice with two fingers shows the whole screen again. Only the phone's view
+ * changes; the profile's screen stays as it is.
  */
 function attachGestures(box: HTMLElement, c: NekoClient): () => void {
   const SCROLL_STEP = 40; // CSS px of finger travel per wheel notch
   const TAP_SLOP = 10; // a touch that moves less than this is a tap
   const LONG_PRESS_MS = 600;
+  const MAX_ZOOM = 4;
+  const TWO_FINGER_TAP_MS = 300; // two fingers down and up within this, without moving
+  const DOUBLE_TAP_MS = 400; // between the two two-finger taps
   let start = { x: 0, y: 0, t: 0 };
   let last = { x: 0, y: 0 };
   let carry = { x: 0, y: 0 };
   let dragging = false;
+  // Set once a second finger joins; the touch is then a zoom, never a click or a scroll.
+  let multi = false;
 
-  const remote = (t: Touch) => {
-    const r = box.getBoundingClientRect();
-    const { width, height } = c.state.screen.size;
-    const clamp = (v: number, max: number) => Math.max(0, Math.min(Math.round(v), max));
-    return {
-      x: clamp((width / r.width) * (t.clientX - r.left), width),
-      y: clamp((height / r.height) * (t.clientY - r.top), height),
+  // The view: box is scaled by `zoom` from its top left corner and moved by `pan` (CSS px).
+  // The overlay letterboxes the box inside the stage with margins, so positions below are
+  // in box coordinates: stage coordinates less the box's margins.
+  let zoom = 1;
+  let pan = { x: 0, y: 0 };
+  let pinch: {
+    dist: number;
+    mid: { x: number; y: number };
+    zoom: number;
+    pan: { x: number; y: number };
+    t: number;
+    moved: boolean;
+  } | null = null;
+  let lastTwoFingerTap = -Infinity;
+  box.style.transformOrigin = '0 0';
+  const showView = () => {
+    const area = box.parentElement ?? box;
+    // A zoomed picture larger than the stage always covers it (no empty edge to drag into);
+    // one still smaller than the stage stays centred.
+    const fit = (p: number, margin: number, size: number, room: number) => {
+      const s = size * zoom;
+      if (s <= room) return (room - s) / 2 - margin;
+      return Math.min(-margin, Math.max(room - s - margin, p));
     };
+    pan.x = fit(pan.x, box.offsetLeft, box.offsetWidth, area.clientWidth);
+    pan.y = fit(pan.y, box.offsetTop, box.offsetHeight, area.clientHeight);
+    box.style.transform = zoom === 1 ? '' : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+  };
+  const resetView = () => {
+    zoom = 1;
+    pan = { x: 0, y: 0 };
+    showView();
+  };
+  // A turn of the phone changes the stage's shape: start again from the whole screen.
+  const resized = new ResizeObserver(resetView);
+  resized.observe(box.parentElement ?? box);
+  resized.observe(box); // the overlay resizes it when the PC screen changes size
+
+  // Where a finger is on the PC screen. The picture keeps its shape inside the box (black
+  // bars at the sides or top and bottom), and the box may be zoomed and moved.
+  const remote = (t: Touch) => {
+    const r = box.getBoundingClientRect(); // includes the zoom
+    const { width, height } = c.state.screen.size;
+    const k = Math.min(r.width / width, r.height / height) || 1;
+    const left = r.left + (r.width - width * k) / 2;
+    const top = r.top + (r.height - height * k) / 2;
+    const clamp = (v: number, max: number) => Math.max(0, Math.min(Math.round(v), max - 1));
+    return { x: clamp((t.clientX - left) / k, width), y: clamp((t.clientY - top) / k, height) };
   };
   const take = (e: TouchEvent) => {
     e.preventDefault(); // no page zoom, no synthetic mouse events
     e.stopPropagation(); // the overlay below never sees the touch
   };
+  const twoFingers = (e: TouchEvent) => {
+    const a = e.touches[0]!;
+    const b = e.touches[1]!;
+    const o = (box.parentElement ?? box).getBoundingClientRect();
+    return {
+      dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1,
+      mid: {
+        x: (a.clientX + b.clientX) / 2 - o.left - box.offsetLeft,
+        y: (a.clientY + b.clientY) / 2 - o.top - box.offsetTop,
+      },
+    };
+  };
 
   const onStart = (e: TouchEvent) => {
     take(e);
+    if (e.touches.length >= 2) {
+      multi = true;
+      const f = twoFingers(e);
+      pinch = { ...f, zoom, pan: { ...pan }, t: e.timeStamp, moved: false };
+      return;
+    }
     if (e.touches.length > 1) return;
+    multi = false;
     if (!c.controlling) c.request();
     const t = e.changedTouches[0]!;
     start = { x: t.clientX, y: t.clientY, t: e.timeStamp };
@@ -344,6 +412,25 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
   };
   const onMove = (e: TouchEvent) => {
     take(e);
+    if (multi) {
+      if (!pinch || e.touches.length < 2) return;
+      const f = twoFingers(e);
+      if (
+        !pinch.moved &&
+        Math.abs(f.dist - pinch.dist) < TAP_SLOP &&
+        Math.hypot(f.mid.x - pinch.mid.x, f.mid.y - pinch.mid.y) < TAP_SLOP
+      ) {
+        return;
+      }
+      pinch.moved = true;
+      zoom = Math.min(MAX_ZOOM, Math.max(1, pinch.zoom * (f.dist / pinch.dist)));
+      // The point that was under the fingers stays under them.
+      const px = (pinch.mid.x - pinch.pan.x) / pinch.zoom;
+      const py = (pinch.mid.y - pinch.pan.y) / pinch.zoom;
+      pan = { x: f.mid.x - px * zoom, y: f.mid.y - py * zoom };
+      showView();
+      return;
+    }
     if (e.touches.length > 1) return;
     const t = e.changedTouches[0]!;
     if (!dragging && Math.hypot(t.clientX - start.x, t.clientY - start.y) < TAP_SLOP) return;
@@ -363,6 +450,24 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
   };
   const onEnd = (e: TouchEvent) => {
     take(e);
+    if (multi) {
+      // A quick two-finger tap; two of them show the whole screen again.
+      if (
+        pinch &&
+        e.touches.length === 1 &&
+        !pinch.moved &&
+        e.timeStamp - pinch.t < TWO_FINGER_TAP_MS
+      ) {
+        if (e.timeStamp - lastTwoFingerTap < DOUBLE_TAP_MS) {
+          resetView();
+          lastTwoFingerTap = -Infinity;
+        } else {
+          lastTwoFingerTap = e.timeStamp;
+        }
+      }
+      if (e.touches.length < 2) pinch = null;
+      return; // the zoom ends when the last finger lifts; no click
+    }
     if (dragging || e.touches.length > 0) return;
     const button = e.timeStamp - start.t >= LONG_PRESS_MS ? 3 : 1; // X11: 1 left, 3 right
     const p = remote(e.changedTouches[0]!);
@@ -375,12 +480,21 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
   box.addEventListener('touchstart', onStart, opts);
   box.addEventListener('touchmove', onMove, opts);
   box.addEventListener('touchend', onEnd, opts);
-  box.addEventListener('touchcancel', take, opts);
+  // The phone took the touch away (a system gesture, a call): no click, no zoom left half done.
+  const onCancel = (e: TouchEvent) => {
+    take(e);
+    dragging = true;
+    if (e.touches.length < 2) pinch = null;
+  };
+
+  box.addEventListener('touchcancel', onCancel, opts);
   return () => {
+    resized.disconnect();
+    resetView();
     box.removeEventListener('touchstart', onStart, opts);
     box.removeEventListener('touchmove', onMove, opts);
     box.removeEventListener('touchend', onEnd, opts);
-    box.removeEventListener('touchcancel', take, opts);
+    box.removeEventListener('touchcancel', onCancel, opts);
   };
 }
 
