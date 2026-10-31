@@ -11,7 +11,11 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['packages/mobile/src/**', 'packages/mobile/static/**', 'packages/desktop/src/renderer/**'],
+    files: [
+      'packages/mobile/src/**',
+      'packages/mobile/static/**',
+      'packages/desktop/src/renderer/**',
+    ],
     languageOptions: { globals: globals.browser },
   },
   prettier,
