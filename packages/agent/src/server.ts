@@ -10,6 +10,7 @@ import {
   API_BASE_PATH,
   type CreateProfileRequest,
   type HealthResponse,
+  MAX_PHONE_FILE_BYTES,
   type UpdateProfileRequest,
 } from '@enclave/shared';
 import { AgentError, InputError } from './errors.js';
@@ -48,6 +49,13 @@ export function buildServer(
         .send({ error: { code: 'UNAUTHORIZED', message: 'Missing or wrong agent token.' } });
     }
   });
+
+  // Files from the phone arrive raw; JSON bodies keep the small limit above.
+  app.addContentTypeParser(
+    'application/octet-stream',
+    { parseAs: 'buffer', bodyLimit: MAX_PHONE_FILE_BYTES },
+    (_req, body, done) => done(null, body),
+  );
 
   app.setErrorHandler(async (thrown, _req, reply) => {
     const err = thrown instanceof Error ? thrown : new Error(String(thrown));
@@ -103,6 +111,18 @@ export function buildServer(
       // Stage 4: the phone asks while it shows the profile, to offer its camera and mic.
       v1.get<{ Params: { id: string } }>('/profiles/:id/media', async (req) =>
         service.media(req.params.id),
+      );
+      // Stage 4: a file from the phone into the profile's open file picker.
+      v1.post<{ Params: { id: string }; Querystring: { name?: string }; Body: Buffer }>(
+        '/profiles/:id/files',
+        { bodyLimit: MAX_PHONE_FILE_BYTES },
+        async (req) => {
+          if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+            throw new InputError('Send the file as the request body (application/octet-stream).');
+          }
+          await service.sendFile(req.params.id, String(req.query.name ?? ''), req.body);
+          return { ok: true };
+        },
       );
       v1.post<{ Params: { id: string } }>('/profiles/:id/check-proxy', async (req) =>
         service.checkProfileProxy(req.params.id),

@@ -3,6 +3,7 @@
 // Served by the agent over Tailscale (docs/setup/tailscale.md); paired once with `enclave phone`.
 
 import { NekoClient, Overlay } from '@m1k1o/neko';
+import { MAX_PHONE_FILE_BYTES } from '@enclave/shared';
 import type {
   ApiError,
   MediaInUse,
@@ -263,8 +264,8 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   );
 
   shown = p;
-  wanted = { camera: false, microphone: false };
-  declined = { camera: false, microphone: false };
+  wanted = { ...NOTHING_WANTED };
+  declined = { camera: false, microphone: false, file: false };
   const poll = window.setInterval(() => void pollMedia(), MEDIA_POLL_MS);
   detach.push(() => window.clearInterval(poll));
 }
@@ -282,7 +283,7 @@ function closeViewer(): void {
   shown = null;
   pasted = null;
   offerCopy(null);
-  wanted = { camera: false, microphone: false };
+  wanted = { ...NOTHING_WANTED };
   showAsk();
   stage.replaceChildren();
   viewer.classList.remove('open');
@@ -566,25 +567,39 @@ document.getElementById('live-stop')!.onclick = () => {
 };
 
 // When a page in the profile starts using the camera or microphone and the phone isn't
-// sharing it, offer to. "Not now" holds until the page lets go and asks again.
+// sharing it, offer to; when it opens a file picker, offer a file from the phone. "Not now"
+// holds until the page lets go (or the picker closes) and asks again.
 const MEDIA_POLL_MS = 2000;
+const NOTHING_WANTED: MediaInUse = { camera: false, microphone: false, filePicker: false };
 const ask = document.getElementById('ask')!;
 const askText = document.getElementById('ask-text')!;
+const askShare = document.getElementById('ask-share')!;
+const fileInput = document.getElementById('file-input') as HTMLInputElement;
 let shown: Profile | null = null;
-let wanted: MediaInUse = { camera: false, microphone: false };
-let declined = { camera: false, microphone: false };
+let wanted: MediaInUse = { ...NOTHING_WANTED };
+let declined = { camera: false, microphone: false, file: false };
 let polling = false;
+let sending = false;
 
 const needCamera = () => wanted.camera && !camera && !declined.camera;
 const needMic = () => wanted.microphone && !mic && !declined.microphone;
+const needFile = () => wanted.filePicker && !declined.file && !sending;
 
 function showAsk(): void {
+  // The file picker waits on screen in the profile, so it comes first.
+  if (needFile()) {
+    ask.hidden = false;
+    askText.textContent = 'This page wants a file.';
+    askShare.textContent = 'Choose file';
+    return;
+  }
   const cam = needCamera();
   const mi = needMic();
   ask.hidden = !(cam || mi);
   askText.textContent = `This page wants your ${
     cam && mi ? 'camera and microphone' : cam ? 'camera' : 'microphone'
   }.`;
+  askShare.textContent = 'Share';
 }
 
 async function pollMedia(): Promise<void> {
@@ -597,6 +612,7 @@ async function pollMedia(): Promise<void> {
     // The page let go: next time it asks, ask again.
     if (!now.camera) declined.camera = false;
     if (!now.microphone) declined.microphone = false;
+    if (!now.filePicker) declined.file = false;
     wanted = now;
   } catch {
     // Missed one check; the next one follows in a moment.
@@ -607,13 +623,19 @@ async function pollMedia(): Promise<void> {
 }
 
 document.getElementById('ask-later')!.onclick = () => {
+  if (needFile()) {
+    declined.file = true;
+    return showAsk();
+  }
   if (needCamera()) declined.camera = true;
   if (needMic()) declined.microphone = true;
   showAsk();
 };
 
 // One request for both, so the phone asks its permission once and the tap still counts.
-document.getElementById('ask-share')!.onclick = async () => {
+askShare.onclick = async () => {
+  // The phone's own chooser: take a photo, pick one, or pick any file.
+  if (needFile()) return fileInput.click();
   const video = needCamera();
   const audio = needMic();
   if (!client || !(video || audio)) return;
@@ -630,6 +652,37 @@ document.getElementById('ask-share')!.onclick = async () => {
     setStatus(
       `The phone did not allow the ${video && audio ? 'camera and microphone' : video ? 'camera' : 'microphone'}. Allow ${video && audio ? 'them' : 'it'} for this app and try again.`,
     );
+  }
+};
+
+// The chosen file goes to the PC, which puts it in the profile and picks it in the open picker.
+fileInput.onchange = async () => {
+  const file = fileInput.files?.[0];
+  fileInput.value = '';
+  const p = shown;
+  if (!file || !p) return;
+  if (file.size > MAX_PHONE_FILE_BYTES) {
+    return setStatus('That file is over 100 MB. Choose a smaller one.');
+  }
+  sending = true;
+  showAsk();
+  setStatus(`Sending ${file.name}`);
+  try {
+    const res = await fetch(`/v1/profiles/${p.id}/files?name=${encodeURIComponent(file.name)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' },
+      body: file,
+    });
+    const body = (await res.json().catch(() => ({}))) as Partial<ApiError>;
+    if (!res.ok) throw new Error(body.error?.message ?? `The PC answered HTTP ${res.status}.`);
+    setStatus('');
+  } catch (e) {
+    setStatus(e instanceof Error ? e.message : String(e));
+  } finally {
+    sending = false;
+    // The picker has closed; don't offer it again before the next check says so.
+    wanted = { ...wanted, filePicker: false };
+    showAsk();
   }
 };
 

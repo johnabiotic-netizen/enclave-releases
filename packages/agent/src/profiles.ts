@@ -44,7 +44,8 @@ const PROXY_UNREACHABLE = 'Proxy unreachable';
  * Stage 4: is a page using the camera or microphone? Run in the container as neko. The
  * camera is in use while a browser process maps the phone camera's shared memory (camfeed,
  * which writes it, always does); the microphone while something records from the
- * "microphone" source (its own loopback module aside). Prints "<camera 0|1> <recordings>".
+ * "microphone" source (its own loopback module aside); a file picker while Firefox's "File
+ * Upload" dialog is on screen. Prints "<camera 0|1> <recordings> <pickers>".
  */
 const MEDIA_IN_USE_SCRIPT = `cam=0
 for d in /proc/[0-9]*; do
@@ -53,7 +54,48 @@ for d in /proc/[0-9]*; do
 done
 src=$(pactl list short sources | awk '$2 == "microphone" { print $1 }')
 mic=$(pactl list short source-outputs | awk -v s="$src" '$2 == s && $4 == "protocol-native.c"' | wc -l)
-echo "$cam $mic"`;
+pick=$(DISPLAY=:99.0 xdotool search --onlyvisible --name '^File Upload' | wc -l)
+echo "$cam $mic $pick"`;
+
+/**
+ * Stage 4: types a file's path ($1) into Firefox's open file picker and confirms. Only while the
+ * picker is the active window, so the path can never go into a web page instead.
+ */
+const FILL_PICKER_SCRIPT = `export DISPLAY=:99.0 LANG=C.UTF-8
+w=$(xdotool search --onlyvisible --name '^File Upload' | head -1)
+[ -n "$w" ] || exit 3
+active() { [ "$(xdotool getactivewindow)" = "$w" ] || exit 4; }
+xdotool windowactivate --sync "$w"
+active
+xdotool key --clearmodifiers ctrl+l
+sleep 0.3
+active
+xdotool type --clearmodifiers --delay 10 "$1"
+sleep 0.2
+active
+xdotool key --clearmodifiers Return`;
+
+/**
+ * A phone file's name as the site will see it: the phone's own name, without folders or
+ * control characters, cut to fit a tar header (keeping the extension).
+ */
+export function phoneFileName(raw: string): string {
+  let name = raw
+    .replace(/^.*[\\/]/, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim();
+  if (!name || name === '.' || name === '..') name = 'file';
+  const max = 60; // bytes; the archive path around it takes the rest of 100
+  if (Buffer.byteLength(name) > max) {
+    const dot = name.lastIndexOf('.');
+    const ext = dot > 0 && Buffer.byteLength(name.slice(dot)) <= 12 ? name.slice(dot) : '';
+    let base = name.slice(0, name.length - ext.length);
+    while (Buffer.byteLength(base + ext) > max) base = [...base].slice(0, -1).join('');
+    name = base + ext;
+  }
+  return name;
+}
 
 const containerName = (id: string) => `enclave-${id}`;
 const networkName = (id: string) => `enclave-${id}`;
@@ -113,11 +155,55 @@ export class ProfileService {
       ['sh', '-c', MEDIA_IN_USE_SCRIPT],
       'neko',
     );
-    const [camera, microphone] = out.stdout.trim().split(/\s+/).map(Number);
-    if (out.code !== 0 || camera === undefined || microphone === undefined) {
+    const [camera, microphone, pickers] = out.stdout.trim().split(/\s+/).map(Number);
+    if (
+      out.code !== 0 ||
+      camera === undefined ||
+      microphone === undefined ||
+      pickers === undefined
+    ) {
       throw new AgentError('INTERNAL', "Couldn't read the profile's camera and microphone state.");
     }
-    return { camera: camera > 0, microphone: microphone > 0 };
+    return { camera: camera > 0, microphone: microphone > 0, filePicker: pickers > 0 };
+  }
+
+  /** Stage 4: puts a file from the phone into the profile and picks it in the open file picker. */
+  async sendFile(id: string, name: string, data: Buffer): Promise<void> {
+    if (!(await this.media(id)).filePicker) {
+      throw new AgentError(
+        'FILE_PICKER_CLOSED',
+        'No file picker is open in the profile. Tap the upload field on the page first.',
+      );
+    }
+    // A folder of its own per file, so two files with one name don't collide. Gone at stop.
+    const dir = `tmp/from-phone/${randomBytes(4).toString('hex')}/`;
+    const file = dir + phoneFileName(name);
+    await this.runtime.putArchive(
+      containerName(id),
+      makeTar([
+        { name: 'tmp/from-phone/', mode: 0o1777 },
+        { name: dir, mode: 0o755 },
+        { name: file, mode: 0o644, content: data },
+      ]),
+    );
+    const code = await this.runtime.exec(
+      containerName(id),
+      ['sh', '-c', FILL_PICKER_SCRIPT, 'sh', `/${file}`],
+      'neko',
+    );
+    if (code === 3) {
+      throw new AgentError(
+        'FILE_PICKER_CLOSED',
+        'The file picker closed before the file arrived. Open it again and resend.',
+      );
+    }
+    if (code !== 0) {
+      throw new AgentError(
+        'INTERNAL',
+        "Couldn't hand the file to the profile's file picker. Try again.",
+      );
+    }
+    await this.store.log(id, 'phone-file', { bytes: data.length });
   }
 
   logs(id: string, tail: number): Promise<string[]> {

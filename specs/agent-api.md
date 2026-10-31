@@ -15,7 +15,8 @@ Base: `http://127.0.0.1:<port>/v1`
 | POST | `/profiles/:id/start` | - | `{ stream }` after health passes; errors if safety check fails |
 | POST | `/profiles/:id/stop` | - | `{ ok }` |
 | GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2) |
-| GET | `/profiles/:id/media` | - | `{ camera, microphone }`: whether a page in the running profile is using its camera or microphone now (Stage 4; the phone app offers to share them) |
+| GET | `/profiles/:id/media` | - | `{ camera, microphone, filePicker }`: whether a page in the running profile is using its camera or microphone now, and whether it has a file picker open (Stage 4; the phone app offers to share them, or a file) |
+| POST | `/profiles/:id/files?name=<file name>` | the file, `application/octet-stream`, up to 100 MB | `{ ok }`: puts the file in the profile and picks it in the open file picker (Stage 4); `FILE_PICKER_CLOSED` if none is open |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
 | GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt }` |
@@ -30,4 +31,4 @@ Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this A
 - Every state change is logged (without secrets) to the profile's log file.
 
 ## Error codes
-`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `INTERNAL`.
+`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `FILE_PICKER_CLOSED` (a phone file arrived but no file picker is open in the profile), `INTERNAL`.

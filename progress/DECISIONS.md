@@ -4,6 +4,16 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Phone files go into the profile's open file picker through the agent
+Context: Stage 4 asks to hand a phone file (or a photo taken now) to the profile's file picker. neko 3.2 can take over Firefox's file picker (desktop.file_chooser_dialog), but its built-in PC client can't answer it, so PC users would lose file pickers until the Windows app.
+Decision: Leave neko's setting off. The agent reports an open picker (window "File Upload ...") in GET /profiles/:id/media; the phone offers "Choose file" (the phone's own chooser: camera, photos, files) and POSTs the file to /v1/profiles/:id/files; the agent copies it into the container (/tmp/from-phone/<random>/<name>, gone at stop) and types its path into the picker, only while the picker is the active window. The site sees the phone's file name.
+Reason: PC file pickers keep working unchanged; no image change. The active-window check keeps a path from ever being typed into a page.
+
+## 2026-10-31  A Docker hiccup no longer marks a running profile as crashed
+Context: DockerRuntime.inspect returned null (container gone) for any error. When the Docker connection dropped for a moment (seen when the agent restarted), the monitor marked a running profile "The browser stopped unexpectedly" and removed its phone relays while the browser kept running; the start-up reconcile could likewise stop a healthy profile.
+Decision: inspect returns null only for Docker's 404; other errors throw, and the monitor skips that round.
+Reason: Only Docker saying the container doesn't exist means it's gone.
+
 ## 2026-10-31  Phone asks to share when a page wants the camera or mic
 Context: Stage 4's permission flow: a page asking for the camera should make the phone offer it. Profiles grant camera and mic like a real Windows PC; the phone must learn that a page is using them.
 Decision: The agent answers GET /v1/profiles/:id/media from inside the container (a short script run as neko): the camera is in use while a browser process maps the phone camera's shared memory, the mic while something records from the "microphone" source. The phone app asks every 2 s while it shows a profile and, when a page uses one it isn't sharing, offers "Share" (both in one request, so the phone asks once) or "Not now" (holds until the page lets go). No Camoufox or image change.

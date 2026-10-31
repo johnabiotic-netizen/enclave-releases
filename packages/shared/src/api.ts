@@ -16,6 +16,7 @@ export const ERROR_CODES = [
   'PROFILE_RUNNING',
   'PROFILE_NOT_RUNNING',
   'REAL_IP_LEAK_SUSPECTED',
+  'FILE_PICKER_CLOSED',
   'INTERNAL',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -82,12 +83,19 @@ export interface StreamInfo {
 export type GetStreamResponse = StreamInfo;
 
 // GET /profiles/:id/media (Stage 4)
-/** Whether a page in the profile is using its camera or microphone right now. */
+/** Whether a page in the profile is using its camera or microphone right now, and whether
+ * it has a file picker open (the phone can fill it). */
 export interface MediaInUse {
   camera: boolean;
   microphone: boolean;
+  filePicker: boolean;
 }
 export type GetMediaResponse = MediaInUse;
+
+// POST /profiles/:id/files?name=<file name>, body: the file (application/octet-stream)
+/** Stage 4: the largest file the phone can put into the profile's file picker. */
+export const MAX_PHONE_FILE_BYTES = 100 * 1024 * 1024;
+export type SendFileResponse = OkResponse;
 
 // POST /profiles/:id/start
 export interface StartProfileResponse {

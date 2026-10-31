@@ -125,12 +125,17 @@ export class DockerRuntime {
       .catch(() => {});
   }
 
-  /** Inspect a container by name, or null if it doesn't exist. */
+  /**
+   * Inspect a container by name, or null if it doesn't exist. Other failures (Docker not
+   * answering for a moment) throw: they say nothing about the container, and taking them for
+   * "gone" marked running profiles as crashed.
+   */
   async inspect(name: string): Promise<Docker.ContainerInspectInfo | null> {
     try {
       return await this.docker.getContainer(name).inspect();
-    } catch {
-      return null;
+    } catch (e) {
+      if ((e as { statusCode?: number }).statusCode === 404) return null;
+      throw e;
     }
   }
 
@@ -162,6 +167,11 @@ export class DockerRuntime {
     } catch {
       return '';
     }
+  }
+
+  /** Unpacks a tar (makeTar) at / in a running container. */
+  async putArchive(name: string, tar: Buffer): Promise<void> {
+    await this.docker.getContainer(name).putArchive(tar, { path: '/' });
   }
 
   /** Runs `cmd` in a running container and returns its stdout and exit code. */
