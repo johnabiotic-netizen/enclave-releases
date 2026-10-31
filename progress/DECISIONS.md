@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  A short gap in the phone camera holds the last frame instead of going black
+Context: On the real phone the owner still saw one blackout in a few minutes; measured, the phone's frames paused 2.8 s once (network). The browser shows black when the last frame is over 2 s old, so any hiccup over 2 s blacked out the camera, which no real webcam does.
+Decision: camfeed.py, while neko still has the pipe open (the phone is sharing), republishes the last frame every 0.5 s when no new one arrives, for up to 10 s. When the phone stops sharing (pipe closed) nothing is republished and the camera goes black after 2 s as before. No browser rebuild.
+Reason: Freezing briefly is how a real webcam behaves on a hiccup. Verified with a simulated phone whose camera stalls 3 s in every 10: longest gap without a frame went from 3.07 s to 0.55 s; after sharing stops, frames stop.
+
 ## 2026-10-31  The phone frames its camera as a 16:9 webcam before sending
 Context: The profile's camera is a 1280x720 landscape webcam and neko scales whatever arrives to that size, ignoring shape. A phone held upright films portrait, so the owner saw faces squashed on the real phone.
 Decision: The phone app sends the middle 16:9 of its camera picture, drawn at 1280x720 frame by frame (canvas fed by requestVideoFrameCallback) from the on-screen preview, which plays the camera itself cut to the same 16:9 by CSS (a hidden player gave the owner a blackout every 3 to 5 s on the real phone: the phone can pause players it considers hidden, and the profile shows black after 2 s without frames; a watchdog restarts the preview if it stops), and asks the camera for 4:3 at 1440x1080: phone sensors are 4:3, so a 16:9 request would make the phone cut the sensor first and an upright phone would look zoomed in (owner, real phone); 4:3 keeps the full sensor width and the crop stays sharp (1080x608 from 1080x1440). The camera stays unmirrored, like a real webcam; sites mirror their own self-view. The preview shows exactly what is sent. Landscape pictures fill the frame whole.
