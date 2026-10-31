@@ -15,6 +15,7 @@ Base: `http://127.0.0.1:<port>/v1`
 | POST | `/profiles/:id/start` | - | `{ stream }` after health passes; errors if safety check fails |
 | POST | `/profiles/:id/stop` | - | `{ ok }` |
 | GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2) |
+| GET | `/profiles/:id/media` | - | `{ camera, microphone }`: whether a page in the running profile is using its camera or microphone now (Stage 4; the phone app offers to share them) |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
 | GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt }` |

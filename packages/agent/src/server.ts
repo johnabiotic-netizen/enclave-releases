@@ -100,6 +100,10 @@ export function buildServer(
       v1.get<{ Params: { id: string } }>('/profiles/:id/stream', async (req) =>
         service.stream(req.params.id),
       );
+      // Stage 4: the phone asks while it shows the profile, to offer its camera and mic.
+      v1.get<{ Params: { id: string } }>('/profiles/:id/media', async (req) =>
+        service.media(req.params.id),
+      );
       v1.post<{ Params: { id: string } }>('/profiles/:id/check-proxy', async (req) =>
         service.checkProfileProxy(req.params.id),
       );

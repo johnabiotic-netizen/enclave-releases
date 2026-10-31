@@ -81,6 +81,14 @@ export interface StreamInfo {
 }
 export type GetStreamResponse = StreamInfo;
 
+// GET /profiles/:id/media (Stage 4)
+/** Whether a page in the profile is using its camera or microphone right now. */
+export interface MediaInUse {
+  camera: boolean;
+  microphone: boolean;
+}
+export type GetMediaResponse = MediaInUse;
+
 // POST /profiles/:id/start
 export interface StartProfileResponse {
   stream: StreamInfo;

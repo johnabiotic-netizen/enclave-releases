@@ -9,6 +9,7 @@ import {
   DEFAULT_IDLE_STOP_MINUTES,
   type CreateProfileRequest,
   type Fingerprint,
+  type MediaInUse,
   type Profile,
   type ProfileStatus,
   type ProxyCheckResult,
@@ -38,6 +39,21 @@ const STREAM_TTL_MS = 24 * 60 * 60 * 1000;
 const CONTAINER_MEMORY_BYTES = 3 * 1024 ** 3;
 const SHM_BYTES = 2 * 1024 ** 3;
 const PROXY_UNREACHABLE = 'Proxy unreachable';
+
+/**
+ * Stage 4: is a page using the camera or microphone? Run in the container as neko. The
+ * camera is in use while a browser process maps the phone camera's shared memory (camfeed,
+ * which writes it, always does); the microphone while something records from the
+ * "microphone" source (its own loopback module aside). Prints "<camera 0|1> <recordings>".
+ */
+const MEDIA_IN_USE_SCRIPT = `cam=0
+for d in /proc/[0-9]*; do
+  grep -qs enclave-camera "$d/maps" || continue
+  grep -qs camfeed "$d/cmdline" || cam=1
+done
+src=$(pactl list short sources | awk '$2 == "microphone" { print $1 }')
+mic=$(pactl list short source-outputs | awk -v s="$src" '$2 == s && $4 == "protocol-native.c"' | wc -l)
+echo "$cam $mic"`;
 
 const containerName = (id: string) => `enclave-${id}`;
 const networkName = (id: string) => `enclave-${id}`;
@@ -87,6 +103,21 @@ export class ProfileService {
       );
     }
     return streamInfo(profile.status.streamPort, secrets.stream);
+  }
+
+  /** Stage 4: whether a page in the profile is using its camera or microphone now. */
+  async media(id: string): Promise<MediaInUse> {
+    await this.stream(id); // PROFILE_NOT_FOUND / PROFILE_NOT_RUNNING
+    const out = await this.runtime.execOutput(
+      containerName(id),
+      ['sh', '-c', MEDIA_IN_USE_SCRIPT],
+      'neko',
+    );
+    const [camera, microphone] = out.stdout.trim().split(/\s+/).map(Number);
+    if (out.code !== 0 || camera === undefined || microphone === undefined) {
+      throw new AgentError('INTERNAL', "Couldn't read the profile's camera and microphone state.");
+    }
+    return { camera: camera > 0, microphone: microphone > 0 };
   }
 
   logs(id: string, tail: number): Promise<string[]> {

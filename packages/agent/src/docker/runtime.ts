@@ -178,7 +178,7 @@ export class DockerRuntime {
     stream.on('data', (c: Buffer) => chunks.push(c));
     await new Promise<void>((resolve) => stream.on('end', () => resolve()));
     const { stdout } = demuxLogs(Buffer.concat(chunks));
-    return { code: (await exec.inspect()).ExitCode ?? -1, stdout };
+    return { code: await exitCode(exec), stdout };
   }
 
   async exec(name: string, cmd: string[], user: string): Promise<number> {
@@ -188,8 +188,19 @@ export class DockerRuntime {
     const stream = await exec.start({});
     stream.resume();
     await new Promise<void>((resolve) => stream.on('end', () => resolve()));
-    return (await exec.inspect()).ExitCode ?? -1;
+    return exitCode(exec);
   }
+}
+
+/** An exec's exit code. Docker can still report it running (code null) just after its
+ * output ends, so ask again briefly; -1 if it never settles. */
+async function exitCode(exec: Docker.Exec): Promise<number> {
+  for (let i = 0; i < 20; i++) {
+    const info = await exec.inspect();
+    if (!info.Running && info.ExitCode !== null) return info.ExitCode;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return -1;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

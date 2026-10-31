@@ -3,7 +3,13 @@
 // Served by the agent over Tailscale (docs/setup/tailscale.md); paired once with `enclave phone`.
 
 import { NekoClient, Overlay } from '@m1k1o/neko';
-import type { ApiError, Profile, StartProfileResponse, StreamInfo } from '@enclave/shared';
+import type {
+  ApiError,
+  MediaInUse,
+  Profile,
+  StartProfileResponse,
+  StreamInfo,
+} from '@enclave/shared';
 
 const TOKEN_KEY = 'enclave.agentToken';
 const home = document.getElementById('home')!;
@@ -231,6 +237,12 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
     ),
   );
   c.connect();
+
+  shown = p;
+  wanted = { camera: false, microphone: false };
+  declined = { camera: false, microphone: false };
+  const poll = window.setInterval(() => void pollMedia(), MEDIA_POLL_MS);
+  detach.push(() => window.clearInterval(poll));
 }
 
 function closeViewer(): void {
@@ -243,6 +255,9 @@ function closeViewer(): void {
   }
   client = null;
   overlay = null;
+  shown = null;
+  wanted = { camera: false, microphone: false };
+  showAsk();
   stage.replaceChildren();
   viewer.classList.remove('open');
   document.title = 'Enclave';
@@ -366,25 +381,31 @@ function stopMic(): void {
   for (const t of mic.stream.getTracks()) t.stop();
   mic = null;
   showMic();
+  showAsk();
+}
+
+const MIC_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
+function useMic(stream: MediaStream): void {
+  if (!client) return;
+  mic = {
+    stream,
+    stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
+  };
+  // The phone (or the user in its settings) can end the capture; follow it.
+  for (const t of stream.getTracks()) t.onended = () => stopMic();
+  showMic();
+  showAsk();
 }
 
 micButton.onclick = async () => {
   if (mic) return stopMic();
   if (!client) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    mic = {
-      stream,
-      stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
-    };
-    // The phone (or the user in its settings) can end the capture; follow it.
-    for (const t of stream.getTracks()) t.onended = () => stopMic();
+    useMic(await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS }));
   } catch {
     setStatus('The phone did not allow the microphone. Allow it for this app and try again.');
   }
-  showMic();
 };
 
 // The phone camera, shared into the profile: what a site sees when it uses the profile's
@@ -409,29 +430,38 @@ function stopCamera(): void {
   for (const t of camera.stream.getTracks()) t.stop();
   camera = null;
   showCamera();
+  showAsk();
+}
+
+const cameraConstraints = (facing: 'user' | 'environment') => ({
+  facingMode: facing,
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  frameRate: { ideal: 30 },
+});
+
+function useCamera(stream: MediaStream, facing: 'user' | 'environment'): void {
+  if (!client) return;
+  camera = {
+    stream,
+    facing,
+    stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
+  };
+  for (const t of stream.getTracks()) t.onended = () => stopCamera();
+  showCamera();
+  showAsk();
 }
 
 async function startCamera(facing: 'user' | 'environment'): Promise<void> {
   if (!client) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: facing,
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30 },
-      },
-    });
-    camera = {
-      stream,
+    useCamera(
+      await navigator.mediaDevices.getUserMedia({ video: cameraConstraints(facing) }),
       facing,
-      stop: client.state.connection.status === 'connected' ? client.shareMedia(stream) : null,
-    };
-    for (const t of stream.getTracks()) t.onended = () => stopCamera();
+    );
   } catch {
     setStatus('The phone did not allow the camera. Allow it for this app and try again.');
   }
-  showCamera();
 }
 
 cameraButton.onclick = async () => {
@@ -444,6 +474,74 @@ document.getElementById('flip')!.onclick = async () => {
   const next = camera.facing === 'user' ? 'environment' : 'user';
   stopCamera();
   await startCamera(next);
+};
+
+// When a page in the profile starts using the camera or microphone and the phone isn't
+// sharing it, offer to. "Not now" holds until the page lets go and asks again.
+const MEDIA_POLL_MS = 2000;
+const ask = document.getElementById('ask')!;
+const askText = document.getElementById('ask-text')!;
+let shown: Profile | null = null;
+let wanted: MediaInUse = { camera: false, microphone: false };
+let declined = { camera: false, microphone: false };
+let polling = false;
+
+const needCamera = () => wanted.camera && !camera && !declined.camera;
+const needMic = () => wanted.microphone && !mic && !declined.microphone;
+
+function showAsk(): void {
+  const cam = needCamera();
+  const mi = needMic();
+  ask.hidden = !(cam || mi);
+  askText.textContent = `This page wants your ${
+    cam && mi ? 'camera and microphone' : cam ? 'camera' : 'microphone'
+  }.`;
+}
+
+async function pollMedia(): Promise<void> {
+  const p = shown;
+  if (!p || polling || client?.state.connection.status !== 'connected') return;
+  polling = true;
+  try {
+    const now = await api<MediaInUse>('GET', `/profiles/${p.id}/media`);
+    if (shown !== p) return;
+    // The page let go: next time it asks, ask again.
+    if (!now.camera) declined.camera = false;
+    if (!now.microphone) declined.microphone = false;
+    wanted = now;
+  } catch {
+    // Missed one check; the next one follows in a moment.
+  } finally {
+    polling = false;
+  }
+  showAsk();
+}
+
+document.getElementById('ask-later')!.onclick = () => {
+  if (needCamera()) declined.camera = true;
+  if (needMic()) declined.microphone = true;
+  showAsk();
+};
+
+// One request for both, so the phone asks its permission once and the tap still counts.
+document.getElementById('ask-share')!.onclick = async () => {
+  const video = needCamera();
+  const audio = needMic();
+  if (!client || !(video || audio)) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: video && cameraConstraints('user'),
+      audio: audio && MIC_CONSTRAINTS,
+    });
+    const audioTracks = stream.getAudioTracks();
+    const videoTracks = stream.getVideoTracks();
+    if (audioTracks.length) useMic(new MediaStream(audioTracks));
+    if (videoTracks.length) useCamera(new MediaStream(videoTracks), 'user');
+  } catch {
+    setStatus(
+      `The phone did not allow the ${video && audio ? 'camera and microphone' : video ? 'camera' : 'microphone'}. Allow ${video && audio ? 'them' : 'it'} for this app and try again.`,
+    );
+  }
 };
 
 document.getElementById('close')!.onclick = () => {

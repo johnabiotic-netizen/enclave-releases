@@ -4,6 +4,11 @@ One entry per real decision. Newest at the top. Keep each to a few lines: contex
 
 Format:
 ```
+## 2026-10-31  Phone asks to share when a page wants the camera or mic
+Context: Stage 4's permission flow: a page asking for the camera should make the phone offer it. Profiles grant camera and mic like a real Windows PC; the phone must learn that a page is using them.
+Decision: The agent answers GET /v1/profiles/:id/media from inside the container (a short script run as neko): the camera is in use while a browser process maps the phone camera's shared memory, the mic while something records from the "microphone" source. The phone app asks every 2 s while it shows a profile and, when a page uses one it isn't sharing, offers "Share" (both in one request, so the phone asks once) or "Not now" (holds until the page lets go). No Camoufox or image change.
+Reason: Works with the current image and browser build; reads what the browser really does, so it can't drift from it. Cost: about 0.5 s of docker exec per check, only while a phone has the profile open.
+
 ## YYYY-MM-DD  Short title
 Context: ...
 Decision: ...
