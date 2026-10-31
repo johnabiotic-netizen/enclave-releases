@@ -6,6 +6,7 @@ import type { AgentState } from '../shared/bridge';
 import { Dashboard } from './Dashboard';
 import { ProfilesIcon, SettingsIcon, SetupIcon } from './icons';
 import { useProfiles } from './useProfiles';
+import { Settings } from './Settings';
 import { Viewer } from './Viewer';
 import { CreateWizard, EditProfile } from './Wizard';
 
@@ -19,27 +20,43 @@ type View =
 
 export function App() {
   const [agent, setAgent] = useState<AgentState>({ status: 'starting' });
+  // Once the app has run, a restart of its service (a settings change) keeps the screens.
+  const [phoneApp, setPhoneApp] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    void window.enclave.agentState().then(setAgent);
-    return window.enclave.onAgentState(setAgent);
+    const take = (s: AgentState) => {
+      setAgent(s);
+      if (s.status === 'running') setPhoneApp(s.phoneApp);
+    };
+    void window.enclave.agentState().then(take);
+    return window.enclave.onAgentState(take);
   }, []);
 
-  if (agent.status === 'starting') {
+  if (phoneApp === undefined) {
     return (
       <div className="splash">
-        <p>Starting Enclave.</p>
+        {agent.status === 'failed' ? (
+          <>
+            <h1>Enclave could not start</h1>
+            <p>{agent.message}</p>
+          </>
+        ) : (
+          <p>Starting Enclave.</p>
+        )}
       </div>
     );
   }
-  if (agent.status === 'failed') {
-    return (
-      <div className="splash">
-        <h1>Enclave could not start</h1>
-        <p>{agent.message}</p>
-      </div>
-    );
-  }
-  return <Shell phoneApp={agent.phoneApp} />;
+  return (
+    <>
+      {agent.status !== 'running' && (
+        <p className={`service-banner${agent.status === 'failed' ? ' error' : ''}`}>
+          {agent.status === 'failed'
+            ? `Enclave's service stopped: ${agent.message}`
+            : "Enclave's service is restarting."}
+        </p>
+      )}
+      <Shell phoneApp={phoneApp} />
+    </>
+  );
 }
 
 function Shell({ phoneApp }: { phoneApp: string | null }) {
@@ -116,7 +133,8 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
               />
             );
           })()}
-        {['settings', 'setup'].includes(view.kind) && (
+        {view.kind === 'settings' && <Settings profiles={model.profiles} />}
+        {view.kind === 'setup' && (
           <section className="page">
             <h1>{TITLES[view.kind as keyof typeof TITLES]}</h1>
             <p className="muted">This screen is being built.</p>

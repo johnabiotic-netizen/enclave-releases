@@ -50,6 +50,11 @@ export function CreateWizard(props: { onDone(id: string | null): void }) {
       (s) => setTestProxyAvailable(s.testProxyAvailable),
       () => {},
     );
+    // Start from the default proxy in Settings, if there is one.
+    void window.enclave.settings().then(
+      (v) => v.defaultProxy && setProxy((p) => p || v.defaultProxy),
+      () => {},
+    );
   }, []);
 
   const proxyKey = testProxy ? 'test' : proxy.trim();
@@ -87,173 +92,180 @@ export function CreateWizard(props: { onDone(id: string | null): void }) {
   const canNext = [name.trim().length > 0, checked, true, true][step];
 
   return (
-    <section className="page wizard">
-      <header className="wizard-head">
-        <button
-          className="icon-button"
-          aria-label="Back to profiles"
-          onClick={() => props.onDone(null)}
-        >
-          <BackIcon />
-        </button>
-        <h1>Create profile</h1>
-      </header>
-      <ol className="steps" aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <li
-            key={s}
-            className={i === step ? 'current' : i < step ? 'done' : ''}
-            aria-current={i === step ? 'step' : undefined}
+    <section className="page">
+      <div className="wizard">
+        <header className="wizard-head">
+          <button
+            className="icon-button"
+            aria-label="Back to profiles"
+            onClick={() => props.onDone(null)}
           >
-            {s}
-          </li>
-        ))}
-      </ol>
+            <BackIcon />
+          </button>
+          <h1>Create profile</h1>
+        </header>
+        <ol className="steps" aria-label="Steps">
+          {STEPS.map((s, i) => (
+            <li
+              key={s}
+              className={i === step ? 'current' : i < step ? 'done' : ''}
+              aria-current={i === step ? 'step' : undefined}
+            >
+              {s}
+            </li>
+          ))}
+        </ol>
 
-      <div className="wizard-body">
-        {step === 0 && (
-          <>
-            <label className="field">
-              <span>Name</span>
-              <input
-                value={name}
-                maxLength={60}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Shop account"
-              />
-            </label>
-            <label className="field">
-              <span>Notes (optional)</span>
-              <textarea
-                value={notes}
-                rows={3}
-                maxLength={2000}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </label>
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            {testProxyAvailable && (
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={testProxy}
-                  onChange={(e) => {
-                    setTestProxy(e.target.checked);
-                    setCheck({ state: 'idle' });
-                  }}
-                />
-                <span>
-                  Use the built in test proxy
-                  <small>
-                    For trying Enclave out. It goes out through this PC&apos;s own connection, so it
-                    is not for real accounts.
-                  </small>
-                </span>
-              </label>
-            )}
-            {!testProxy && (
+        <div className="wizard-body">
+          {step === 0 && (
+            <>
               <label className="field">
-                <span>Proxy</span>
+                <span>Name</span>
                 <input
-                  className="mono"
-                  value={proxy}
+                  value={name}
+                  maxLength={60}
                   autoFocus
-                  spellCheck={false}
-                  onChange={(e) => {
-                    setProxy(e.target.value);
-                    if (check.state !== 'checking') setCheck({ state: 'idle' });
-                  }}
-                  placeholder="socks5://user:pass@host:port"
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Shop account"
                 />
-                <small>Paste it in any of these forms: {PROXY_FORMATS}.</small>
               </label>
-            )}
-            <div className="row">
-              <button
-                className="button"
-                onClick={() => void runCheck()}
-                disabled={check.state === 'checking' || (!testProxy && !proxy.trim())}
-              >
-                {check.state === 'checking' ? 'Checking proxy' : 'Check proxy'}
-              </button>
-              {check.state === 'checking' && (
-                <span className="muted">This takes a few seconds.</span>
+              <label className="field">
+                <span>Notes (optional)</span>
+                <textarea
+                  value={notes}
+                  rows={3}
+                  maxLength={2000}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              {testProxyAvailable && (
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={testProxy}
+                    onChange={(e) => {
+                      setTestProxy(e.target.checked);
+                      setCheck({ state: 'idle' });
+                    }}
+                  />
+                  <span>
+                    Use the built in test proxy
+                    <small>
+                      For trying Enclave out. It goes out through this PC&apos;s own connection, so
+                      it is not for real accounts.
+                    </small>
+                  </span>
+                </label>
               )}
+              {!testProxy && (
+                <label className="field">
+                  <span>Proxy</span>
+                  <input
+                    className="mono"
+                    value={proxy}
+                    autoFocus
+                    spellCheck={false}
+                    onChange={(e) => {
+                      setProxy(e.target.value);
+                      if (check.state !== 'checking') setCheck({ state: 'idle' });
+                    }}
+                    placeholder="socks5://user:pass@host:port"
+                  />
+                  <small>Paste it in any of these forms: {PROXY_FORMATS}.</small>
+                </label>
+              )}
+              <div className="row">
+                <button
+                  className="button"
+                  onClick={() => void runCheck()}
+                  disabled={check.state === 'checking' || (!testProxy && !proxy.trim())}
+                >
+                  {check.state === 'checking' ? 'Checking proxy' : 'Check proxy'}
+                </button>
+                {check.state === 'checking' && (
+                  <span className="muted">This takes a few seconds.</span>
+                )}
+              </div>
+              {check.state === 'ok' && checked && <CheckResult result={check.result} />}
+              {check.state === 'failed' && <p className="notice error">{check.message}</p>}
+            </>
+          )}
+
+          {step === 2 && (
+            <div className="choice selected" aria-label="Device">
+              <strong>Auto</strong>
+              <p>
+                A Windows PC with this computer&apos;s graphics card, the fonts and settings of
+                Windows Firefox, and a screen size picked from those real Windows users have.
+                Enclave picks the rest from real devices too, and keeps all of it fixed for this
+                profile.
+              </p>
             </div>
-            {check.state === 'ok' && checked && <CheckResult result={check.result} />}
-            {check.state === 'failed' && <p className="notice error">{check.message}</p>}
-          </>
-        )}
+          )}
 
-        {step === 2 && (
-          <div className="choice selected" aria-label="Device">
-            <strong>Auto</strong>
-            <p>
-              A Windows PC with this computer&apos;s graphics card, the fonts and settings of
-              Windows Firefox, and a screen size picked from those real Windows users have. Enclave
-              picks the rest from real devices too, and keeps all of it fixed for this profile.
-            </p>
-          </div>
-        )}
+          {step === 3 && check.state === 'ok' && (
+            <>
+              <dl className="facts review">
+                <dt>Name</dt>
+                <dd>{name.trim()}</dd>
+                <dt>Proxy</dt>
+                <dd className="mono">{testProxy ? 'Built in test proxy' : redact(proxy.trim())}</dd>
+                <dt>Exit IP</dt>
+                <dd>
+                  <Flag code={check.result.country} />{' '}
+                  <span className="mono">{check.result.exitIp}</span>
+                </dd>
+                <dt>Location</dt>
+                <dd>
+                  {countryName(check.result.country)}, {check.result.timezone}
+                </dd>
+                <dt>Device</dt>
+                <dd>Auto, Windows</dd>
+              </dl>
+              <p className="notice">
+                The profile&apos;s time zone, language and location will match{' '}
+                {countryName(check.result.country)}. Its device fingerprint is made once now and
+                never changes.
+              </p>
+              {error && <p className="notice error">{error}</p>}
+            </>
+          )}
+        </div>
 
-        {step === 3 && check.state === 'ok' && (
-          <>
-            <dl className="facts review">
-              <dt>Name</dt>
-              <dd>{name.trim()}</dd>
-              <dt>Proxy</dt>
-              <dd className="mono">{testProxy ? 'Built in test proxy' : redact(proxy.trim())}</dd>
-              <dt>Exit IP</dt>
-              <dd>
-                <Flag code={check.result.country} />{' '}
-                <span className="mono">{check.result.exitIp}</span>
-              </dd>
-              <dt>Location</dt>
-              <dd>
-                {countryName(check.result.country)}, {check.result.timezone}
-              </dd>
-              <dt>Device</dt>
-              <dd>Auto, Windows</dd>
-            </dl>
-            <p className="notice">
-              The profile&apos;s time zone, language and location will match{' '}
-              {countryName(check.result.country)}. Its device fingerprint is made once now and never
-              changes.
-            </p>
-            {error && <p className="notice error">{error}</p>}
-          </>
-        )}
+        <footer className="wizard-foot">
+          {step > 0 && (
+            <button className="button quiet" onClick={() => setStep(step - 1)} disabled={creating}>
+              Back
+            </button>
+          )}
+          {step < STEPS.length - 1 ? (
+            <button
+              className="button primary"
+              onClick={() => setStep(step + 1)}
+              disabled={!canNext}
+            >
+              Continue
+            </button>
+          ) : (
+            <button className="button primary" onClick={() => void create()} disabled={creating}>
+              {creating ? 'Creating profile' : 'Create profile'}
+            </button>
+          )}
+          {creating && (
+            <span className="muted">
+              Checking the proxy again and making the fingerprint. This takes up to a minute.
+            </span>
+          )}
+          {step === 1 && !checked && check.state !== 'checking' && (
+            <span className="muted">Check the proxy to continue.</span>
+          )}
+        </footer>
       </div>
-
-      <footer className="wizard-foot">
-        {step > 0 && (
-          <button className="button quiet" onClick={() => setStep(step - 1)} disabled={creating}>
-            Back
-          </button>
-        )}
-        {step < STEPS.length - 1 ? (
-          <button className="button primary" onClick={() => setStep(step + 1)} disabled={!canNext}>
-            Continue
-          </button>
-        ) : (
-          <button className="button primary" onClick={() => void create()} disabled={creating}>
-            {creating ? 'Creating profile' : 'Create profile'}
-          </button>
-        )}
-        {creating && (
-          <span className="muted">
-            Checking the proxy again and making the fingerprint. This takes up to a minute.
-          </span>
-        )}
-        {step === 1 && !checked && check.state !== 'checking' && (
-          <span className="muted">Check the proxy to continue.</span>
-        )}
-      </footer>
     </section>
   );
 }
@@ -329,83 +341,85 @@ export function EditProfile(props: { profile: Profile; running: boolean; onDone(
   const idleOk = /^\d+$/.test(idle) && Number(idle) >= 1 && Number(idle) <= 1440;
 
   return (
-    <section className="page wizard">
-      <header className="wizard-head">
-        <button className="icon-button" aria-label="Back to profiles" onClick={props.onDone}>
-          <BackIcon />
-        </button>
-        <h1>Edit {p.name}</h1>
-      </header>
-      <div className="wizard-body">
-        <label className="field">
-          <span>Name</span>
-          <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="field">
-          <span>Notes</span>
-          <textarea
-            value={notes}
-            rows={3}
-            maxLength={2000}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </label>
-        <label className="field narrow">
-          <span>Stop after this many idle minutes</span>
-          <input value={idle} inputMode="numeric" onChange={(e) => setIdle(e.target.value)} />
-          {!idleOk && <small className="error-text">A whole number from 1 to 1440.</small>}
-        </label>
-        <div className="field">
-          <span>Proxy</span>
-          <p className="mono">
-            {p.runtime.usesTestProxy
-              ? 'Built in test proxy'
-              : `${p.proxy.type}://${p.proxy.host}:${p.proxy.port}`}
-          </p>
-          {!changeProxy ? (
-            <button
-              className="button small"
-              onClick={() => setChangeProxy(true)}
-              disabled={props.running}
-              title={props.running ? 'Stop the profile to change its proxy.' : undefined}
-            >
-              Change proxy
-            </button>
-          ) : (
-            <>
-              <input
-                className="mono"
-                value={proxy}
-                autoFocus
-                spellCheck={false}
-                onChange={(e) => setProxy(e.target.value)}
-                placeholder="socks5://user:pass@host:port"
-              />
-              <small>
-                The new proxy must be in the same country and time zone as the profile. Saving
-                checks it first.
-              </small>
-            </>
-          )}
-          {props.running && <small>Stop the profile to change its proxy.</small>}
+    <section className="page">
+      <div className="wizard">
+        <header className="wizard-head">
+          <button className="icon-button" aria-label="Back to profiles" onClick={props.onDone}>
+            <BackIcon />
+          </button>
+          <h1>Edit {p.name}</h1>
+        </header>
+        <div className="wizard-body">
+          <label className="field">
+            <span>Name</span>
+            <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Notes</span>
+            <textarea
+              value={notes}
+              rows={3}
+              maxLength={2000}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </label>
+          <label className="field narrow">
+            <span>Stop after this many idle minutes</span>
+            <input value={idle} inputMode="numeric" onChange={(e) => setIdle(e.target.value)} />
+            {!idleOk && <small className="error-text">A whole number from 1 to 1440.</small>}
+          </label>
+          <div className="field">
+            <span>Proxy</span>
+            <p className="mono">
+              {p.runtime.usesTestProxy
+                ? 'Built in test proxy'
+                : `${p.proxy.type}://${p.proxy.host}:${p.proxy.port}`}
+            </p>
+            {!changeProxy ? (
+              <button
+                className="button small"
+                onClick={() => setChangeProxy(true)}
+                disabled={props.running}
+                title={props.running ? 'Stop the profile to change its proxy.' : undefined}
+              >
+                Change proxy
+              </button>
+            ) : (
+              <>
+                <input
+                  className="mono"
+                  value={proxy}
+                  autoFocus
+                  spellCheck={false}
+                  onChange={(e) => setProxy(e.target.value)}
+                  placeholder="socks5://user:pass@host:port"
+                />
+                <small>
+                  The new proxy must be in the same country and time zone as the profile. Saving
+                  checks it first.
+                </small>
+              </>
+            )}
+            {props.running && <small>Stop the profile to change its proxy.</small>}
+          </div>
+          {error && <p className="notice error">{error}</p>}
         </div>
-        {error && <p className="notice error">{error}</p>}
+        <footer className="wizard-foot">
+          <button className="button quiet" onClick={props.onDone} disabled={saving}>
+            Cancel
+          </button>
+          <button
+            className="button primary"
+            onClick={() => void save()}
+            disabled={saving || !name.trim() || !idleOk}
+          >
+            {saving ? 'Saving' : 'Save changes'}
+          </button>
+          {saving && changeProxy && proxy.trim() && (
+            <span className="muted">Checking the new proxy.</span>
+          )}
+        </footer>
       </div>
-      <footer className="wizard-foot">
-        <button className="button quiet" onClick={props.onDone} disabled={saving}>
-          Cancel
-        </button>
-        <button
-          className="button primary"
-          onClick={() => void save()}
-          disabled={saving || !name.trim() || !idleOk}
-        >
-          {saving ? 'Saving' : 'Save changes'}
-        </button>
-        {saving && changeProxy && proxy.trim() && (
-          <span className="muted">Checking the new proxy.</span>
-        )}
-      </footer>
     </section>
   );
 }

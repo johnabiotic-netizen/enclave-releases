@@ -11,8 +11,12 @@ export interface AppSettings {
   agentTokenEnc?: string;
   /** WSL distro running Docker Engine, on a PC without Docker Desktop. */
   wslDistro?: string;
-  /** Phone access over Tailscale. */
-  phone?: 'tailscale';
+  /** Phone access over Tailscale, or off. Unset: as the environment says (developer .env). */
+  phone?: 'tailscale' | 'off';
+  /** Idle stop for new profiles, in minutes. */
+  idleMinutes?: number;
+  /** The proxy the create wizard starts with, encrypted (base64). */
+  defaultProxyEnc?: string;
   /** The "still running in the tray" notice was shown once. */
   trayHintShown?: boolean;
 }
@@ -59,6 +63,20 @@ export class SettingsFile {
     const token = fromEnv && fromEnv.length >= 24 ? fromEnv : randomBytes(32).toString('base64url');
     await this.saveToken(settings, token);
     return token;
+  }
+
+  async defaultProxy(): Promise<string> {
+    const enc = (await this.read()).defaultProxyEnc;
+    if (!enc) return '';
+    return (await safeStorage.decryptStringAsync(Buffer.from(enc, 'base64'))).result;
+  }
+
+  async setDefaultProxy(proxy: string): Promise<void> {
+    const settings = await this.read();
+    if (!proxy) delete settings.defaultProxyEnc;
+    else
+      settings.defaultProxyEnc = (await safeStorage.encryptStringAsync(proxy)).toString('base64');
+    await this.write(settings);
   }
 
   private async saveToken(settings: AppSettings, token: string): Promise<void> {

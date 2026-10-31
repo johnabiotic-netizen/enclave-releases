@@ -20,8 +20,13 @@ import {
 } from 'electron';
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
-import { SettingsFile } from './settings.js';
-import type { AgentReply, AgentState } from '../shared/bridge.js';
+import { SettingsFile, type AppSettings } from './settings.js';
+import type {
+  AgentReply,
+  AgentState,
+  AppSettingsChange,
+  AppSettingsView,
+} from '../shared/bridge.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -82,13 +87,30 @@ async function bootAgent(): Promise<void> {
       ...process.env,
       AGENT_TOKEN: token,
       ENCLAVE_WSL_DISTRO: saved.wslDistro ?? process.env.ENCLAVE_WSL_DISTRO,
-      ENCLAVE_PHONE: saved.phone ?? process.env.ENCLAVE_PHONE,
+      ENCLAVE_PHONE: phoneSetting(saved),
+      ENCLAVE_IDLE_MINUTES: saved.idleMinutes
+        ? String(saved.idleMinutes)
+        : process.env.ENCLAVE_IDLE_MINUTES,
     });
     agent = await startAgent(config, { sealer: safeStorageSealer });
     setState({ status: 'running', dockerMode: agent.dockerMode, phoneApp: agent.phoneApp ?? null });
   } catch (err) {
     setState({ status: 'failed', message: describeStartError(err) });
   }
+}
+
+function phoneSetting(saved: AppSettings): string | undefined {
+  if (saved.phone === 'off') return '';
+  return saved.phone ?? process.env.ENCLAVE_PHONE;
+}
+
+/** Restarts the agent inside the app (settings changed). Running profiles keep running. */
+async function restartAgent(): Promise<void> {
+  const old = agent;
+  agent = null;
+  setState({ status: 'starting' });
+  await old?.close().catch(() => {});
+  await bootAgent();
 }
 
 function describeStartError(err: unknown): string {
@@ -160,6 +182,48 @@ function showWindow(): void {
 // ---------------------------------------------------------------- the bridge
 
 ipcMain.handle('agent:state', () => state);
+
+ipcMain.handle('settings:get', async (): Promise<AppSettingsView> => {
+  const file = new SettingsFile(home);
+  const saved = await file.read();
+  return {
+    idleMinutes: saved.idleMinutes ?? (Number(process.env.ENCLAVE_IDLE_MINUTES) || 20),
+    defaultProxy: await file.defaultProxy(),
+    phone: phoneSetting(saved) === 'tailscale',
+    dataFolder: home,
+    versions: {
+      app: app.getVersion(),
+      electron: process.versions.electron ?? '',
+      chromium: process.versions.chrome ?? '',
+      node: process.versions.node,
+    },
+  };
+});
+
+ipcMain.handle('settings:set', async (_e, change: AppSettingsChange) => {
+  const file = new SettingsFile(home);
+  const saved = await file.read();
+  let restart = false;
+  if (change.idleMinutes !== undefined) {
+    const n = Number(change.idleMinutes);
+    if (!Number.isInteger(n) || n < 1 || n > 1440)
+      throw new Error('A whole number from 1 to 1440.');
+    restart ||= n !== saved.idleMinutes;
+    saved.idleMinutes = n;
+  }
+  if (change.phone !== undefined) {
+    const next = change.phone ? 'tailscale' : 'off';
+    restart ||= next !== (phoneSetting(saved) === 'tailscale' ? 'tailscale' : 'off');
+    saved.phone = next;
+  }
+  await file.write(saved);
+  if (change.defaultProxy !== undefined) await file.setDefaultProxy(change.defaultProxy.trim());
+  if (restart) await restartAgent();
+});
+
+ipcMain.handle('app:open-data', async () => {
+  if (home) await shell.openPath(home);
+});
 
 ipcMain.handle('clipboard:write', (_e, text: unknown) => {
   if (typeof text === 'string' && text.length <= 1_000_000) clipboard.writeText(text);

@@ -135,6 +135,8 @@ export interface SystemResponse {
   imageBuilt: boolean;
   /** A built-in test proxy is set up (TEST_PROXY), so profiles can be made without one. */
   testProxyAvailable: boolean;
+  /** Memory each running profile uses now (null when Docker could not say). */
+  profileMemory: { id: string; bytes: number | null }[];
 }
 
 // POST /proxy-check: the safety check for a proxy not saved in a profile yet.

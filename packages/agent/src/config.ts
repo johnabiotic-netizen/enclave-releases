@@ -22,6 +22,8 @@ export interface AgentConfig {
   mobileDir: string;
   /** Real Windows Firefox measurements the audit compares with (testing/reference/). */
   referenceDir: string;
+  /** Idle stop for new profiles, in minutes (ENCLAVE_IDLE_MINUTES; default 20). */
+  defaultIdleStopMinutes?: number;
 }
 
 const MIN_TOKEN_LENGTH = 24;
@@ -51,6 +53,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
     mobileDir:
       env.ENCLAVE_MOBILE_DIR ||
       path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../mobile/dist'),
+    ...(env.ENCLAVE_IDLE_MINUTES
+      ? { defaultIdleStopMinutes: idleMinutes(env.ENCLAVE_IDLE_MINUTES) }
+      : {}),
     referenceDir:
       env.ENCLAVE_REFERENCE_DIR ||
       path.resolve(
@@ -58,6 +63,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentConfig {
         '../../../testing/reference/windows-firefox-158',
       ),
   };
+}
+
+function idleMinutes(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 1440) {
+    throw new Error(`ENCLAVE_IDLE_MINUTES must be a whole number from 1 to 1440, got "${value}".`);
+  }
+  return n;
 }
 
 function phoneMode(value: string | undefined): 'tailscale' | undefined {

@@ -10,7 +10,26 @@ export interface AgentReply {
   body: unknown;
 }
 
+/** The Settings screen's values (the default proxy in plain text: only this window sees it). */
+export interface AppSettingsView {
+  idleMinutes: number;
+  defaultProxy: string;
+  phone: boolean;
+  dataFolder: string;
+  versions: { app: string; electron: string; chromium: string; node: string };
+}
+
+export interface AppSettingsChange {
+  idleMinutes?: number;
+  defaultProxy?: string;
+  phone?: boolean;
+}
+
 export interface EnclaveBridge {
+  settings(): Promise<AppSettingsView>;
+  /** Saves; a change to phone access or the idle default restarts the agent inside the app. */
+  saveSettings(change: AppSettingsChange): Promise<void>;
+  openDataFolder(): Promise<void>;
   /** A call to the agent's API (paths as in specs/agent-api.md, without /v1). */
   request(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',

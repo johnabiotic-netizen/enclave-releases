@@ -243,6 +243,14 @@ export class ProfileService {
       virtualizationOk: dockerOk,
       imageBuilt: dockerOk && (await this.runtime.imageExists()),
       testProxyAvailable: Boolean(this.config.testProxy),
+      profileMemory: await Promise.all(
+        profiles
+          .filter((p) => p.status.state === 'running')
+          .map(async (p) => ({
+            id: p.id,
+            bytes: dockerOk ? await this.runtime.memoryBytes(containerName(p.id)) : null,
+          })),
+      ),
     };
   }
 
@@ -296,7 +304,7 @@ export class ProfileService {
       },
       fingerprint,
       runtime: {
-        idleStopMinutes: DEFAULT_IDLE_STOP_MINUTES,
+        idleStopMinutes: this.config.defaultIdleStopMinutes ?? DEFAULT_IDLE_STOP_MINUTES,
         ...(useTestProxy ? { usesTestProxy: true } : {}),
       },
       status: {

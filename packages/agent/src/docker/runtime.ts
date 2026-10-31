@@ -139,6 +139,23 @@ export class DockerRuntime {
     }
   }
 
+  /**
+   * Memory a container uses now, as `docker stats` shows it (usage less the page cache), or
+   * null if it is not running.
+   */
+  async memoryBytes(name: string): Promise<number | null> {
+    try {
+      const s = (await this.docker.getContainer(name).stats({ stream: false })) as unknown as {
+        memory_stats?: { usage?: number; stats?: { inactive_file?: number } };
+      };
+      const usage = s.memory_stats?.usage;
+      if (usage === undefined) return null;
+      return Math.max(0, usage - (s.memory_stats?.stats?.inactive_file ?? 0));
+    } catch {
+      return null;
+    }
+  }
+
   /** Graceful stop (Firefox saves its session), then remove. The data volume stays. */
   async stopAndRemove(name: string, graceSeconds = 15): Promise<void> {
     const container = this.docker.getContainer(name);
