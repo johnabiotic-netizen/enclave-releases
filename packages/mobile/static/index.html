@@ -126,30 +126,75 @@
         right: 0;
         bottom: 0;
         height: calc(52px + env(safe-area-inset-bottom));
-        padding: 4px 6px env(safe-area-inset-bottom);
+        padding: 4px 2px env(safe-area-inset-bottom);
         display: flex;
-        gap: 4px;
         background: #0d1016;
       }
       #bar button {
+        position: relative;
         flex: 1;
+        min-width: 0;
         min-height: 44px;
         padding: 0;
         background: transparent;
-        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #bar svg {
+        width: 24px;
+        height: 24px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       #bar button.live {
         color: var(--danger);
       }
-      #bar button.live::before {
+      #bar button.live::after {
         content: '';
-        display: inline-block;
+        position: absolute;
+        top: 6px;
+        left: calc(50% + 9px);
         width: 8px;
         height: 8px;
-        margin-right: 5px;
         border-radius: 50%;
         background: var(--danger);
-        vertical-align: middle;
+      }
+      #live {
+        position: absolute;
+        top: calc(10px + env(safe-area-inset-top));
+        left: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 4px 4px 12px;
+        border-radius: 12px;
+        background: rgba(13, 16, 22, 0.88);
+        box-shadow: 0 0 0 1px var(--danger);
+        font-size: 14px;
+      }
+      #live[hidden] {
+        display: none;
+      }
+      #live:not([hidden]) ~ #preview {
+        top: calc(62px + env(safe-area-inset-top));
+      }
+      #live-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #live-stop {
+        flex: none;
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 14px;
       }
       #preview {
         position: absolute;
@@ -194,6 +239,29 @@
       #ask[hidden] {
         display: none;
       }
+      #copied {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: calc(62px + env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 6px 6px 14px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        font-size: 15px;
+      }
+      #copied[hidden] {
+        display: none;
+      }
+      #ask:not([hidden]) ~ #copied {
+        bottom: calc(132px + env(safe-area-inset-bottom));
+      }
+      #copied span {
+        flex: 1;
+      }
       #ask-text {
         flex: 1;
         font-size: 15px;
@@ -220,6 +288,10 @@
     <div id="viewer">
       <div id="stage"></div>
       <div id="status"></div>
+      <div id="live" role="status" hidden>
+        <span id="live-text"></span>
+        <button id="live-stop">Stop sharing</button>
+      </div>
       <div id="preview" hidden>
         <video id="preview-video" muted playsinline autoplay></video>
         <button id="flip" aria-label="Switch between the front and back camera">Flip</button>
@@ -229,14 +301,52 @@
         <button id="ask-later">Not now</button>
         <button id="ask-share" class="primary">Share</button>
       </div>
+      <div id="copied" role="status" hidden>
+        <span>Copied in the profile.</span>
+        <button id="copy-phone">Copy to phone</button>
+      </div>
       <div id="bar">
-        <button id="back" aria-label="Back">Back</button>
-        <button id="forward" aria-label="Forward">Forward</button>
-        <button id="reload" aria-label="Reload">Reload</button>
-        <button id="keyboard" aria-label="Keyboard">Keyboard</button>
-        <button id="mic" aria-label="Share the phone microphone" aria-pressed="false">Mic</button>
-        <button id="camera" aria-label="Share the phone camera" aria-pressed="false">Camera</button>
-        <button id="close" aria-label="Close">Close</button>
+        <button id="back" aria-label="Back">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <button id="forward" aria-label="Forward">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+        <button id="reload" aria-label="Reload">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5" />
+            <path d="M20 3.5v5h-5" />
+          </svg>
+        </button>
+        <button id="keyboard" aria-label="Keyboard">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2.5" y="6" width="19" height="12" rx="2" />
+            <path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8" />
+          </svg>
+        </button>
+        <button id="paste" aria-label="Paste the phone's clipboard into the profile">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="2.5" width="8" height="4" rx="1" />
+            <path
+              d="M16 4.5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h2"
+            />
+          </svg>
+        </button>
+        <button id="mic" aria-label="Share the phone microphone" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="2.5" width="6" height="11.5" rx="3" />
+            <path d="M5.5 10.5v.5a6.5 6.5 0 0 0 13 0v-.5M12 17.5v4" />
+          </svg>
+        </button>
+        <button id="camera" aria-label="Share the phone camera" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="2.5" y="6" width="13.5" height="12" rx="2" />
+            <path d="M16 10.5l5.5-3.5v10l-5.5-3.5" />
+          </svg>
+        </button>
+        <button id="close" aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
       </div>
     </div>
     <script type="module" src="app.js"></script>

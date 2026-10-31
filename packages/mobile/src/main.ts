@@ -205,6 +205,18 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   closeViewer();
   const c = new NekoClient({ inputMode: 'touch', autoplay: true });
   client = c;
+  // The library guesses whether a paste means the phone's text or the profile's newer copy (a
+  // desktop Ctrl+V is ambiguous). On the phone a paste is always a deliberate tap on Paste, so
+  // its text becomes the profile's clipboard before the paste keystroke.
+  c.preparePaste = async (text) => {
+    if (!text || text === c.state.control.clipboard?.text) return;
+    pasted = text;
+    c.send('clipboard/set', { text });
+    await new Promise<void>((done) => {
+      const off = c.events.on('room.clipboard.updated', () => (off(), done()));
+      setTimeout(() => (off(), done()), 500);
+    });
+  };
   c.setUrl(stream.phoneUrl);
   await c.login('phone', stream.password);
 
@@ -238,6 +250,18 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   );
   c.connect();
 
+  // Text copied in the profile goes to the phone's clipboard. Where the phone allows that only
+  // right after a tap (iPhone), offer a button that does it. Not for the phone's own paste.
+  detach.push(
+    c.events.on('room.clipboard.updated', (text: string) => {
+      if (text === pasted) return;
+      navigator.clipboard.writeText(text).then(
+        () => offerCopy(null),
+        () => offerCopy(text),
+      );
+    }),
+  );
+
   shown = p;
   wanted = { camera: false, microphone: false };
   declined = { camera: false, microphone: false };
@@ -256,6 +280,8 @@ function closeViewer(): void {
   client = null;
   overlay = null;
   shown = null;
+  pasted = null;
+  offerCopy(null);
   wanted = { camera: false, microphone: false };
   showAsk();
   stage.replaceChildren();
@@ -353,7 +379,7 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
 }
 
 // X11 keysyms for the toolbar: what Firefox on Windows uses for back, forward and reload.
-const XK = { Alt_L: 0xffe9, Left: 0xff51, Right: 0xff53, F5: 0xffc2 };
+const XK = { Alt_L: 0xffe9, Control_L: 0xffe3, Left: 0xff51, Right: 0xff53, F5: 0xffc2, v: 0x76 };
 
 function press(...keys: number[]): void {
   if (!client?.controlling) client?.request();
@@ -365,6 +391,22 @@ document.getElementById('back')!.onclick = () => press(XK.Alt_L, XK.Left);
 document.getElementById('forward')!.onclick = () => press(XK.Alt_L, XK.Right);
 document.getElementById('reload')!.onclick = () => press(XK.F5);
 document.getElementById('keyboard')!.onclick = () => overlay?.mobileKeyboardToggle();
+// The phone's clipboard into the profile, where the cursor is. The phone may ask first.
+document.getElementById('paste')!.onclick = async () => {
+  if (!client) return;
+  let text: string;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    return setStatus(
+      'The phone did not allow reading the clipboard. Allow it for this app and try again.',
+    );
+  }
+  if (!text) return setStatus('Nothing to paste. Copy some text on the phone first.');
+  if (!client.controlling) client.request();
+  await client.preparePaste(text);
+  press(XK.Control_L, XK.v);
+};
 // The phone microphone, shared into the profile: what a site hears when it uses the
 // profile's microphone. Only while the button shows it live.
 const micButton = document.getElementById('mic')!;
@@ -372,7 +414,11 @@ const micButton = document.getElementById('mic')!;
 function showMic(): void {
   micButton.classList.toggle('live', Boolean(mic));
   micButton.setAttribute('aria-pressed', String(Boolean(mic)));
-  micButton.textContent = mic ? 'Mic on' : 'Mic';
+  micButton.setAttribute(
+    'aria-label',
+    mic ? 'Stop sharing the phone microphone' : 'Share the phone microphone',
+  );
+  showLive();
 }
 
 function stopMic(): void {
@@ -417,7 +463,11 @@ const previewVideo = document.getElementById('preview-video') as HTMLVideoElemen
 function showCamera(): void {
   cameraButton.classList.toggle('live', Boolean(camera));
   cameraButton.setAttribute('aria-pressed', String(Boolean(camera)));
-  cameraButton.textContent = camera ? 'Camera on' : 'Camera';
+  cameraButton.setAttribute(
+    'aria-label',
+    camera ? 'Stop sharing the phone camera' : 'Share the phone camera',
+  );
+  showLive();
   preview.hidden = !camera;
   previewVideo.srcObject = camera?.stream ?? null;
   // The front camera is shown mirrored, as phones do; the profile gets it unmirrored.
@@ -474,6 +524,45 @@ document.getElementById('flip')!.onclick = async () => {
   const next = camera.facing === 'user' ? 'environment' : 'user';
   stopCamera();
   await startCamera(next);
+};
+
+// "Copy to phone", while a copy from the profile hasn't reached the phone's clipboard.
+const copied = document.getElementById('copied')!;
+let pasted: string | null = null;
+let toCopy: string | null = null;
+let copiedTimer = 0;
+
+function offerCopy(text: string | null): void {
+  toCopy = text;
+  copied.hidden = text === null;
+  window.clearTimeout(copiedTimer);
+  if (text !== null) copiedTimer = window.setTimeout(() => offerCopy(null), 15_000);
+}
+
+document.getElementById('copy-phone')!.onclick = async () => {
+  if (toCopy === null) return;
+  try {
+    await navigator.clipboard.writeText(toCopy);
+    offerCopy(null);
+  } catch {
+    offerCopy(null);
+    setStatus('The phone did not allow writing the clipboard.');
+  }
+};
+
+// While the camera or mic is shared, say so and where, with a way to stop both.
+const live = document.getElementById('live')!;
+const liveText = document.getElementById('live-text')!;
+
+function showLive(): void {
+  live.hidden = !(camera || mic);
+  const what = camera && mic ? 'Camera and mic' : camera ? 'Camera' : 'Mic';
+  liveText.textContent = `${what} live in ${shown?.name ?? 'this profile'}`;
+}
+
+document.getElementById('live-stop')!.onclick = () => {
+  stopCamera();
+  stopMic();
 };
 
 // When a page in the profile starts using the camera or microphone and the phone isn't
