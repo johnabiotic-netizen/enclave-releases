@@ -487,12 +487,14 @@ function stopCamera(): void {
   showAsk();
 }
 
-// 1080p, so the middle 16:9 of an upright phone's picture is still at least 1280 wide or
-// close to it (1080 x 608 from 1080 x 1920).
+// 4:3 at 1440 x 1080: phone sensors are 4:3, and asking for 16:9 makes the phone cut the
+// sensor first, so an upright phone would lose a quarter of its width before asWebcam crops.
+// 1080 wide keeps the middle 16:9 sharp (1080 x 608 from 1080 x 1440).
 const cameraConstraints = (facing: 'user' | 'environment') => ({
   facingMode: facing,
-  width: { ideal: 1920 },
+  width: { ideal: 1440 },
   height: { ideal: 1080 },
+  aspectRatio: { ideal: 4 / 3 },
   frameRate: { ideal: 30 },
 });
 

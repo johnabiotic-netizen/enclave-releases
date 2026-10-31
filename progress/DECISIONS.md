@@ -6,7 +6,7 @@ Format:
 ```
 ## 2026-10-31  The phone frames its camera as a 16:9 webcam before sending
 Context: The profile's camera is a 1280x720 landscape webcam and neko scales whatever arrives to that size, ignoring shape. A phone held upright films portrait, so the owner saw faces squashed on the real phone.
-Decision: The phone app sends the middle 16:9 of its camera picture, drawn at 1280x720 frame by frame (canvas fed by requestVideoFrameCallback), and asks the camera for 1080p so the crop from a portrait picture stays sharp (1080x608 from 1080x1920). The preview shows exactly what is sent. Landscape pictures fill the frame whole.
+Decision: The phone app sends the middle 16:9 of its camera picture, drawn at 1280x720 frame by frame (canvas fed by requestVideoFrameCallback), and asks the camera for 4:3 at 1440x1080: phone sensors are 4:3, so a 16:9 request would make the phone cut the sensor first and an upright phone would look zoomed in (owner, real phone); 4:3 keeps the full sensor width and the crop stays sharp (1080x608 from 1080x1440). The camera stays unmirrored, like a real webcam; sites mirror their own self-view. The preview shows exactly what is sent. Landscape pictures fill the frame whole.
 Reason: Fixing it on the phone needs no neko rebuild, works on Android and iPhone, and a centered 16:9 crop is how a laptop webcam frames a person; black side bars would look like no real webcam.
 
 ## 2026-10-31  Location is removed from phone photos and videos before they reach a profile
