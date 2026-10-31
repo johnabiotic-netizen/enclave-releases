@@ -31,4 +31,4 @@ Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this A
 - Every state change is logged (without secrets) to the profile's log file.
 
 ## Error codes
-`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `FILE_PICKER_CLOSED` (a phone file arrived but no file picker is open in the profile), `INTERNAL`.
+`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `FILE_PICKER_CLOSED` (a phone file arrived but no file picker is open in the profile), `SECRETS_LOCKED` (the profile's passwords are encrypted for the Windows app and this agent cannot open them, e.g. the CLI), `INTERNAL`.

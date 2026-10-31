@@ -9,6 +9,11 @@ Context: Stage 5 "Verify first". Checked npm, releases.electronjs.org and the El
 Decision: Electron 45.2.1 (Node 24.22.1, Chromium 156; the newest stable, three majors supported), React 19.3.1, Vite 8.3.5, @vitejs/plugin-react 6.1.2, electron-builder 26.18.0, @playwright/test 1.64.1; TypeScript stays at the repo's 6.0.3. Secrets use the async safeStorage API (isAsyncEncryptionAvailable, encryptStringAsync, decryptStringAsync): the sync calls are deprecated in 45 and removed in 46. On Windows it is DPAPI, which protects from other Windows users, not from other programs of the same user. The PC viewer uses @m1k1o/neko 3.2.0 (neko's official client library, as the phone app) directly in the renderer with mouse and keyboard input, not a webview or iframe of neko's page.
 Reason: Node 24 in Electron matches the agent, so the agent runs in the main process unchanged (startAgent). One client library for PC and phone; no second web app to keep in step.
 
+## 2026-10-31  Profile passwords sealed per profile with safeStorage, not the Windows credential manager
+Context: Stage 5 moves secrets off plain files. Options: Windows Credential Manager (keytar-style native module) or Electron safeStorage. keytar is archived and needs a native build; safeStorage is built into Electron and uses DPAPI.
+Decision: Each profile's secrets stay one small file, now `secrets.sealed` encrypted with safeStorage (async API); the agent takes a SecretSealer, so the agent code stays free of Electron. The app seals plain files at start after checking that encryption reads back. New error code `SECRETS_LOCKED` when an agent without a sealer meets a sealed profile.
+Reason: No native module to build or ship; secrets stay next to the profile they belong to, so delete and backup stay simple.
+
 ## 2026-10-31  Closing the window keeps profiles running in the tray
 Context: Stage 5 acceptance 4 leaves it to us: stop profiles on close, or keep them running. The phone can reach a profile only while the agent (inside the app) runs.
 Decision: Owner chose: closing the window hides Enclave to the system tray and profiles keep running. "Quit Enclave" in the tray menu stops every profile cleanly (tabs and logins kept) and exits.

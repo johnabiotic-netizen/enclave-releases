@@ -17,6 +17,7 @@ export const ERROR_CODES = [
   'PROFILE_NOT_RUNNING',
   'REAL_IP_LEAK_SUSPECTED',
   'FILE_PICKER_CLOSED',
+  'SECRETS_LOCKED',
   'INTERNAL',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -89,8 +89,8 @@ Spec: `stages/stage-4-camera-mic-passthrough.md`. Design: DECISIONS.md 2026-10-3
 ## Stage 5: Windows app  [~]
 Spec: `stages/stage-5-windows-app.md`
 - [x] Verify first (2026-10-31): Electron 45.2.1 (Node 24, Chromium 156), async safeStorage (sync calls removed in 46), viewer with neko's client library in the renderer (DECISIONS 2026-10-31). Closing the window keeps profiles running in the tray (owner, DECISIONS 2026-10-31).
-- [ ] A. Skeleton: packages/desktop (Electron, React, Vite, TypeScript), the agent inside the main process, the renderer reaching it over IPC only.
-- [ ] B. Secrets in safeStorage: agent token made on first run; proxy and stream passwords encrypted on disk; the CLI refuses app-protected profiles instead of reading them.
+- [x] A. Skeleton: packages/desktop (Electron, React, Vite, TypeScript), the agent inside the main process, the renderer reaching it over IPC only. Verified 2026-10-31: the app lists the five profiles through its own agent and tracks the running one; the agent token is kept only encrypted (app-settings.json). Electron pinned at 45.1.0: pnpm refuses releases under a day old (45.2.1 was); move to the newest qualifying patch before packaging.
+- [x] B. Secrets in safeStorage: agent token made on first run; proxy and stream passwords encrypted on disk; the CLI refuses app-protected profiles instead of reading them. Verified 2026-10-31: 6 new unit tests (40 in all); the app checks that encryption reads back before using it; at start it sealed all five profiles (secrets.json gone, no password text in secrets.sealed); Profile 2 then started through its real proxy with the decrypted password (exit 72.245.64.165, US) and stopped.
 - [ ] C. Dashboard: profile tiles with the status seam, exit IP, actions; empty state.
 - [ ] D. Create and edit wizard: name, proxy with Check, test proxy toggle, template, review.
 - [ ] E. Profile viewer: embedded stream (mouse, keyboard, sound), top bar, open on phone (Tailscale address), "switch to your phone" notice.

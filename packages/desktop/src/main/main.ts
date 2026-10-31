@@ -4,8 +4,8 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import { loadConfig, startAgent, type RunningAgent } from '@enclave/agent';
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH } from '@enclave/shared';
 import { SettingsFile } from './settings.js';
 import type { AgentReply, AgentState } from '../shared/bridge.js';
@@ -37,6 +37,7 @@ async function bootAgent(): Promise<void> {
     const base = loadConfig({ ...process.env, AGENT_TOKEN: 'x'.repeat(32) });
     const settings = new SettingsFile(base.home);
     const saved = await settings.read();
+    await checkEncryption();
     token = await settings.agentToken(process.env.AGENT_TOKEN);
     const config = loadConfig({
       ...process.env,
@@ -44,7 +45,7 @@ async function bootAgent(): Promise<void> {
       ENCLAVE_WSL_DISTRO: saved.wslDistro ?? process.env.ENCLAVE_WSL_DISTRO,
       ENCLAVE_PHONE: saved.phone ?? process.env.ENCLAVE_PHONE,
     });
-    agent = await startAgent(config);
+    agent = await startAgent(config, { sealer: safeStorageSealer });
     setState({ status: 'running', dockerMode: agent.dockerMode, phoneApp: agent.phoneApp ?? null });
   } catch (err) {
     setState({ status: 'failed', message: describeStartError(err) });
@@ -149,4 +150,20 @@ async function shutdown(): Promise<void> {
   quitting = true;
   await agent?.close().catch(() => {});
   app.quit();
+}
+
+/** Profile passwords on disk, encrypted for this Windows user (DPAPI through safeStorage). */
+const safeStorageSealer: SecretSealer = {
+  seal: (plain) => safeStorage.encryptStringAsync(plain),
+  open: async (sealed) => (await safeStorage.decryptStringAsync(sealed)).result,
+};
+
+/** Encryption must read back what it wrote before any password is sealed with it. */
+async function checkEncryption(): Promise<void> {
+  const probe = `enclave-check-${Date.now()}`;
+  const sealed = await safeStorage.encryptStringAsync(probe);
+  const { result } = await safeStorage.decryptStringAsync(sealed);
+  if (result !== probe || sealed.includes(probe)) {
+    throw new Error("Windows could not protect Enclave's secrets for this user.");
+  }
 }

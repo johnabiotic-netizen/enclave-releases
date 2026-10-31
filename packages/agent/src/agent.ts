@@ -8,7 +8,7 @@ import { DockerRuntime } from './docker/runtime.js';
 import { phoneAppOrigin, ProfileService } from './profiles.js';
 import { Tailscale } from './tailscale.js';
 import { buildServer, listen } from './server.js';
-import { ProfileStore } from './store.js';
+import { ProfileStore, type SecretSealer } from './store.js';
 
 export interface RunningAgent {
   service: ProfileService;
@@ -19,7 +19,15 @@ export interface RunningAgent {
   close(): Promise<void>;
 }
 
-export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
+export interface AgentOptions {
+  /** Encrypts profile secrets on disk (the Windows app: safeStorage). Without it they are plain. */
+  sealer?: SecretSealer;
+}
+
+export async function startAgent(
+  config: AgentConfig,
+  options: AgentOptions = {},
+): Promise<RunningAgent> {
   const connection: DockerConnection = await connectDocker({
     dockerHost: config.dockerHost,
     wslDistro: config.wslDistro,
@@ -32,7 +40,9 @@ export async function startAgent(config: AgentConfig): Promise<RunningAgent> {
 
   const runtime = new DockerRuntime(connection.docker, config.image);
   const phone = config.phone === 'tailscale' ? new Tailscale() : undefined;
-  const service = new ProfileService(config, new ProfileStore(config.home), runtime, phone);
+  const store = new ProfileStore(config.home, options.sealer);
+  await store.sealAll();
+  const service = new ProfileService(config, store, runtime, phone);
   await service.startMonitor();
   const app = buildServer(config.token, service, runtime, config.mobileDir);
   await listen(app, config.port);

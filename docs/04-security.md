@@ -35,8 +35,9 @@ The browser inside the profile must not reveal local or real public IPs through 
 ## Secrets
 
 - Development: `.env` (git ignored). Provide `.env.example` with placeholders only.
-- Desktop app: Electron `safeStorage` for proxy passwords and agent token.
-- `profile.json` stores a reference to the proxy secret, not the password itself, once Stage 5 lands. Until then, proxy credentials can live in a git ignored per profile secrets file.
+- Desktop app: Electron `safeStorage` (DPAPI on Windows) for the agent token (`app-settings.json`) and each profile's passwords (`profiles/<id>/secrets.sealed`: proxy password, stream logins). The app seals any plain `secrets.json` it finds at start and deletes it. DPAPI protects from other Windows users and from copying the files to another PC, not from other programs of the same Windows user.
+- `profile.json` stores only a reference to the proxy secret (`secretRef`), never the password.
+- The developer CLI's own agent (`enclave serve`) has no safeStorage: it uses a plain git ignored `secrets.json` and refuses a sealed profile (`SECRETS_LOCKED`). CLI commands sent to the app's agent work as usual.
 
 ## Container hardening checklist
 
