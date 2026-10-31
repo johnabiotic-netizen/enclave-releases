@@ -1,70 +1,104 @@
 <!doctype html>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>media test</title>
-<body style="font:14px sans-serif">
-<video id="v" autoplay muted playsinline width="320"></video>
-<pre id="out">running</pre>
-<script>
-const out = document.getElementById('out');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-(async () => {
-  const r = { started: new Date().toISOString() };
-  try {
-    r.devicesBefore = (await navigator.mediaDevices.enumerateDevices()).map((d) => [d.kind, d.label]);
-    const q = new URLSearchParams(location.search); const wantA = q.get("a") !== "0", wantV = q.get("v") !== "0"; r.asked = { audio: wantA, video: wantV };
-    const raw = q.get("raw") === "1"; r.raw = raw; const s = await navigator.mediaDevices.getUserMedia({ audio: wantA && (raw ? { noiseSuppression: false, echoCancellation: false, autoGainControl: false } : true), video: wantV && { width: 1280, height: 720 } });
-    r.devicesAfter = (await navigator.mediaDevices.enumerateDevices()).map((d) => [d.kind, d.label]);
-    const vt = s.getVideoTracks()[0] || { label: null, getSettings: () => null }, at = s.getAudioTracks()[0] || { label: null, getSettings: () => null };
-    r.video = { label: vt.label, settings: vt.getSettings() };
-    r.audio = { label: at.label, settings: at.getSettings() };
-    const v = document.getElementById('v');
-    v.srcObject = s;
-    await v.play().catch(() => {});
-    const ac = new AudioContext();
-    const an = ac.createAnalyser();
-    an.fftSize = 2048;
-    if (wantA) ac.createMediaStreamSource(s).connect(an);
-    const td = new Float32Array(an.fftSize), fd = new Float32Array(an.frequencyBinCount);
-    const c = document.createElement('canvas');
-    c.width = 160; c.height = 90;
-    const g = c.getContext('2d', { willReadFrequently: true });
-    const frames = [], audio = [];
-    let prev = null;
-    for (let i = 0; i < 24; i++) {
-      await sleep(250);
-      g.drawImage(v, 0, 0, 160, 90);
-      const px = g.getImageData(0, 0, 160, 90).data;
-      let sum = 0, diff = 0;
-      for (let j = 0; j < px.length; j += 4) {
-        const y = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
-        sum += y;
-        if (prev) diff += Math.abs(y - prev[j / 4]);
+<body style="font: 14px sans-serif">
+  <video id="v" autoplay muted playsinline width="320"></video>
+  <pre id="out">running</pre>
+  <script>
+    const out = document.getElementById('out');
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    (async () => {
+      const r = { started: new Date().toISOString() };
+      try {
+        r.devicesBefore = (await navigator.mediaDevices.enumerateDevices()).map((d) => [
+          d.kind,
+          d.label,
+        ]);
+        const q = new URLSearchParams(location.search);
+        const wantA = q.get('a') !== '0',
+          wantV = q.get('v') !== '0';
+        r.asked = { audio: wantA, video: wantV };
+        const raw = q.get('raw') === '1';
+        r.raw = raw;
+        const s = await navigator.mediaDevices.getUserMedia({
+          audio:
+            wantA &&
+            (raw
+              ? { noiseSuppression: false, echoCancellation: false, autoGainControl: false }
+              : true),
+          video: wantV && { width: 1280, height: 720 },
+        });
+        r.devicesAfter = (await navigator.mediaDevices.enumerateDevices()).map((d) => [
+          d.kind,
+          d.label,
+        ]);
+        const vt = s.getVideoTracks()[0] || { label: null, getSettings: () => null },
+          at = s.getAudioTracks()[0] || { label: null, getSettings: () => null };
+        r.video = { label: vt.label, settings: vt.getSettings() };
+        r.audio = { label: at.label, settings: at.getSettings() };
+        const v = document.getElementById('v');
+        v.srcObject = s;
+        await v.play().catch(() => {});
+        const ac = new AudioContext();
+        const an = ac.createAnalyser();
+        an.fftSize = 2048;
+        if (wantA) ac.createMediaStreamSource(s).connect(an);
+        const td = new Float32Array(an.fftSize),
+          fd = new Float32Array(an.frequencyBinCount);
+        const c = document.createElement('canvas');
+        c.width = 160;
+        c.height = 90;
+        const g = c.getContext('2d', { willReadFrequently: true });
+        const frames = [],
+          audio = [];
+        let prev = null;
+        for (let i = 0; i < 24; i++) {
+          await sleep(250);
+          g.drawImage(v, 0, 0, 160, 90);
+          const px = g.getImageData(0, 0, 160, 90).data;
+          let sum = 0,
+            diff = 0;
+          for (let j = 0; j < px.length; j += 4) {
+            const y = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+            sum += y;
+            if (prev) diff += Math.abs(y - prev[j / 4]);
+          }
+          const luma = new Float32Array(px.length / 4);
+          for (let j = 0; j < px.length; j += 4)
+            luma[j / 4] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
+          frames.push({
+            mean: +(sum / luma.length).toFixed(1),
+            change: prev ? +(diff / luma.length).toFixed(2) : null,
+            w: v.videoWidth,
+            h: v.videoHeight,
+          });
+          prev = luma;
+          an.getFloatTimeDomainData(td);
+          an.getFloatFrequencyData(fd);
+          let rms = 0;
+          for (const x of td) rms += x * x;
+          let peak = 0;
+          for (let k = 1; k < fd.length; k++) if (fd[k] > fd[peak]) peak = k;
+          audio.push({
+            rms: +Math.sqrt(rms / td.length).toFixed(4),
+            peakHz: Math.round((peak * ac.sampleRate) / an.fftSize),
+          });
+        }
+        r.frames = frames;
+        r.audioSamples = audio;
+        r.audioSampleRate = ac.sampleRate;
+      } catch (e) {
+        r.error = String(e && e.name) + ': ' + String(e && e.message);
       }
-      const luma = new Float32Array(px.length / 4);
-      for (let j = 0; j < px.length; j += 4) luma[j / 4] = 0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2];
-      frames.push({ mean: +(sum / luma.length).toFixed(1), change: prev ? +(diff / luma.length).toFixed(2) : null, w: v.videoWidth, h: v.videoHeight });
-      prev = luma;
-      an.getFloatTimeDomainData(td);
-      an.getFloatFrequencyData(fd);
-      let rms = 0;
-      for (const x of td) rms += x * x;
-      let peak = 0;
-      for (let k = 1; k < fd.length; k++) if (fd[k] > fd[peak]) peak = k;
-      audio.push({ rms: +Math.sqrt(rms / td.length).toFixed(4), peakHz: Math.round((peak * ac.sampleRate) / an.fftSize) });
-    }
-    r.frames = frames;
-    r.audioSamples = audio;
-    r.audioSampleRate = ac.sampleRate;
-  } catch (e) {
-    r.error = String(e && e.name) + ': ' + String(e && e.message);
-  }
-  out.textContent = JSON.stringify(r, null, 1);
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(r, null, 1)], { type: 'application/json' }));
-  a.download = 'media-test-result.json';
-  document.body.append(a);
-  a.click();
-  document.title = 'media test done';
-})();
-</script>
+      out.textContent = JSON.stringify(r, null, 1);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(
+        new Blob([JSON.stringify(r, null, 1)], { type: 'application/json' }),
+      );
+      a.download = 'media-test-result.json';
+      document.body.append(a);
+      a.click();
+      document.title = 'media test done';
+    })();
+  </script>
 </body>

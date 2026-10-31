@@ -1,58 +1,98 @@
 <!doctype html>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>rt test</title>
-<style>html, body { margin: 0; height: 100%; overflow: hidden; background: #000; } canvas { display: block; position: fixed; left: 0; top: calc(50vh - 50px); width: 100vw; height: 100px; } video { position: fixed; width: 1px; height: 1px; opacity: 0; }</style>
+<style>
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+  canvas {
+    display: block;
+    position: fixed;
+    left: 0;
+    top: calc(50vh - 50px);
+    width: 100vw;
+    height: 100px;
+  }
+  video {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+</style>
 <body>
-<video id="v" autoplay muted playsinline></video>
-<canvas id="c"></canvas>
-<script>
-// Test-only: reads the phone clock barcode (clockcam.js) from the profile's camera and redraws it
-// across the whole page at once, for the phone to read back from the screen stream. Downloads the
-// page's position on screen first, so the phone knows where to look.
-const v = document.getElementById('v');
-const c = document.getElementById('c');
-const row = document.createElement('canvas');
-row.width = 1280;
-row.height = 1;
-const rg = row.getContext('2d', { willReadFrequently: true });
-const save = (name, data) => {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
-  a.download = name;
-  document.body.append(a);
-  a.click();
-};
-(async () => {
-  c.width = innerWidth;
-  c.height = 100;
-  const g = c.getContext('2d');
-  save('rt-geometry.json', { x: mozInnerScreenX, y: mozInnerScreenY, w: innerWidth, h: innerHeight, dpr: devicePixelRatio, sw: screen.width, sh: screen.height });
-  v.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-  let frames = 0;
-  const cam = [];
-  const onFrame = () => {
-    rg.drawImage(v, 0, v.videoHeight / 2, v.videoWidth, 1, 0, 0, 1280, 1);
-    const px = rg.getImageData(0, 0, 1280, 1).data;
-    let t = 0;
-    for (let i = 0; i < 24; i++) {
-      const x = Math.floor(((i + 0.5) * 1280) / 24) * 4;
-      t = t * 2 + (px[x] + px[x + 1] + px[x + 2] > 384 ? 1 : 0);
-    }
-    cam.push((Date.now() % 16777216 - t + 16777216) % 16777216);
-    for (let i = 0; i < 24; i++) {
-      const x = Math.floor(((i + 0.5) * 1280) / 24) * 4;
-      g.fillStyle = px[x] + px[x + 1] + px[x + 2] > 384 ? '#fff' : '#000';
-      g.fillRect(Math.round((i * c.width) / 24), 0, Math.ceil(c.width / 24), c.height);
-    }
-    frames++;
-    v.requestVideoFrameCallback(onFrame);
-  };
-  v.requestVideoFrameCallback(onFrame);
-  setTimeout(() => {
-    const ok = cam.filter((d) => d < 5000).sort((a, b) => a - b);
-    const q = (p) => ok[Math.min(ok.length - 1, Math.floor(ok.length * p))];
-    save('rt-frames.json', { frames, valid: ok.length, min: ok[0], p10: q(0.1), p50: q(0.5), p90: q(0.9), max: ok[ok.length - 1] });
-  }, 25000);
-})();
-</script>
+  <video id="v" autoplay muted playsinline></video>
+  <canvas id="c"></canvas>
+  <script>
+    // Test-only: reads the phone clock barcode (clockcam.js) from the profile's camera and redraws it
+    // across the whole page at once, for the phone to read back from the screen stream. Downloads the
+    // page's position on screen first, so the phone knows where to look.
+    const v = document.getElementById('v');
+    const c = document.getElementById('c');
+    const row = document.createElement('canvas');
+    row.width = 1280;
+    row.height = 1;
+    const rg = row.getContext('2d', { willReadFrequently: true });
+    const save = (name, data) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+      a.download = name;
+      document.body.append(a);
+      a.click();
+    };
+    (async () => {
+      c.width = innerWidth;
+      c.height = 100;
+      const g = c.getContext('2d');
+      save('rt-geometry.json', {
+        x: mozInnerScreenX,
+        y: mozInnerScreenY,
+        w: innerWidth,
+        h: innerHeight,
+        dpr: devicePixelRatio,
+        sw: screen.width,
+        sh: screen.height,
+      });
+      v.srcObject = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720 },
+      });
+      let frames = 0;
+      const cam = [];
+      const onFrame = () => {
+        rg.drawImage(v, 0, v.videoHeight / 2, v.videoWidth, 1, 0, 0, 1280, 1);
+        const px = rg.getImageData(0, 0, 1280, 1).data;
+        let t = 0;
+        for (let i = 0; i < 24; i++) {
+          const x = Math.floor(((i + 0.5) * 1280) / 24) * 4;
+          t = t * 2 + (px[x] + px[x + 1] + px[x + 2] > 384 ? 1 : 0);
+        }
+        cam.push(((Date.now() % 16777216) - t + 16777216) % 16777216);
+        for (let i = 0; i < 24; i++) {
+          const x = Math.floor(((i + 0.5) * 1280) / 24) * 4;
+          g.fillStyle = px[x] + px[x + 1] + px[x + 2] > 384 ? '#fff' : '#000';
+          g.fillRect(Math.round((i * c.width) / 24), 0, Math.ceil(c.width / 24), c.height);
+        }
+        frames++;
+        v.requestVideoFrameCallback(onFrame);
+      };
+      v.requestVideoFrameCallback(onFrame);
+      setTimeout(() => {
+        const ok = cam.filter((d) => d < 5000).sort((a, b) => a - b);
+        const q = (p) => ok[Math.min(ok.length - 1, Math.floor(ok.length * p))];
+        save('rt-frames.json', {
+          frames,
+          valid: ok.length,
+          min: ok[0],
+          p10: q(0.1),
+          p50: q(0.5),
+          p90: q(0.9),
+          max: ok[ok.length - 1],
+        });
+      }, 25000);
+    })();
+  </script>
 </body>

@@ -1,19 +1,58 @@
 <!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Phone check</title>
 <style>
-  body { font: 18px system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
-  button, input { font-size: 20px; padding: 10px 14px; margin: 6px 0; }
-  video { width: 100%; max-width: 640px; background: #000; display: block; transform: scaleX(-1); }
-  #bar { height: 20px; background: #ddd; max-width: 640px; }
-  #lvl { height: 100%; width: 0; background: #2a7; }
-  img { max-width: 320px; max-height: 240px; display: block; margin-top: 6px; }
-  .big { font-size: 22px; font-weight: 600; }
-  #clock { font: 700 64px monospace; }
+  body {
+    font:
+      18px system-ui,
+      sans-serif;
+    margin: 16px;
+    background: #fff;
+    color: #111;
+  }
+  button,
+  input {
+    font-size: 20px;
+    padding: 10px 14px;
+    margin: 6px 0;
+  }
+  video {
+    width: 100%;
+    max-width: 640px;
+    background: #000;
+    display: block;
+    transform: scaleX(-1);
+  }
+  #bar {
+    height: 20px;
+    background: #ddd;
+    max-width: 640px;
+  }
+  #lvl {
+    height: 100%;
+    width: 0;
+    background: #2a7;
+  }
+  img {
+    max-width: 320px;
+    max-height: 240px;
+    display: block;
+    margin-top: 6px;
+  }
+  .big {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  #clock {
+    font: 700 64px monospace;
+  }
 </style>
 <h2>Phone check</h2>
-<p>Your camera is shown mirrored here, as video call sites show your own picture. The site itself gets it unmirrored, like any webcam.</p>
+<p>
+  Your camera is shown mirrored here, as video call sites show your own picture. The site itself
+  gets it unmirrored, like any webcam.
+</p>
 <p><button id="go">Start camera and mic</button> <span id="camInfo"></span></p>
 <video id="v" autoplay muted playsinline></video>
 <p>Mic level</p>
@@ -22,55 +61,91 @@
 <p class="big">Copy to phone</p>
 <p>Code: <b id="code"></b> <button id="copybtn">Copy</button> <span id="copyInfo"></span></p>
 <p class="big">Paste from phone</p>
-<textarea id="pastebox" rows="2" style="width:100%;max-width:640px;font-size:20px" placeholder="Tap here, then Paste"></textarea>
+<textarea
+  id="pastebox"
+  rows="2"
+  style="width: 100%; max-width: 640px; font-size: 20px"
+  placeholder="Tap here, then Paste"
+></textarea>
 <p id="pasteInfo"></p>
 <p class="big">Upload a photo</p>
-<input id="f" type="file">
+<input id="f" type="file" />
 <p id="fileInfo"></p>
-<img id="img" alt="">
+<img id="img" alt="" />
 <script>
-const $ = (id) => document.getElementById(id);
-setInterval(() => { const d = new Date(); $('clock').textContent = d.toLocaleTimeString('en-GB') + '.' + String(d.getMilliseconds()).padStart(3, '0').slice(0, 1); }, 50);
-$('go').onclick = async () => {
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    $('v').srcObject = s;
-    const t = s.getVideoTracks()[0];
-    const show = () => { const st = t.getSettings(); $('camInfo').textContent = `Camera ${st.width}x${st.height}`; };
-    $('v').onresize = show; show();
-    const ac = new AudioContext();
-    const an = ac.createAnalyser();
-    ac.createMediaStreamSource(s).connect(an);
-    const buf = new Float32Array(an.fftSize);
-    const loop = () => { an.getFloatTimeDomainData(buf); let m = 0; for (const x of buf) m = Math.max(m, Math.abs(x)); $('lvl').style.width = Math.min(100, m * 200) + '%'; requestAnimationFrame(loop); };
-    loop();
-  } catch (e) { $('camInfo').textContent = 'Failed: ' + e.name; }
-};
-// Finds a GPS entry (tag 0x8825) in any Exif block of the file.
-function hasGps(b) {
-  const sig = [0x45, 0x78, 0x69, 0x66, 0, 0];
-  for (let i = 0; i + 14 < b.length; i++) {
-    if (b[i] !== 0x45 || !sig.every((v, k) => b[i + k] === v)) continue;
-    const t = i + 6, le = b[t] === 0x49;
-    const dv = new DataView(b.buffer, b.byteOffset);
-    const u16 = (o) => dv.getUint16(o, le), u32 = (o) => dv.getUint32(o, le);
+  const $ = (id) => document.getElementById(id);
+  setInterval(() => {
+    const d = new Date();
+    $('clock').textContent =
+      d.toLocaleTimeString('en-GB') +
+      '.' +
+      String(d.getMilliseconds()).padStart(3, '0').slice(0, 1);
+  }, 50);
+  $('go').onclick = async () => {
     try {
-      const ifd = t + u32(t + 4), n = u16(ifd);
-      for (let e = 0; e < n; e++) if (u16(ifd + 2 + e * 12) === 0x8825) return true;
-    } catch {}
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      $('v').srcObject = s;
+      const t = s.getVideoTracks()[0];
+      const show = () => {
+        const st = t.getSettings();
+        $('camInfo').textContent = `Camera ${st.width}x${st.height}`;
+      };
+      $('v').onresize = show;
+      show();
+      const ac = new AudioContext();
+      const an = ac.createAnalyser();
+      ac.createMediaStreamSource(s).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      const loop = () => {
+        an.getFloatTimeDomainData(buf);
+        let m = 0;
+        for (const x of buf) m = Math.max(m, Math.abs(x));
+        $('lvl').style.width = Math.min(100, m * 200) + '%';
+        requestAnimationFrame(loop);
+      };
+      loop();
+    } catch (e) {
+      $('camInfo').textContent = 'Failed: ' + e.name;
+    }
+  };
+  // Finds a GPS entry (tag 0x8825) in any Exif block of the file.
+  function hasGps(b) {
+    const sig = [0x45, 0x78, 0x69, 0x66, 0, 0];
+    for (let i = 0; i + 14 < b.length; i++) {
+      if (b[i] !== 0x45 || !sig.every((v, k) => b[i + k] === v)) continue;
+      const t = i + 6,
+        le = b[t] === 0x49;
+      const dv = new DataView(b.buffer, b.byteOffset);
+      const u16 = (o) => dv.getUint16(o, le),
+        u32 = (o) => dv.getUint32(o, le);
+      try {
+        const ifd = t + u32(t + 4),
+          n = u16(ifd);
+        for (let e = 0; e < n; e++) if (u16(ifd + 2 + e * 12) === 0x8825) return true;
+      } catch {}
+    }
+    return false;
   }
-  return false;
-}
-$('code').textContent = 'ENCLAVE-' + Math.floor(1000 + Math.random() * 9000);
-$('copybtn').onclick = async () => { try { await navigator.clipboard.writeText($('code').textContent); $('copyInfo').textContent = 'Copied'; } catch (e) { $('copyInfo').textContent = 'Failed: ' + e.name; } };
-$('pastebox').oninput = () => { $('pasteInfo').textContent = 'Got ' + $('pastebox').value.length + ' characters'; };
-$('f').onchange = async () => {
-  const file = $('f').files[0];
-  if (!file) return;
-  const b = new Uint8Array(await file.arrayBuffer());
-  const text = new TextDecoder('latin1').decode(b);
-  const gps = hasGps(b) || /:GPS(Latitude|Longitude)|©xyz/.test(text);
-  $('fileInfo').textContent = `Got ${file.name}, ${(file.size / 1024).toFixed(0)} KB, ${file.type || 'unknown type'}. Location in file: ${gps ? 'FOUND' : 'none'}`;
-  if (file.type.startsWith('image/')) $('img').src = URL.createObjectURL(file);
-};
+  $('code').textContent = 'ENCLAVE-' + Math.floor(1000 + Math.random() * 9000);
+  $('copybtn').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($('code').textContent);
+      $('copyInfo').textContent = 'Copied';
+    } catch (e) {
+      $('copyInfo').textContent = 'Failed: ' + e.name;
+    }
+  };
+  $('pastebox').oninput = () => {
+    $('pasteInfo').textContent = 'Got ' + $('pastebox').value.length + ' characters';
+  };
+  $('f').onchange = async () => {
+    const file = $('f').files[0];
+    if (!file) return;
+    const b = new Uint8Array(await file.arrayBuffer());
+    const text = new TextDecoder('latin1').decode(b);
+    const gps = hasGps(b) || /:GPS(Latitude|Longitude)|©xyz/.test(text);
+    $('fileInfo').textContent =
+      `Got ${file.name}, ${(file.size / 1024).toFixed(0)} KB, ${file.type || 'unknown type'}. Location in file: ${gps ? 'FOUND' : 'none'}`;
+    if (file.type.startsWith('image/')) $('img').src = URL.createObjectURL(file);
+  };
 </script>

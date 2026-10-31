@@ -1,25 +1,25 @@
 <!doctype html>
-<meta charset="utf-8">
+<meta charset="utf-8" />
 <title>file test</title>
-<body style="font:14px sans-serif">
-<input id="f" type="file" autofocus>
-<pre id="out">no file</pre>
-<script>
-const f = document.getElementById('f');
-f.focus();
-f.onchange = async () => {
-  const file = f.files[0];
-  const buf = new Uint8Array(await file.arrayBuffer());
-  let sum = 0;
-  for (const b of buf) sum = (sum * 31 + b) >>> 0;
-  const r = { name: file.name, size: file.size, type: file.type, sum };
-  document.getElementById('out').textContent = JSON.stringify(r);
-  document.title = 'file test done';
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(r)], { type: 'application/json' }));
-  a.download = 'file-test-result.json';
-  document.body.append(a);
-  a.click();
-};
-</script>
+<body style="font: 14px sans-serif">
+  <input id="f" type="file" autofocus />
+  <pre id="out">no file</pre>
+  <script>
+    const f = document.getElementById('f');
+    f.focus();
+    f.onchange = async () => {
+      const file = f.files[0];
+      const buf = new Uint8Array(await file.arrayBuffer());
+      let sum = 0;
+      for (const b of buf) sum = (sum * 31 + b) >>> 0;
+      const r = { name: file.name, size: file.size, type: file.type, sum };
+      document.getElementById('out').textContent = JSON.stringify(r);
+      document.title = 'file test done';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(r)], { type: 'application/json' }));
+      a.download = 'file-test-result.json';
+      document.body.append(a);
+      a.click();
+    };
+  </script>
 </body>

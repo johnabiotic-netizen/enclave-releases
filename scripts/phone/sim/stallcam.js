@@ -20,7 +20,8 @@
     draw();
     setInterval(draw, 1000 / 30);
     const stream = canvas.captureStream();
-    if (c.audio) for (const t of (await gum({ audio: c.audio })).getAudioTracks()) stream.addTrack(t);
+    if (c.audio)
+      for (const t of (await gum({ audio: c.audio })).getAudioTracks()) stream.addTrack(t);
     return stream;
   };
 })();
