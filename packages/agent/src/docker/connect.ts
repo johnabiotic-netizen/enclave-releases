@@ -65,14 +65,10 @@ async function startWslBridge(distro: string): Promise<WslBridge> {
   const children = new Set<ChildProcess>();
 
   const server = net.createServer((socket) => {
-    const child = spawn(
-      'wsl.exe',
-      ['-d', distro, '-u', 'root', '-e', 'sh', '-c', DIAL],
-      {
-        stdio: ['pipe', 'pipe', 'ignore'],
-        windowsHide: true,
-      },
-    );
+    const child = spawn('wsl.exe', ['-d', distro, '-u', 'root', '-e', 'sh', '-c', DIAL], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      windowsHide: true,
+    });
     children.add(child);
     socket.pipe(child.stdin!);
     child.stdout!.pipe(socket);
