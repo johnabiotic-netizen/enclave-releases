@@ -24,7 +24,8 @@ echo "Copying $(git rev-parse --short HEAD) to $host:$dir"
 git archive --format=tar HEAD \
   package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .dockerignore \
   packages/shared packages/relay packages/mobile deploy/relay |
-  "${ssh_[@]}" "install -d -m 0750 $dir && rm -rf $dir/packages $dir/deploy && tar -x -C $dir"
+  "${ssh_[@]}" "install -d -m 0750 $dir && rm -rf $dir/packages && find $dir/deploy -mindepth 2 -type f ! -name .env -delete 2>/dev/null; tar -x -C $dir"
+# The server's .env (its secrets) lives only there: the copy above never removes or replaces it.
 
 if [ -n "$domain" ]; then
   "${ssh_[@]}" "domain='$domain' bash -s" <<'EOF'
@@ -45,4 +46,4 @@ echo "Made .env for $domain at $ip. One-time invite code for the first account: 
 EOF
 fi
 
-"${ssh_[@]}" "cd $dir/deploy/relay && test -f .env && docker compose up -d --build --remove-orphans && docker image prune -f >/dev/null && docker compose ps"
+"${ssh_[@]}" "cd $dir/deploy/relay && { test -f .env || { echo 'No .env on the server: run once with the domain.' >&2; exit 1; }; } && docker compose up -d --build --remove-orphans && docker image prune -f >/dev/null && docker compose ps"
