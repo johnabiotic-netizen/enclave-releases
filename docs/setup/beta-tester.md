@@ -20,7 +20,7 @@ If Docker doesn't start, see `docs/setup/windows-setup.md` (it covers WSL and tu
 ## 2. Install Enclave
 1. Run **Enclave-Setup** (the file you were sent).
 2. Windows may show a blue box, **Windows protected your PC**. The beta isn't signed yet. Click **More info**, then **Run anyway**.
-3. Enclave opens on **Setup**. Each line should turn green. On **Browser ready**, click **Fix**, then **Download the browser**. It's about 2.5 GB, once; keep the PC on until it finishes.
+3. Enclave opens on **Setup**. Each line should turn green. On **Browser ready**, click **Fix**, then **Download the browser**. It's about 1.7 GB, once; keep the PC on until it finishes.
 4. When every line is green, click **Go to profiles**.
 
 ## 3. Make your first profile

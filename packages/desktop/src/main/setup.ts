@@ -174,7 +174,7 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
       ...(facts.image.includes('/')
         ? {
             fix: [
-              'The secure browser downloads once per PC, about 2.5 GB. Keep this PC on and connected until it finishes.',
+              'The secure browser downloads once per PC, about 1.7 GB. Keep this PC on and connected until it finishes.',
             ],
             action: 'download-image' as const,
           }
