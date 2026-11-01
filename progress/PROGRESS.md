@@ -121,7 +121,8 @@ Spec: `stages/stage-6-phone-linking.md`
 ## Stage 7: Launch  [~]
 Spec: `stages/stage-7-launch.md`. Owner (2026-11-01): a free beta among testers first, no payments yet (DECISIONS 2026-11-01).
 - [x] Browser source published (MPL): github.com/johnabiotic-netizen/enclave-browser-source.
-- [~] Browser image on ghcr.io/johnabiotic-netizen/enclave-browser (upload running), pinned by digest in the app; Setup downloads it with progress (built and typechecked; to verify on a PC without the image).
+- [x] Browser image built and published on GitHub (enclave-camoufox workflow Enclave image, run 41343173910, under 8 minutes; the upload from this PC crawled at 1 to 2 Mbit/s and was stopped): ghcr.io/johnabiotic-netizen/enclave-browser@sha256:3506fdef..., public. The app pins it; Setup downloads it with progress. Verified 2026-11-01: an anonymous download through the agent (1.4 GB, 39 layers, 16 min on this PC), then a profile started on it (browser and neko running). scripts/sync-image-ci.sh keeps enclave-image/ in step. The first test filled C: (WSL disk file); build leftovers removed and the WSL disk compacted with the owner (24 to 17 GB, C: back to 10.7 GB free).
+- [x] Windows app 0.3.0 (beta) installer built. Invite made for the first tester (psalmywise).
 - [x] Relay: single-use invites (deploy/relay/invite.sh), invite mode on, owner's shared code off; admin refused from the internet (404). Test: an invite makes one account, a second use is refused.
 - [x] Tester guide: docs/setup/beta-tester.md.
 - [ ] Fresh-PC test (Stage 5 test 1 and Stage 7 test 1): a tester's PC from nothing to a running profile.
