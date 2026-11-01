@@ -107,24 +107,25 @@ export const PAIRING_SECRET_BYTES = 16;
 
 /**
  * Proves to the PC that the phone key arriving through the relay is the one the phone that
- * scanned the QR code sent: only the QR code holds the secret.
+ * scanned the QR code sent: only the QR code holds the secret. It covers the hash of the PC key
+ * from the same QR code (`keyHash`), the only form of the PC key the phone has at that point.
  */
 export async function pairingProof(
   secret: string,
   phoneKey: string,
-  pcKey: string,
+  keyHash: string,
 ): Promise<string> {
-  const data = enc.encode(`enclave-pair-v1\n${phoneKey}\n${pcKey}`);
+  const data = enc.encode(`enclave-pair-v1\n${phoneKey}\n${keyHash}`);
   return toBase64Url(await hmac(fromBase64Url(secret), data));
 }
 
 export async function checkPairingProof(
   secret: string,
   phoneKey: string,
-  pcKey: string,
+  keyHash: string,
   proof: string,
 ): Promise<boolean> {
-  const want = fromBase64Url(await pairingProof(secret, phoneKey, pcKey));
+  const want = fromBase64Url(await pairingProof(secret, phoneKey, keyHash));
   let given: Uint8Array;
   try {
     given = fromBase64Url(proof);

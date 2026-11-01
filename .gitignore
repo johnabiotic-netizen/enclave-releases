@@ -16,3 +16,4 @@ out/
 __pycache__/
 release/
 e2e-results/
+packages/relay/data/

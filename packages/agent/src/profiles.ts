@@ -12,6 +12,7 @@ import {
   type CreateProfileRequest,
   type Fingerprint,
   type MediaInUse,
+  type PcTurn,
   type Profile,
   type ProfileStatus,
   type ProxyCheckResult,
@@ -133,6 +134,8 @@ export class ProfileService {
     private readonly runtime: DockerRuntime,
     /** Phone mode (ENCLAVE_PHONE=tailscale): relays streams to the tailnet. */
     private readonly phone?: Tailscale,
+    /** Phone mode (ENCLAVE_PHONE=relay): the relay's TURN server, while the PC is linked. */
+    private readonly relayTurn?: () => PcTurn | null,
   ) {}
 
   // ---------------------------------------------------------------- queries
@@ -155,6 +158,18 @@ export class ProfileService {
       );
     }
     return streamInfo(profile.status.streamPort, secrets.stream);
+  }
+
+  /** The stream server's port of a running profile (the relay tunnel reaches it there). */
+  async streamPort(id: string): Promise<number> {
+    const profile = await this.store.get(id);
+    if (profile.status.state !== 'running' || !profile.status.streamPort) {
+      throw new AgentError(
+        'PROFILE_NOT_RUNNING',
+        `"${profile.name}" isn't running. Start it first.`,
+      );
+    }
+    return profile.status.streamPort;
   }
 
   /** Stage 4: whether a page in the profile is using its camera or microphone now. */
@@ -741,6 +756,10 @@ export class ProfileService {
         // profile still starts for the PC; the phone link is simply missing.
         const tailnet = this.phone ? await this.phone.address() : null;
         if (this.phone && !tailnet) await this.store.log(id, 'phone-unavailable');
+        // Relay mode: the phone's stream may need the relay's TURN server. Without the link
+        // the profile still starts for the PC; a phone can use it after a restart.
+        const turn = this.relayTurn ? this.relayTurn() : null;
+        if (this.relayTurn && !turn) await this.store.log(id, 'phone-unavailable');
         const stream = {
           userPassword: randomPassword(),
           adminPassword: randomPassword(),
@@ -761,7 +780,7 @@ export class ProfileService {
             `NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD=${stream.adminPassword}`,
             `NEKO_WEBRTC_TCPMUX=${muxPort}`,
             `NEKO_WEBRTC_UDPMUX=${muxPort}`,
-            'NEKO_WEBRTC_ICELITE=true',
+            ...(turn ? relayStreamEnv(turn) : ['NEKO_WEBRTC_ICELITE=true']),
             // The address WebRTC tells viewers to reach the mux port at. One only: with two,
             // pion keeps the first ("overlapping address rewrite rule"). In phone mode that is
             // the PC's Tailscale IP, which tailscale serve relays and the PC reaches too.
@@ -817,7 +836,7 @@ export class ProfileService {
           webPort,
           muxPort,
           exitIp: raw.exitIp,
-          phone: Boolean(tailnet),
+          phone: tailnet ? 'tailscale' : turn ? 'relay' : false,
         });
         return { stream: streamInfo(webPort, stream) };
       } catch (e) {
@@ -1255,6 +1274,31 @@ function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>)
     password: stream.userPassword,
     expiresAt: stream.expiresAt,
   };
+}
+
+/**
+ * Relay mode (Stage 6): neko gathers candidates for the phone too (no ICE lite), with the
+ * relay's STUN and TURN server by IP (the container has no DNS). The egress lock opens UDP
+ * and that TURN server to neko's own group only (apply_egress_lock.sh): the browser still
+ * reaches nothing but its proxy. Viewers get no ICE servers from neko: the phone app brings
+ * its own from the relay, and the PC's viewer needs none.
+ */
+export function relayStreamEnv(turn: PcTurn): string[] {
+  const at = `${turn.ip}:${turn.port}`;
+  const servers = [
+    { urls: [`stun:${at}`] },
+    {
+      urls: [`turn:${at}?transport=udp`, `turn:${at}?transport=tcp`],
+      username: turn.username,
+      credential: turn.credential,
+    },
+  ];
+  return [
+    'NEKO_WEBRTC_ICELITE=false',
+    `NEKO_WEBRTC_ICESERVERS_BACKEND=${JSON.stringify(servers)}`,
+    'NEKO_WEBRTC_ICESERVERS_FRONTEND=[]',
+    `ENCLAVE_STREAM_TURN=${at}`,
+  ];
 }
 
 /** Where the phone app is served: the agent's port, relayed to the tailnet over HTTPS. */

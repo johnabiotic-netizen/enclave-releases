@@ -16,8 +16,11 @@ export interface AgentConfig {
   wslDistro: string | undefined;
   /** Part of the graphics card's name, on a PC with several (ENCLAVE_GPU). */
   gpu: string | undefined;
-  /** Phone access (Stage 2): `tailscale` relays streams and the phone app to the tailnet. */
-  phone: 'tailscale' | undefined;
+  /**
+   * Phone access: `tailscale` relays streams and the phone app to the tailnet (Stage 2);
+   * `relay` links the PC to the Enclave relay the phone reaches it through (Stage 6).
+   */
+  phone: 'tailscale' | 'relay' | undefined;
   /** The built phone app (packages/mobile/dist), served by the agent. */
   mobileDir: string;
   /** Real Windows Firefox measurements the audit compares with (testing/reference/). */
@@ -73,8 +76,8 @@ function idleMinutes(value: string): number {
   return n;
 }
 
-function phoneMode(value: string | undefined): 'tailscale' | undefined {
+function phoneMode(value: string | undefined): 'tailscale' | 'relay' | undefined {
   if (!value) return undefined;
-  if (value === 'tailscale') return 'tailscale';
-  throw new Error(`ENCLAVE_PHONE must be "tailscale" or empty, got "${value}".`);
+  if (value === 'tailscale' || value === 'relay') return value;
+  throw new Error(`ENCLAVE_PHONE must be "tailscale", "relay" or empty, got "${value}".`);
 }

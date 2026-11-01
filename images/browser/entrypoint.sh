@@ -25,7 +25,8 @@ chmod 0644 /run/enclave/openbox.xml
 
 # Fail closed: no lock, no browser. Needs the NET_ADMIN capability (docker run --cap-add).
 . /run/enclave/egress.env
-if ! /opt/enclave/apply_egress_lock.sh "$PROXY_IP" "$PROXY_PORT"; then
+# ENCLAVE_STREAM_TURN (relay phone mode): the TURN server neko may reach, as IPv4:port.
+if ! /opt/enclave/apply_egress_lock.sh "$PROXY_IP" "$PROXY_PORT" "${ENCLAVE_STREAM_TURN:-}"; then
   echo "enclave: cannot apply the network lock, so the browser will not start. The container needs --cap-add NET_ADMIN." >&2
   exit 1
 fi

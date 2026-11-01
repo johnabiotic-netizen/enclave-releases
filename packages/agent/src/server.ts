@@ -12,11 +12,13 @@ import {
   type CreateProfileRequest,
   type HealthResponse,
   MAX_PHONE_FILE_BYTES,
+  type RelaySignInRequest,
   type UpdateProfileRequest,
 } from '@enclave/shared';
 import { AgentError, InputError } from './errors.js';
 import type { ProfileService, ProxyTestRequest } from './profiles.js';
 import type { DockerRuntime } from './docker/runtime.js';
+import type { RelayLink } from './relay/link.js';
 
 export const AGENT_VERSION = '0.1.0';
 const LOOPBACK = '127.0.0.1';
@@ -35,6 +37,7 @@ export function buildServer(
   service: ProfileService,
   runtime: DockerRuntime,
   mobileDir?: string,
+  relay?: RelayLink,
 ): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
   const expected = Buffer.from(`Bearer ${token}`);
@@ -158,6 +161,22 @@ export function buildServer(
       v1.get<{ Params: { jobId: string } }>('/proxy-tests/:jobId', async (req) =>
         service.proxyTestJob(req.params.jobId),
       );
+      // Stage 6: phone linking through the relay.
+      if (relay) {
+        v1.get('/relay', async () => relay.status());
+        v1.post<{ Body: RelaySignInRequest }>('/relay/sign-in', async (req) =>
+          relay.signIn(req.body ?? ({} as RelaySignInRequest)),
+        );
+        v1.post('/relay/sign-out', async () => {
+          await relay.signOut();
+          return { ok: true };
+        });
+        v1.post('/relay/pairing', async () => relay.pairing());
+        v1.delete<{ Params: { id: string } }>('/relay/devices/:id', async (req) => {
+          await relay.revoke(req.params.id);
+          return { ok: true };
+        });
+      }
       v1.get<{ Params: { id: string }; Querystring: { tail?: string } }>(
         '/profiles/:id/logs',
         async (req) => {

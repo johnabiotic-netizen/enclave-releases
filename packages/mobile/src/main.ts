@@ -1,9 +1,13 @@
-// Enclave on the phone (Stage 2): lists the PC's profiles through the agent API and opens a
-// running one full screen. The browser keeps running on the PC; this is only a screen onto it.
-// Served by the agent over Tailscale (docs/setup/tailscale.md); paired once with `enclave phone`.
+// Enclave on the phone: lists the PC's profiles through the agent API and opens a running one
+// full screen. The browser keeps running on the PC; this is only a screen onto it.
+//
+// Two ways in. Through the Enclave relay (Stage 6): the relay serves this app, the phone is
+// paired by scanning a QR code in the Windows app, and everything goes through an end-to-end
+// encrypted tunnel to the PC (relay.ts). Or over Tailscale (Stage 2, docs/setup/tailscale.md):
+// the agent serves it, paired once with `enclave phone`.
 
 import { NekoClient, Overlay } from '@m1k1o/neko';
-import { MAX_PHONE_FILE_BYTES } from '@enclave/shared';
+import { MAX_PHONE_FILE_BYTES, parsePairingFragment, RELAY_API_PATH } from '@enclave/shared';
 import type {
   ApiError,
   MediaInUse,
@@ -11,6 +15,16 @@ import type {
   StartProfileResponse,
   StreamInfo,
 } from '@enclave/shared';
+import {
+  forgetIdentity,
+  loadIdentity,
+  pair as pairWithPc,
+  phoneName,
+  RelayLink,
+  routeThroughTunnel,
+  TUNNEL_ORIGIN,
+  type Identity,
+} from './relay.js';
 
 const TOKEN_KEY = 'enclave.agentToken';
 const home = document.getElementById('home')!;
@@ -20,13 +34,69 @@ const statusLine = document.getElementById('status')!;
 
 // ------------------------------------------------------------------ pairing and the agent API
 
-// `enclave phone` shows a QR code for <app>#pair=<token>. Keep the token, drop it from the URL.
-const pair = /^#pair=([\w-]+)$/.exec(location.hash);
-if (pair) {
-  localStorage.setItem(TOKEN_KEY, pair[1]!);
-  history.replaceState(null, '', location.pathname);
+/** Served by the Enclave relay (Stage 6), rather than by the agent over Tailscale. */
+const viaRelay = await fetch(`${RELAY_API_PATH}/info`)
+  .then(async (r) => r.ok && ((await r.json()) as { name?: string }).name === 'enclave-relay')
+  .catch(() => false);
+
+/** Relay mode: the link to the paired PC (null while this phone isn't paired). */
+let link: RelayLink | null = null;
+/** Relay mode: what the home screen says while there is no link. */
+let pairing: { busy: boolean; message: string | null } = { busy: false, message: null };
+
+if (viaRelay) {
+  routeThroughTunnel(() => link);
+  // The Windows app's QR code opens <relay>/#pair=<code>.<secret>.<key hash>.
+  const fromQr = parsePairingFragment(location.hash);
+  if (fromQr) history.replaceState(null, '', location.pathname);
+  const saved = await loadIdentity().catch(() => undefined);
+  if (fromQr) void pairPhone(fromQr);
+  else if (saved) useIdentity(saved);
+} else {
+  // `enclave phone` shows a QR code for <app>#pair=<token>. Keep the token, drop it from the URL.
+  const pair = /^#pair=([\w-]+)$/.exec(location.hash);
+  if (pair) {
+    localStorage.setItem(TOKEN_KEY, pair[1]!);
+    history.replaceState(null, '', location.pathname);
+  }
 }
 const token = () => localStorage.getItem(TOKEN_KEY);
+
+function useIdentity(identity: Identity): void {
+  link?.stop();
+  const l = new RelayLink(identity);
+  link = l;
+  l.onState = (state) => {
+    if (link !== l) return;
+    if (state.kind === 'revoked') {
+      l.stop();
+      link = null;
+      void forgetIdentity().catch(() => {});
+      pairing = {
+        busy: false,
+        message: 'This phone was unpaired on the PC. To use it again, pair it from the PC.',
+      };
+      closeViewer();
+    }
+    void refresh();
+  };
+  l.start();
+}
+
+async function pairPhone(qr: NonNullable<ReturnType<typeof parsePairingFragment>>) {
+  pairing = { busy: true, message: null };
+  void refresh();
+  try {
+    useIdentity(await pairWithPc(qr, phoneName()));
+    pairing = { busy: false, message: null };
+  } catch (e) {
+    pairing = { busy: false, message: e instanceof Error ? e.message : String(e) };
+    // An earlier pairing still works.
+    const saved = await loadIdentity().catch(() => undefined);
+    if (saved && !link) useIdentity(saved);
+  }
+  void refresh();
+}
 
 class AgentError extends Error {
   constructor(
@@ -38,6 +108,17 @@ class AgentError extends Error {
 }
 
 async function api<T>(method: string, path: string): Promise<T> {
+  if (viaRelay) {
+    if (!link) throw new AgentError('This phone is not paired with a PC.', 401);
+    const res = await link.request(method, `/v1${path}`);
+    const text = new TextDecoder().decode(res.body);
+    const body = JSON.parse(text || '{}') as T & Partial<ApiError>;
+    if (res.status >= 400) {
+      const message = body.error?.message ?? `The PC answered HTTP ${res.status}.`;
+      throw new AgentError(message, res.status);
+    }
+    return body;
+  }
   const res = await fetch(`/v1${path}`, {
     method,
     headers: { Authorization: `Bearer ${token()}` },
@@ -71,18 +152,44 @@ function showUnpaired(message?: string): void {
     el(
       'p',
       { className: 'note' },
-      'On the PC, run "enclave phone" and scan the QR code it shows with this phone.',
+      viaRelay
+        ? 'On the PC, open Enclave, go to Settings, choose Pair a phone, and scan the QR code with this phone.'
+        : 'On the PC, run "enclave phone" and scan the QR code it shows with this phone.',
     ),
+  );
+}
+
+function showMessage(text: string, note?: string): void {
+  home.replaceChildren(
+    el('h1', {}, 'Enclave'),
+    el('p', {}, text),
+    ...(note ? [el('p', { className: 'note' }, note)] : []),
   );
 }
 
 async function refresh(): Promise<void> {
   if (viewer.classList.contains('open')) return;
-  if (!token()) return showUnpaired();
+  if (viaRelay) {
+    if (pairing.busy) return showMessage('Pairing this phone with your PC.');
+    if (!link) return showUnpaired(pairing.message ?? undefined);
+    if (link.state.kind !== 'ready') {
+      const pc = link.identity.pc.name;
+      return link.state.kind === 'connecting'
+        ? showMessage(`Connecting to ${pc}.`)
+        : showMessage(link.describe());
+    }
+  } else if (!token()) return showUnpaired();
   let profiles: Profile[];
   try {
     profiles = await api<Profile[]>('GET', '/profiles');
   } catch (e) {
+    if (viaRelay) {
+      return showMessage(
+        link?.state.kind === 'ready'
+          ? String(e instanceof Error ? e.message : e)
+          : (link?.describe() ?? ''),
+      );
+    }
     if (e instanceof AgentError && e.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       return showUnpaired('The PC no longer accepts this phone. Pair it again.');
@@ -98,8 +205,12 @@ async function refresh(): Promise<void> {
     return;
   }
   const cards = profiles.map((p) => profileCard(p));
+  // A failed new pairing, while an earlier one still works: say so once, above the list.
+  const notice = pairing.message;
+  pairing.message = null;
   home.replaceChildren(
     el('h1', {}, 'Profiles'),
+    ...(notice ? [el('div', { className: 'error' }, notice)] : []),
     ...(cards.length
       ? cards
       : [el('p', { className: 'note' }, 'No profiles yet. Create one on the PC.')]),
@@ -205,8 +316,10 @@ let overlay: Overlay | null = null;
 const detach: (() => void)[] = [];
 
 async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
-  if (!stream.phoneUrl) {
-    throw new Error('Phone access is off on the PC. Start the agent with ENCLAVE_PHONE=tailscale.');
+  // Through the relay, the stream server is reached through the tunnel (relay.ts).
+  const streamUrl = viaRelay ? `${TUNNEL_ORIGIN}/neko/${p.id}` : stream.phoneUrl;
+  if (!streamUrl) {
+    throw new Error('Phone access is off on the PC. Turn it on in Enclave, under Settings.');
   }
   closeViewer();
   const c = new NekoClient({ inputMode: 'touch', autoplay: true });
@@ -223,7 +336,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
       setTimeout(() => (off(), done()), 500);
     });
   };
-  c.setUrl(stream.phoneUrl);
+  c.setUrl(streamUrl);
   await c.login('phone', stream.password);
 
   viewer.classList.add('open');
@@ -881,13 +994,27 @@ fileInput.onchange = async () => {
   showAsk();
   setStatus(`Sending ${file.name}`);
   try {
-    const res = await fetch(`/v1/profiles/${p.id}/files?name=${encodeURIComponent(file.name)}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' },
-      body: file,
-    });
-    const body = (await res.json().catch(() => ({}))) as Partial<ApiError>;
-    if (!res.ok) throw new Error(body.error?.message ?? `The PC answered HTTP ${res.status}.`);
+    const path = `/v1/profiles/${p.id}/files?name=${encodeURIComponent(file.name)}`;
+    let status: number;
+    let body: Partial<ApiError>;
+    if (viaRelay) {
+      if (!link) throw new Error('This phone is not paired with a PC.');
+      const res = await link.request('POST', path, {
+        body: file,
+        contentType: 'application/octet-stream',
+      });
+      status = res.status;
+      body = JSON.parse(new TextDecoder().decode(res.body) || '{}') as Partial<ApiError>;
+    } else {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/octet-stream' },
+        body: file,
+      });
+      status = res.status;
+      body = (await res.json().catch(() => ({}))) as Partial<ApiError>;
+    }
+    if (status >= 400) throw new Error(body.error?.message ?? `The PC answered HTTP ${status}.`);
     setStatus('');
   } catch (e) {
     setStatus(e instanceof Error ? e.message : String(e));
@@ -908,6 +1035,7 @@ document.getElementById('close')!.onclick = () => {
 // while the screen was off, start again when the app comes back. The PC session is untouched.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  link?.wake();
   if (client && client.state.connection.status === 'disconnected') client.connect();
   if (!client) void refresh();
 });
@@ -915,5 +1043,6 @@ document.addEventListener('visibilitychange', () => {
 // ------------------------------------------------------------------ start
 
 if ('serviceWorker' in navigator) void navigator.serviceWorker.register('sw.js');
+window.addEventListener('online', () => link?.wake());
 void refresh();
 window.setInterval(() => void refresh(), 10_000);

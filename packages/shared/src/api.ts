@@ -20,6 +20,8 @@ export const ERROR_CODES = [
   'REAL_IP_LEAK_SUSPECTED',
   'FILE_PICKER_CLOSED',
   'SECRETS_LOCKED',
+  'RELAY_UNREACHABLE',
+  'RELAY_REFUSED',
   'INTERNAL',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -156,3 +158,48 @@ export interface CheckNewProxyRequest {
   useTestProxy?: boolean;
 }
 export type CheckNewProxyResponse = ProxyCheckResult;
+
+// ------------------------------------------------------------------ phone linking (Stage 6)
+
+/** A phone paired with this PC through the relay. */
+export interface PairedPhone {
+  id: string;
+  name: string;
+  pairedAt: string;
+  /** When the relay last saw it (null: never, or the relay could not be asked). */
+  lastSeenAt: string | null;
+}
+
+// GET /relay
+export interface RelayStatus {
+  signedIn: boolean;
+  /** The relay's address, e.g. https://relay.example.com. */
+  url?: string;
+  email?: string;
+  pcName?: string;
+  /** The PC's link to the relay is up (phones can reach it). */
+  connected: boolean;
+  /** Why it isn't, in words for the user. */
+  problem?: string;
+  devices: PairedPhone[];
+}
+
+// POST /relay/sign-in: sign in (or make the account first) and register this PC.
+export interface RelaySignInRequest {
+  url: string;
+  email: string;
+  password: string;
+  /** This PC's name as the phone shows it. */
+  pcName: string;
+  createAccount?: boolean;
+  inviteCode?: string;
+}
+
+// POST /relay/pairing: a QR code for pairing a phone.
+export interface RelayPairingResponse {
+  /** What the QR code holds: the relay's address with a one-time code and secret. */
+  link: string;
+  expiresAt: string;
+}
+
+// DELETE /relay/devices/:id: unpair a phone. POST /relay/sign-out: forget the relay.

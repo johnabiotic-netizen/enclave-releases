@@ -7,8 +7,8 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "build": "tsc -b packages/shared packages/agent && node packages/mobile/build.mjs && node packages/desktop/build.mjs",
-    "typecheck": "tsc -b packages/shared packages/agent && tsc -p packages/mobile && tsc -p packages/desktop && tsc -p packages/desktop/tsconfig.main.json",
+    "build": "tsc -b packages/shared packages/agent packages/relay && node packages/mobile/build.mjs && node packages/desktop/build.mjs",
+    "typecheck": "tsc -b packages/shared packages/agent packages/relay && tsc -p packages/mobile && tsc -p packages/desktop && tsc -p packages/desktop/tsconfig.main.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

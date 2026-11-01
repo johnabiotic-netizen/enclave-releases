@@ -7,7 +7,8 @@ import { connectDocker, type DockerConnection } from './docker/connect.js';
 import { DockerRuntime } from './docker/runtime.js';
 import { phoneAppOrigin, ProfileService } from './profiles.js';
 import { Tailscale } from './tailscale.js';
-import { buildServer, listen } from './server.js';
+import { RelayLink } from './relay/link.js';
+import { AGENT_VERSION, buildServer, listen } from './server.js';
 import { ProfileStore, type SecretSealer } from './store.js';
 
 export interface RunningAgent {
@@ -16,6 +17,8 @@ export interface RunningAgent {
   dockerMode: string;
   /** Phone mode: where the phone app is, or undefined when phone mode is off or Tailscale is down. */
   phoneApp: string | undefined;
+  /** Phone linking through the relay (Stage 6); connected only in relay phone mode. */
+  relay: RelayLink;
   close(): Promise<void>;
 }
 
@@ -42,10 +45,41 @@ export async function startAgent(
   const phone = config.phone === 'tailscale' ? new Tailscale() : undefined;
   const store = new ProfileStore(config.home, options.sealer);
   await store.sealAll();
-  const service = new ProfileService(config, store, runtime, phone);
+  // The relay link answers phones with the agent's own API, so it is made before the server
+  // and reaches it once it exists.
+  const server: { app?: FastifyInstance } = {};
+  const relay: RelayLink = new RelayLink(
+    config.home,
+    {
+      inject: async (req) => {
+        const res = await server.app!.inject({
+          method: req.method as 'GET',
+          url: req.url,
+          headers: {
+            authorization: `Bearer ${config.token}`,
+            ...(req.contentType ? { 'content-type': req.contentType } : {}),
+          },
+          ...(req.body ? { payload: req.body } : {}),
+        });
+        return {
+          status: res.statusCode,
+          contentType: String(res.headers['content-type'] ?? 'application/json'),
+          body: res.rawPayload,
+        };
+      },
+      streamPort: (id: string): Promise<number> => service.streamPort(id),
+    },
+    AGENT_VERSION,
+    options.sealer,
+  );
+  const service: ProfileService = new ProfileService(config, store, runtime, phone, () =>
+    relay.turn(),
+  );
   await service.startMonitor();
-  const app = buildServer(config.token, service, runtime, config.mobileDir);
+  const app = buildServer(config.token, service, runtime, config.mobileDir, relay);
+  server.app = app;
   await listen(app, config.port);
+  await relay.start(config.phone === 'relay');
 
   // Phone mode: the agent itself (API and phone app) is relayed to the tailnet over HTTPS.
   let phoneApp: string | undefined;
@@ -60,7 +94,9 @@ export async function startAgent(
     app,
     dockerMode: connection.mode,
     phoneApp,
+    relay,
     close: async () => {
+      relay.stop();
       if (phone && phoneApp) await phone.stopHttps(config.port);
       service.stopMonitor();
       await app.close();

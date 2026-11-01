@@ -74,7 +74,11 @@ async function main(): Promise<void> {
     const agent = await startAgent(config);
     console.log(`Agent running on http://127.0.0.1:${config.port} (Docker: ${agent.dockerMode}).`);
     console.log(`Profiles are stored in ${config.home}. Press Ctrl+C to stop the agent.`);
-    if (config.phone && agent.phoneApp) {
+    if (config.phone === 'relay') {
+      console.log(
+        'Phone access is through the Enclave relay. Sign in and pair phones in the Windows app (Settings).',
+      );
+    } else if (config.phone && agent.phoneApp) {
       console.log(`Phone access is on: ${agent.phoneApp} (pair a phone with: enclave phone).`);
     } else if (config.phone) {
       console.log(
@@ -249,6 +253,11 @@ async function showPairingCode(
   if (!phone) {
     throw new UsageError(
       'Phone access is off. Add ENCLAVE_PHONE=tailscale to .env and restart the agent.',
+    );
+  }
+  if (phone === 'relay') {
+    throw new UsageError(
+      'Phones pair through the Enclave relay: in the Windows app, open Settings and choose Pair a phone.',
     );
   }
   const tailnet = await new Tailscale().address();

@@ -197,7 +197,16 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*; \
     command -v capsh
 
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py camfeed.py /opt/enclave/
+# Stage 6: neko runs with its own primary group, "stream", so the egress lock can let it (and
+# only it, not the browser) send the phone stream when the PC is linked through the relay.
+RUN set -eux; \
+    groupadd --system stream; \
+    f=/etc/neko/supervisord.conf; \
+    sed -i '/^\[program:neko\]/,/^$/ { s|^command=/usr/bin/neko |command=/opt/enclave/run-neko.sh |; s|^user=.*|user=root| }' "$f"; \
+    sed -n '/^\[program:neko\]/,/^$/p' "$f" | grep -qx 'command=/opt/enclave/run-neko.sh serve --server.static "/var/www"'; \
+    sed -n '/^\[program:neko\]/,/^$/p' "$f" | grep -qx 'user=root'
+
+COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py camfeed.py run-neko.sh /opt/enclave/
 # Check pages for audit runs (audit.py, testing/test-suite.md).
 COPY audit/ /opt/enclave/audit/
 # Windows line endings break the shebang ("required file not found"): refuse them.
