@@ -22,6 +22,7 @@ import {
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
 import { SettingsFile, type AppSettings, type PhoneMode } from './settings.js';
+import { BROWSER_IMAGE } from './image.js';
 import { findWslDocker, runSetupChecks } from './setup.js';
 import type {
   AgentReply,
@@ -49,6 +50,8 @@ if (!app.isPackaged && existsSync(repoEnv)) process.loadEnvFile(repoEnv);
 if (app.isPackaged) {
   process.env.ENCLAVE_MOBILE_DIR = path.join(process.resourcesPath, 'mobile');
   process.env.ENCLAVE_REFERENCE_DIR = path.join(process.resourcesPath, 'reference');
+  // The published browser image, pinned (image.ts); Setup downloads it if it's missing.
+  process.env.ENCLAVE_IMAGE ??= BROWSER_IMAGE;
 }
 
 let agent: RunningAgent | null = null;
