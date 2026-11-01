@@ -139,18 +139,39 @@ async function engineProblem(): Promise<string> {
 }
 
 /**
+ * Runs as administrator. `wsl --install --no-distribution` turns on what WSL needs; Windows 10
+ * builds whose own wsl.exe predates that option get the two Windows features turned on
+ * directly. Then WSL itself is updated to the current release (from GitHub, not the Store).
+ */
+const TURN_ON_WSL = `
+$ErrorActionPreference = 'Continue'
+Write-Host 'Turning on WSL for Enclave. This window closes by itself.'
+wsl.exe --install --no-distribution --web-download
+if ($LASTEXITCODE -ne 0) {
+  dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+  dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+}
+wsl.exe --update --web-download
+Start-Sleep -Seconds 3
+`;
+
+/** PowerShell's -EncodedCommand: UTF-16LE, base64. No quoting to get wrong. */
+function encoded(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64');
+}
+
+/**
  * Turns WSL on: Windows asks for administrator permission, then installs it. A restart
  * finishes it. Resolves when the installer has closed.
  */
 export async function turnOnWsl(): Promise<void> {
-  const inner = 'wsl.exe --install --no-distribution --web-download; Start-Sleep -Seconds 3';
   const r = await run(
     'powershell.exe',
     [
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-Command','${inner}'`,
+      `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '-NoProfile','-EncodedCommand','${encoded(TURN_ON_WSL)}'`,
     ],
     30 * 60_000,
   );
