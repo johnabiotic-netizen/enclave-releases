@@ -242,3 +242,24 @@ describe('relay', () => {
     expect(JSON.stringify(saved)).not.toContain(pcAuth.split('.')[1]);
   });
 });
+
+describe('single-use invites', () => {
+  it('make one account each, and only from the relay itself', async () => {
+    const made = await call('POST', '/r/v1/admin/invites', { note: 'tester one' });
+    expect(made.status).toBe(201);
+    const code = made.body.code as string;
+    const first = { email: 'tester1@example.com', password: 'a long password', inviteCode: code };
+    expect((await call('POST', '/r/v1/accounts', first)).status).toBe(201);
+    const second = { email: 'tester2@example.com', password: 'a long password', inviteCode: code };
+    const again = await call('POST', '/r/v1/accounts', second);
+    expect(again.status).toBe(403);
+    expect(again.body).toMatchObject({ error: { code: 'INVITE_REQUIRED' } });
+    const list = (await call('GET', '/r/v1/admin/invites')).body as unknown as Record<
+      string,
+      unknown
+    >[];
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ note: 'tester one', usedBy: 'tester1@example.com' });
+    expect(JSON.stringify(list)).not.toContain(code);
+  });
+});

@@ -191,6 +191,22 @@ export class DockerRuntime {
     await this.docker.getContainer(name).putArchive(tar, { path: '/' });
   }
 
+  /**
+   * Downloads the browser image (a registry reference, pinned by digest). `onProgress` gets
+   * each of Docker's progress events.
+   */
+  async pullImage(onProgress: (event: PullEvent) => void): Promise<void> {
+    const stream = (await this.docker.pull(this.image)) as NodeJS.ReadableStream;
+    await new Promise<void>((resolve, reject) => {
+      this.docker.modem.followProgress(
+        stream,
+        (err: Error | null) => (err ? reject(err) : resolve()),
+        (event: PullEvent) => onProgress(event),
+      );
+    });
+    if (!(await this.imageExists())) throw new Error('The download finished without the image.');
+  }
+
   /** One regular file from a container (docker cp), refused when larger than `maxBytes`. */
   async getFile(name: string, path: string, maxBytes: number): Promise<Buffer> {
     const stream = (await this.docker
@@ -262,4 +278,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       },
     );
   });
+}
+
+/** One line of Docker's pull progress. */
+export interface PullEvent {
+  id?: string;
+  status?: string;
+  progressDetail?: { current?: number; total?: number };
+  error?: string;
 }

@@ -7,6 +7,7 @@ import { connectDocker, type DockerConnection } from './docker/connect.js';
 import { DockerRuntime } from './docker/runtime.js';
 import { phoneAppOrigin, ProfileService } from './profiles.js';
 import { Tailscale } from './tailscale.js';
+import { ImageDownloader } from './image-download.js';
 import { RelayLink } from './relay/link.js';
 import { AGENT_VERSION, buildServer, listen } from './server.js';
 import { ProfileStore, type SecretSealer } from './store.js';
@@ -76,7 +77,14 @@ export async function startAgent(
     relay.turn(),
   );
   await service.startMonitor();
-  const app = buildServer(config.token, service, runtime, config.mobileDir, relay);
+  const app = buildServer(
+    config.token,
+    service,
+    runtime,
+    config.mobileDir,
+    relay,
+    new ImageDownloader(runtime),
+  );
   server.app = app;
   await listen(app, config.port);
   await relay.start(config.phone === 'relay');

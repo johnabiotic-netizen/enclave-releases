@@ -127,12 +127,6 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
               "This relay isn't taking new accounts. If you already have one, untick Make a new account with this email and sign in.",
             );
           }
-          if (
-            config.signup === 'invite' &&
-            !sameText(req.body.inviteCode ?? '', config.inviteCode!)
-          ) {
-            throw new HttpError(403, 'INVITE_REQUIRED', 'The invite code is not right.');
-          }
           const email = req.body.email.trim().toLowerCase();
           if (store.accountByEmail(email)) {
             throw new HttpError(
@@ -140,6 +134,20 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
               'ACCOUNT_EXISTS',
               'There is already an account with this email. Untick Make a new account with this email and sign in.',
             );
+          }
+          if (config.signup === 'invite') {
+            const code = (req.body.inviteCode ?? '').trim();
+            // The relay's own code (RELAY_INVITE_CODE), or a single-use one (used up here).
+            const ok =
+              (config.inviteCode !== undefined && sameText(code, config.inviteCode)) ||
+              (code !== '' && (await store.useInvite(code, email)));
+            if (!ok) {
+              throw new HttpError(
+                403,
+                'INVITE_REQUIRED',
+                'The invite code is not right, or it was already used.',
+              );
+            }
           }
           await store.addAccount(email, req.body.password);
           return reply.code(201).send({ ok: true });
@@ -222,6 +230,32 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
           };
         },
       );
+
+      // Invites, for the relay's owner only: from inside the relay's own container
+      // (node /app/relay.mjs invite <note>), never through Caddy.
+      const ownerOnly = (req: FastifyRequest) => {
+        const from = req.socket.remoteAddress ?? '';
+        if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(from)) {
+          throw new HttpError(404, 'NOT_FOUND', 'Not found.');
+        }
+      };
+      r.post<{ Body: { note?: string } }>('/admin/invites', async (req, reply) => {
+        ownerOnly(req);
+        const note = String(req.body?.note ?? '').slice(0, 100);
+        const { code, invite } = await store.addInvite(note);
+        reply.code(201);
+        return { code, id: invite.id, note: invite.note };
+      });
+      r.get('/admin/invites', async (req) => {
+        ownerOnly(req);
+        return store.invites().map((i) => ({
+          id: i.id,
+          note: i.note,
+          createdAt: i.createdAt,
+          usedAt: i.usedAt,
+          usedBy: i.usedBy,
+        }));
+      });
 
       r.get('/devices', async (req): Promise<RelayDevice[]> => {
         const pc = pcAuth(req);

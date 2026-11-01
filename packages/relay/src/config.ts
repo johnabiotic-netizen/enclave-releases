@@ -37,8 +37,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
     throw new Error(`RELAY_SIGNUP must be open, invite or closed, got "${signup}".`);
   }
   const inviteCode = env.RELAY_INVITE_CODE || undefined;
-  if (signup === 'invite' && (!inviteCode || inviteCode.length < 12)) {
-    throw new Error('RELAY_SIGNUP=invite needs RELAY_INVITE_CODE, at least 12 characters.');
+  // With RELAY_SIGNUP=invite, accounts need RELAY_INVITE_CODE (if set) or a single-use
+  // invite (node relay.mjs invite <note>).
+  if (inviteCode && inviteCode.length < 12) {
+    throw new Error('RELAY_INVITE_CODE must be at least 12 characters.');
   }
   const secret = env.TURN_SECRET;
   if (secret && secret.length < 32) throw new Error('TURN_SECRET must be at least 32 characters.');

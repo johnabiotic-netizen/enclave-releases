@@ -162,6 +162,18 @@ export interface SystemResponse {
   profileMemory: { id: string; bytes: number | null }[];
 }
 
+// GET /system/image: the browser image download (POST /system/image starts it).
+export interface ImageDownload {
+  state: 'idle' | 'downloading' | 'done' | 'failed';
+  /** Bytes downloaded and in all, over the layers Docker has announced so far. */
+  downloadedBytes: number;
+  totalBytes: number;
+  /** Layers unpacked, of all. */
+  layersDone: number;
+  layers: number;
+  error?: string;
+}
+
 // POST /proxy-check: the safety check for a proxy not saved in a profile yet.
 export interface CheckNewProxyRequest {
   /** Required unless `useTestProxy` is true. */

@@ -21,6 +21,7 @@ import { AgentError, InputError } from './errors.js';
 import type { ProfileService, ProxyTestRequest } from './profiles.js';
 import type { DockerRuntime } from './docker/runtime.js';
 import type { RelayLink } from './relay/link.js';
+import type { ImageDownloader } from './image-download.js';
 
 export const AGENT_VERSION = '0.1.0';
 const LOOPBACK = '127.0.0.1';
@@ -40,6 +41,7 @@ export function buildServer(
   runtime: DockerRuntime,
   mobileDir?: string,
   relay?: RelayLink,
+  images?: ImageDownloader,
 ): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
   const expected = Buffer.from(`Bearer ${token}`);
@@ -83,6 +85,14 @@ export function buildServer(
         dockerOk: await runtime.ping(),
       }));
       v1.get('/system', async () => service.system());
+      // Stage 7: the browser image's one-time download, for the setup screen.
+      if (images) {
+        v1.get('/system/image', async () => images.get());
+        v1.post('/system/image', async (_req, reply) => {
+          reply.code(202);
+          return images.start();
+        });
+      }
 
       v1.get('/profiles', async () => service.list());
       v1.post<{ Body: CreateProfileRequest }>('/profiles', async (req, reply) => {

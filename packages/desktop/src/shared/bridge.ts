@@ -37,6 +37,8 @@ export interface SetupCheck {
   detail: string;
   /** The exact steps to fix it, in order. */
   fix: string[];
+  /** The fix is a button in the app instead: download the browser image. */
+  action?: 'download-image';
 }
 
 export interface EnclaveBridge {

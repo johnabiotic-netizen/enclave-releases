@@ -170,10 +170,20 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
         : facts.dockerOk
           ? 'The secure browser is not set up on this PC yet.'
           : 'Checked once Docker is running.',
-      fix: [
-        'The secure browser is set up once per PC and takes about 5 to 10 minutes.',
-        'On this build it is set up from the Enclave source folder: in PowerShell, run .\\scripts\\build-image.ps1, then click Recheck.',
-      ],
+      // A published image (a registry reference) downloads from the app; a local one is built.
+      ...(facts.image.includes('/')
+        ? {
+            fix: [
+              'The secure browser downloads once per PC, about 2.5 GB. Keep this PC on and connected until it finishes.',
+            ],
+            action: 'download-image' as const,
+          }
+        : {
+            fix: [
+              'The secure browser is set up once per PC and takes about 5 to 10 minutes.',
+              'On this build it is set up from the Enclave source folder: in PowerShell, run .\\scripts\\build-image.ps1, then click Recheck.',
+            ],
+          }),
     },
   ];
   return checks;

@@ -36,11 +36,24 @@ export interface Device {
   lastSeenAt: string | null;
 }
 
+/** A single-use invite code for making one account (beta testers). Only its hash is kept. */
+export interface Invite {
+  id: string;
+  codeHash: string;
+  /** Who it is for, as the owner wrote it. */
+  note: string;
+  createdAt: string;
+  usedAt: string | null;
+  /** The account it made. */
+  usedBy: string | null;
+}
+
 interface Data {
   version: 1;
   accounts: Account[];
   pcs: Pc[];
   devices: Device[];
+  invites?: Invite[];
 }
 
 // OWASP's argon2id minimum: 19 MiB, 2 passes, 1 lane.
@@ -137,6 +150,36 @@ export class RelayStore {
     this.data.accounts.push(account);
     await this.save();
     return account;
+  }
+
+  /** A new invite; the code is shown once and only its hash is kept. */
+  async addInvite(note: string): Promise<{ code: string; invite: Invite }> {
+    const code = randomBytes(9).toString('base64url');
+    const invite: Invite = {
+      id: newId('inv'),
+      codeHash: hashSecret(code),
+      note,
+      createdAt: new Date().toISOString(),
+      usedAt: null,
+      usedBy: null,
+    };
+    (this.data.invites ??= []).push(invite);
+    await this.save();
+    return { code, invite };
+  }
+
+  invites(): Invite[] {
+    return this.data.invites ?? [];
+  }
+
+  /** Uses up an unused invite with this code for `email`; false if there is none. */
+  async useInvite(code: string, email: string): Promise<boolean> {
+    const invite = this.invites().find((i) => !i.usedAt && secretMatches(code, i.codeHash));
+    if (!invite) return false;
+    invite.usedAt = new Date().toISOString();
+    invite.usedBy = email;
+    await this.save();
+    return true;
   }
 
   pc(id: string): Pc | undefined {
