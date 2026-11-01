@@ -2,7 +2,8 @@
 // seam, and a detail panel for the selected one.
 
 import { useEffect, useRef, useState } from 'react';
-import type { Profile } from '@enclave/shared';
+import type { DownloadedFile, Profile } from '@enclave/shared';
+import { api } from './api';
 import { Flag } from './Flag';
 import {
   country,
@@ -318,6 +319,7 @@ function Details(props: {
         <dt>Profile id</dt>
         <dd className="mono small">{p.id}</dd>
       </dl>
+      {state === 'running' && <Downloads profileId={p.id} />}
       {p.runtime.usesTestProxy && (
         <p className="notice">
           Test proxy. This profile goes out through this PC&apos;s own connection. Not for real
@@ -351,4 +353,80 @@ function ConfirmDelete(props: { profile: Profile; onCancel(): void; onConfirm():
       </div>
     </dialog>
   );
+}
+
+/** What a running profile downloaded, with Save to PC (into this PC's Downloads folder). */
+function Downloads({ profileId }: { profileId: string }) {
+  const [files, setFiles] = useState<DownloadedFile[] | null>(null);
+  const [saved, setSaved] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      api<DownloadedFile[]>('GET', `/profiles/${profileId}/downloads`).then(
+        (list) => alive && setFiles(list),
+        () => {},
+      );
+    void load();
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [profileId]);
+
+  if (!files || files.length === 0) return null;
+  const save = async (f: DownloadedFile) => {
+    setBusy(f.name);
+    setError(null);
+    try {
+      const { path } = await window.enclave.saveDownload(profileId, f.name);
+      setSaved((s) => ({ ...s, [f.name]: path }));
+    } catch (e) {
+      setError(
+        (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''),
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <section className="downloads" aria-label="Downloads">
+      <h3 className="notices-head">Downloads</h3>
+      {error && <p className="notice error">{error}</p>}
+      <ul>
+        {files.map((f) => (
+          <li key={f.name}>
+            <div>
+              <span className="name">{f.name}</span>
+              <small>{fileSize(f.bytes)}</small>
+            </div>
+            {saved[f.name] ? (
+              <button
+                className="button small quiet"
+                onClick={() => void window.enclave.showInFolder(saved[f.name]!)}
+              >
+                Show in folder
+              </button>
+            ) : (
+              <button
+                className="button small"
+                disabled={busy !== null}
+                onClick={() => void save(f)}
+              >
+                {busy === f.name ? 'Saving' : 'Save to PC'}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function fileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

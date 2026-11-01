@@ -7,6 +7,7 @@
 
 import {
   BODY_CHUNK_BYTES,
+  BODY_WINDOW,
   CHANNEL,
   MAX_PHONE_FILE_BYTES,
   packChannel,
@@ -39,6 +40,8 @@ const AGENT_ROUTES: [string, RegExp][] = [
   ['POST', new RegExp(`^/v1/profiles/${ID}/(start|stop)$`)],
   ['GET', new RegExp(`^/v1/profiles/${ID}/(stream|media)$`)],
   ['POST', new RegExp(`^/v1/profiles/${ID}/files\\?name=[^&#]*$`)],
+  ['GET', new RegExp(`^/v1/profiles/${ID}/downloads$`)],
+  ['GET', new RegExp(`^/v1/profiles/${ID}/downloads/[^/?#]+$`)],
 ];
 /** The profile an agent API path is about, if any. */
 const PROFILE_PATH = new RegExp(`^/v1/profiles/(${ID})/`);
@@ -69,6 +72,8 @@ interface SocketChannel {
 
 export class TunnelSession {
   private readonly channels = new Map<number, RequestChannel | SocketChannel>();
+  /** Large responses being sent: pieces not yet taken by the phone, and who waits on that. */
+  private readonly sending = new Map<number, { inFlight: number; wake: (() => void) | null }>();
   private closed = false;
 
   constructor(
@@ -92,6 +97,8 @@ export class TunnelSession {
     if (this.closed) return;
     this.closed = true;
     this.tunnel.close();
+    for (const s of this.sending.values()) s.wake?.();
+    this.sending.clear();
     for (const ch of this.channels.values()) if (ch.type === 'socket') ch.ws.close(1000);
     this.channels.clear();
   }
@@ -168,6 +175,15 @@ export class TunnelSession {
         void this.dispatch(channel, ch);
         return;
       }
+      case CHANNEL.RESPONSE_ACK: {
+        const s = this.sending.get(channel);
+        if (!s) return;
+        s.inFlight--;
+        const w = s.wake;
+        s.wake = null;
+        w?.();
+        return;
+      }
       case CHANNEL.WS_OPEN: {
         if (ch) throw new Error('A channel was opened twice.');
         const { path } = JSON.parse(textOf(data)) as { path?: unknown };
@@ -200,7 +216,37 @@ export class TunnelSession {
   ) {
     const bytes =
       body instanceof Uint8Array ? body : typeof body === 'string' ? body : JSON.stringify(body);
+    if (typeof bytes !== 'string' && bytes.length > BODY_CHUNK_BYTES) {
+      void this.respondInPieces(channel, status, contentType, bytes);
+      return;
+    }
     this.post(CHANNEL.RESPONSE, channel, packResponse({ status, contentType }, bytes));
+  }
+
+  /** A large body (a download) in pieces, a few in flight, so the relay never holds much. */
+  private async respondInPieces(
+    channel: number,
+    status: number,
+    contentType: string,
+    body: Uint8Array,
+  ): Promise<void> {
+    const state = { inFlight: 0, wake: null as (() => void) | null };
+    this.sending.set(channel, state);
+    this.post(
+      CHANNEL.RESPONSE_START,
+      channel,
+      JSON.stringify({ status, contentType, length: body.length }),
+    );
+    for (let at = 0; at < body.length; at += BODY_CHUNK_BYTES) {
+      while (state.inFlight >= BODY_WINDOW && !this.closed) {
+        await new Promise<void>((r) => (state.wake = r));
+      }
+      if (this.closed) return;
+      state.inFlight++;
+      this.post(CHANNEL.RESPONSE_DATA, channel, body.subarray(at, at + BODY_CHUNK_BYTES));
+    }
+    this.post(CHANNEL.RESPONSE_END, channel);
+    this.sending.delete(channel);
   }
 
   private async dispatch(channel: number, req: RequestChannel): Promise<void> {

@@ -11,6 +11,8 @@ const bridge: EnclaveBridge = {
   saveSettings: (change) => ipcRenderer.invoke('settings:set', change),
   openDataFolder: () => ipcRenderer.invoke('app:open-data'),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
+  saveDownload: (profileId, name) => ipcRenderer.invoke('downloads:save', profileId, name),
+  showInFolder: (path) => ipcRenderer.invoke('downloads:show', path),
   onAgentState: (listener) => {
     const handler = (_e: IpcRendererEvent, state: AgentState) => listener(state);
     ipcRenderer.on('agent:state', handler);

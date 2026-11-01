@@ -126,3 +126,63 @@ describe('a phone limited to some profiles', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('a large download through the tunnel', () => {
+  it('arrives whole, in pieces, with only a few in flight', async () => {
+    const big = Buffer.alloc(1_300_000);
+    for (let i = 0; i < big.length; i++) big[i] = (i * 7) % 251;
+    const phoneKey = await generateTunnelKey(false);
+    const pcKey = await generateTunnelKey(true);
+    const backend: TunnelBackend = {
+      inject: async () => ({ status: 200, contentType: 'application/octet-stream', body: big }),
+      streamPort: async () => 1,
+    };
+    let inFlightMax = 0;
+    let inFlight = 0;
+    const phone: Tunnel = new Tunnel('phone', phoneKey, pcKey.publicKey, (b) =>
+      queueMicrotask(() => pc.receive(b)),
+    );
+    const pc: Tunnel = new Tunnel('pc', pcKey, phoneKey.publicKey, (b) =>
+      queueMicrotask(() => phone.receive(b)),
+    );
+    new TunnelSession(
+      pc,
+      backend,
+      () => {},
+      () => 'all',
+    );
+    const parts: Uint8Array[] = [];
+    let head: { status: number; length: number } | null = null;
+    const done = new Promise<void>((resolve) => {
+      phone.onMessage = (b) => {
+        const m = unpackChannel(b);
+        if (m.kind === CHANNEL.RESPONSE_START) head = JSON.parse(textOf(m.data));
+        if (m.kind === CHANNEL.RESPONSE_DATA) {
+          parts.push(m.data.slice());
+          inFlightMax = Math.max(inFlightMax, ++inFlight);
+          // The phone takes each piece a little later, as a slow network would.
+          setTimeout(() => {
+            inFlight--;
+            void phone.post(packChannel(CHANNEL.RESPONSE_ACK, 1));
+          }, 5);
+        }
+        if (m.kind === CHANNEL.RESPONSE_END) resolve();
+      };
+    });
+    await phone.open();
+    const id = '11111111-1111-4111-8111-111111111111';
+    await phone.post(
+      packChannel(
+        CHANNEL.REQUEST,
+        1,
+        JSON.stringify({ method: 'GET', path: `/v1/profiles/${id}/downloads/a.zip` }),
+      ),
+    );
+    await phone.post(packChannel(CHANNEL.END, 1));
+    await done;
+    expect(head).toMatchObject({ status: 200, length: big.length });
+    expect(Buffer.concat(parts).equals(big)).toBe(true);
+    expect(parts.length).toBe(Math.ceil(big.length / (256 * 1024)));
+    expect(inFlightMax).toBeLessThanOrEqual(8);
+  });
+});

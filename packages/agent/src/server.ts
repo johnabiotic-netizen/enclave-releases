@@ -118,6 +118,23 @@ export function buildServer(
       v1.get<{ Params: { id: string } }>('/profiles/:id/media', async (req) =>
         service.media(req.params.id),
       );
+      // Downloads: what the profile saved, to take to the phone or the PC.
+      v1.get<{ Params: { id: string } }>('/profiles/:id/downloads', async (req) =>
+        service.downloads(req.params.id),
+      );
+      v1.get<{ Params: { id: string; name: string } }>(
+        '/profiles/:id/downloads/:name',
+        async (req, reply) => {
+          const { data } = await service.download(req.params.id, req.params.name);
+          return reply
+            .type('application/octet-stream')
+            .header(
+              'Content-Disposition',
+              `attachment; filename*=UTF-8''${encodeURIComponent(req.params.name)}`,
+            )
+            .send(data);
+        },
+      );
       // Stage 4: a file from the phone into the profile's open file picker.
       v1.post<{ Params: { id: string }; Querystring: { name?: string }; Body: Buffer }>(
         '/profiles/:id/files',

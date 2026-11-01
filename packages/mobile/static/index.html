@@ -259,6 +259,79 @@
       #copied[hidden] {
         display: none;
       }
+      #got {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: calc(62px + env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 6px 6px 14px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        font-size: 15px;
+      }
+      #got[hidden],
+      #files[hidden] {
+        display: none;
+      }
+      #ask:not([hidden]) ~ #got,
+      #copied:not([hidden]) ~ #got {
+        bottom: calc(132px + env(safe-area-inset-bottom));
+      }
+      #got-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #files {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        top: calc(10px + env(safe-area-inset-top));
+        bottom: calc(62px + env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      }
+      .files-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .files-head h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+      #files-list {
+        flex: 1;
+        overflow-y: auto;
+        margin-top: 10px;
+      }
+      .file {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
+      }
+      .file div {
+        flex: 1;
+        min-width: 0;
+      }
+      .file .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       #ask:not([hidden]) ~ #copied {
         bottom: calc(132px + env(safe-area-inset-bottom));
       }
@@ -309,6 +382,18 @@
         <span>Copied in the profile.</span>
         <button id="copy-phone">Copy to phone</button>
       </div>
+      <div id="got" role="status" hidden>
+        <span id="got-text"></span>
+        <button id="got-later">Not now</button>
+        <button id="got-save" class="primary">Save to phone</button>
+      </div>
+      <div id="files" role="dialog" aria-labelledby="files-title" hidden>
+        <div class="files-head">
+          <h2 id="files-title">Downloads</h2>
+          <button id="files-close">Close</button>
+        </div>
+        <div id="files-list"></div>
+      </div>
       <div id="bar">
         <button id="back" aria-label="Back">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
@@ -346,6 +431,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="2.5" y="6" width="13.5" height="12" rx="2" />
             <path d="M16 10.5l5.5-3.5v10l-5.5-3.5" />
+          </svg>
+        </button>
+        <button id="downloads" aria-label="Downloads">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3.5v12M7 11l5 5 5-5M4.5 20.5h15" />
           </svg>
         </button>
         <button id="close" aria-label="Close">

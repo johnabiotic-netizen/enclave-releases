@@ -10,6 +10,8 @@ import {
   DESKTOP_APP_ORIGIN,
   type CheckNewProxyRequest,
   type CreateProfileRequest,
+  type DownloadedFile,
+  MAX_DOWNLOAD_BYTES,
   type Fingerprint,
   type MediaInUse,
   type PcTurn,
@@ -43,6 +45,8 @@ const MONITOR_INTERVAL_MS = 60_000;
 const STREAM_TTL_MS = 24 * 60 * 60 * 1000;
 const CONTAINER_MEMORY_BYTES = 3 * 1024 ** 3;
 const SHM_BYTES = 2 * 1024 ** 3;
+/** Where the profile's browser saves downloads (launch_browser.py RUNTIME_PREFS). */
+const DOWNLOADS_DIR = '/data/downloads';
 const PROXY_UNREACHABLE = 'Proxy unreachable';
 
 /**
@@ -201,6 +205,61 @@ export class ProfileService {
       phoneCamera: phoneCam > 0,
       phoneMicrophone: phoneMic > 0,
     };
+  }
+
+  /** What the running profile has downloaded (finished files only), newest first. */
+  async downloads(id: string): Promise<DownloadedFile[]> {
+    await this.streamPort(id); // running, or PROFILE_NOT_RUNNING
+    const out = await this.runtime.execOutput(
+      containerName(id),
+      // Firefox writes a download as <name>.part and renames it when it is complete.
+      [
+        'find',
+        DOWNLOADS_DIR,
+        '-maxdepth',
+        '1',
+        '-type',
+        'f',
+        '!',
+        '-name',
+        '*.part',
+        '-printf',
+        '%s\\t%T@\\t%f\\0',
+      ],
+      'neko',
+    );
+    if (out.code !== 0) {
+      throw new AgentError('INTERNAL', "Couldn't read the profile's downloads.");
+    }
+    return out.stdout
+      .split('\0')
+      .filter(Boolean)
+      .map((line) => {
+        const [bytes = '0', at = '0', ...name] = line.split('\t');
+        return {
+          name: name.join('\t'),
+          bytes: Number(bytes),
+          modifiedAt: new Date(Number(at) * 1000).toISOString(),
+        };
+      })
+      .filter((f) => f.name && !f.name.includes('/'))
+      .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+  }
+
+  /** One downloaded file's content. Only a name in the profile's own downloads list. */
+  async download(id: string, name: string): Promise<{ file: DownloadedFile; data: Buffer }> {
+    const file = (await this.downloads(id)).find((f) => f.name === name);
+    if (!file) throw new InputError('No downloaded file with that name in this profile.');
+    if (file.bytes > MAX_DOWNLOAD_BYTES) {
+      throw new InputError('That file is over 500 MB. Use it inside the profile instead.');
+    }
+    const data = await this.runtime.getFile(
+      containerName(id),
+      `${DOWNLOADS_DIR}/${name}`,
+      MAX_DOWNLOAD_BYTES,
+    );
+    await this.store.log(id, 'download-taken', { bytes: data.length });
+    return { file, data };
   }
 
   /** Stage 4: puts a file from the phone into the profile and picks it in the open file picker. */

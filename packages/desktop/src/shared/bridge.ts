@@ -53,6 +53,13 @@ export interface EnclaveBridge {
     body?: unknown,
   ): Promise<AgentReply>;
   agentState(): Promise<AgentState>;
+  /**
+   * Saves a file the profile downloaded into this PC's Downloads folder (marked as from the
+   * internet, as a browser does) and gives where it went. Never opens it.
+   */
+  saveDownload(profileId: string, name: string): Promise<{ path: string }>;
+  /** Shows a saved download in File Explorer. */
+  showInFolder(path: string): Promise<void>;
   /** Puts text on the Windows clipboard (works while the window is not focused). */
   copyText(text: string): Promise<void>;
   /** Called on every change; returns what stops listening. */

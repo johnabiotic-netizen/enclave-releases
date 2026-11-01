@@ -379,6 +379,14 @@ export const CHANNEL = {
   WS_TEXT: 8,
   /** both ways: JSON { code, reason }: the WebSocket closed. */
   WS_CLOSE: 9,
+  /** pc -> phone: a large response's JSON { status, contentType, length }; pieces follow. */
+  RESPONSE_START: 10,
+  /** pc -> phone: a piece of a large response (at most BODY_CHUNK_BYTES). */
+  RESPONSE_DATA: 11,
+  /** pc -> phone: the large response is complete. */
+  RESPONSE_END: 12,
+  /** phone -> pc: one RESPONSE_DATA piece was taken (flow control, as ACK the other way). */
+  RESPONSE_ACK: 13,
 } as const;
 
 export const BODY_CHUNK_BYTES = 256 * 1024;

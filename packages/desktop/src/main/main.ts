@@ -2,6 +2,7 @@
 // a narrow bridge to it (preload.ts). The renderer never sees the agent token.
 
 import { existsSync } from 'node:fs';
+import { access, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -282,6 +283,41 @@ ipcMain.handle('app:open-data', async () => {
   if (home) await shell.openPath(home);
 });
 
+// A profile's download into this PC's Downloads folder. The file came from a website, so it
+// gets Windows' "from the internet" mark (as a browser's downloads do) and is never opened
+// by Enclave: opening it is the user's choice, with Windows' own warnings.
+ipcMain.handle('downloads:save', async (_e, profileId: unknown, name: unknown) => {
+  if (!agent) throw new Error('Enclave is still starting.');
+  if (
+    typeof profileId !== 'string' ||
+    !/^[0-9a-f-]{36}$/.test(profileId) ||
+    typeof name !== 'string' ||
+    !name ||
+    name.length > 255
+  ) {
+    throw new Error('Bad download.');
+  }
+  const res = await agent.app.inject({
+    method: 'GET',
+    url: `${API_BASE_PATH}/profiles/${profileId}/downloads/${encodeURIComponent(name)}`,
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (res.statusCode >= 400) {
+    const err = parseBody(res.body) as { error?: { message?: string } } | null;
+    throw new Error(err?.error?.message ?? `Couldn't get the file (${res.statusCode}).`);
+  }
+  const dir = app.getPath('downloads');
+  const target = await freeName(dir, windowsFileName(name));
+  await writeFile(target, res.rawPayload, { flag: 'wx' });
+  await writeFile(`${target}:Zone.Identifier`, '[ZoneTransfer]\r\nZoneId=3\r\n').catch(() => {});
+  return { path: target };
+});
+
+ipcMain.handle('downloads:show', (_e, target: unknown) => {
+  const dir = app.getPath('downloads');
+  if (typeof target === 'string' && path.dirname(target) === dir) shell.showItemInFolder(target);
+});
+
 ipcMain.handle('clipboard:write', (_e, text: unknown) => {
   if (typeof text === 'string' && text.length <= 1_000_000) clipboard.writeText(text);
 });
@@ -400,4 +436,28 @@ async function checkEncryption(): Promise<void> {
   if (result !== probe || sealed.includes(probe)) {
     throw new Error("Windows could not protect Enclave's secrets for this user.");
   }
+}
+
+/** A name Windows accepts: no reserved characters or names, no trailing dot or space. */
+function windowsFileName(name: string): string {
+  // Control characters are exactly what Windows refuses in a file name.
+  // eslint-disable-next-line no-control-regex
+  let n = name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/, '');
+  if (/^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(n)) n = `_${n}`;
+  return n || 'download';
+}
+
+/** `name`, or "name (2).ext" and so on if it is taken, in `dir`. */
+async function freeName(dir: string, name: string): Promise<string> {
+  const ext = path.extname(name);
+  const base = name.slice(0, name.length - ext.length);
+  for (let i = 1; i < 1000; i++) {
+    const candidate = path.join(dir, i === 1 ? name : `${base} (${i})${ext}`);
+    try {
+      await access(candidate);
+    } catch {
+      return candidate;
+    }
+  }
+  throw new Error('Too many files with that name in Downloads.');
 }

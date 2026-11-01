@@ -61,3 +61,21 @@ export function demuxLogs(buf: Buffer): { stdout: string; stderr: string } {
     stderr: Buffer.concat(err).toString('utf8'),
   };
 }
+
+/** The first regular file in a tar (what docker cp of one file gives). */
+export function readTarFile(tar: Buffer): Buffer {
+  let at = 0;
+  while (at + BLOCK <= tar.length) {
+    const header = tar.subarray(at, at + BLOCK);
+    if (header.every((b) => b === 0)) break;
+    const size = parseInt(header.toString('ascii', 124, 136).replace(/\0.*$/, '').trim() || '0', 8);
+    const type = String.fromCharCode(header[156] ?? 0);
+    const start = at + BLOCK;
+    if (type === '0' || type === '\0') {
+      if (start + size > tar.length) throw new Error('tar: truncated file');
+      return tar.subarray(start, start + size);
+    }
+    at = start + Math.ceil(size / BLOCK) * BLOCK;
+  }
+  throw new Error('tar: no file in the archive');
+}

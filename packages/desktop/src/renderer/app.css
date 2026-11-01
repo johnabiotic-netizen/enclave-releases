@@ -862,3 +862,32 @@ textarea:focus-visible {
   max-height: 220px;
   overflow-y: auto;
 }
+
+/* ---------------------------------------------------------------- downloads */
+
+.downloads ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.downloads li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.downloads li > div {
+  display: grid;
+  min-width: 0;
+}
+.downloads .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.downloads small {
+  color: var(--text-500);
+  font-size: 12px;
+}

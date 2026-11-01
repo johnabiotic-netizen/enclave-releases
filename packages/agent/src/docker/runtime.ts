@@ -2,7 +2,7 @@
 
 import type Docker from 'dockerode';
 import { AgentError } from '../errors.js';
-import { demuxLogs, makeTar, type TarEntry } from './tar.js';
+import { demuxLogs, makeTar, readTarFile, type TarEntry } from './tar.js';
 
 /** Label on every container, network and volume the agent creates. */
 export const PROFILE_LABEL = 'enclave.profile';
@@ -189,6 +189,21 @@ export class DockerRuntime {
   /** Unpacks a tar (makeTar) at / in a running container. */
   async putArchive(name: string, tar: Buffer): Promise<void> {
     await this.docker.getContainer(name).putArchive(tar, { path: '/' });
+  }
+
+  /** One regular file from a container (docker cp), refused when larger than `maxBytes`. */
+  async getFile(name: string, path: string, maxBytes: number): Promise<Buffer> {
+    const stream = (await this.docker
+      .getContainer(name)
+      .getArchive({ path })) as unknown as NodeJS.ReadableStream;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of stream) {
+      size += (chunk as Buffer).length;
+      if (size > maxBytes + 4096) throw new Error('file too large');
+      chunks.push(chunk as Buffer);
+    }
+    return readTarFile(Buffer.concat(chunks));
   }
 
   /** Runs `cmd` in a running container and returns its stdout and exit code. */

@@ -111,6 +111,17 @@ export interface MediaInUse {
 }
 export type GetMediaResponse = MediaInUse;
 
+// GET /profiles/:id/downloads: what the profile has downloaded (newest first), while it runs.
+export interface DownloadedFile {
+  name: string;
+  bytes: number;
+  /** When the download finished. */
+  modifiedAt: string;
+}
+export type ListDownloadsResponse = DownloadedFile[];
+/** GET /profiles/:id/downloads/:name gives the file (application/octet-stream), up to this size. */
+export const MAX_DOWNLOAD_BYTES = 500 * 1024 * 1024;
+
 // POST /profiles/:id/files?name=<file name>, body: the file (application/octet-stream)
 /** Stage 4: the largest file the phone can put into the profile's file picker. */
 export const MAX_PHONE_FILE_BYTES = 100 * 1024 * 1024;

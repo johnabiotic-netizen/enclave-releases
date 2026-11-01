@@ -159,6 +159,14 @@ export class RelayLink {
   private nextChannel = 1;
   private readonly requests = new Map<number, PendingRequest>();
   private readonly sockets = new Map<number, VirtualSocket>();
+  /** Large responses arriving in pieces. */
+  private readonly incoming = new Map<
+    number,
+    { status: number; contentType: string; parts: Uint8Array[] }
+  >();
+  private readonly lengths = new Map<number, number>();
+  /** Called as a large response arrives: bytes so far and in all. */
+  onProgress: (channel: number, got: number, total: number) => void = () => {};
   private retry = 0;
   private timer = 0;
   private stopped = false;
@@ -404,6 +412,8 @@ export class RelayLink {
     this.sessionId = null;
     for (const r of this.requests.values()) r.reject(reason);
     this.requests.clear();
+    this.incoming.clear();
+    this.lengths.clear();
     for (const s of this.sockets.values()) s.closed(1006, reason.message);
     this.sockets.clear();
   }
@@ -425,6 +435,46 @@ export class RelayLink {
         const { head, body } = unpackResponse(data);
         r.resolve({ status: head.status, contentType: head.contentType, body });
         r.wake?.();
+        return;
+      }
+      case CHANNEL.RESPONSE_START: {
+        if (!this.requests.has(channel)) return;
+        const head = JSON.parse(textOf(data)) as {
+          status: number;
+          contentType: string;
+          length: number;
+        };
+        this.incoming.set(channel, {
+          status: head.status,
+          contentType: head.contentType,
+          parts: [],
+        });
+        this.lengths.set(channel, head.length);
+        return;
+      }
+      case CHANNEL.RESPONSE_DATA: {
+        const r = this.incoming.get(channel);
+        if (!r) return;
+        r.parts.push(data.slice());
+        this.tunnel?.post(packChannel(CHANNEL.RESPONSE_ACK, channel)).catch(() => {});
+        const got = r.parts.reduce((n, p) => n + p.length, 0);
+        this.onProgress(channel, got, this.lengths.get(channel) ?? got);
+        return;
+      }
+      case CHANNEL.RESPONSE_END: {
+        const r = this.incoming.get(channel);
+        const req = this.requests.get(channel);
+        this.incoming.delete(channel);
+        this.lengths.delete(channel);
+        if (!r || !req) return;
+        this.requests.delete(channel);
+        const body = new Uint8Array(r.parts.reduce((n, p) => n + p.length, 0));
+        let at = 0;
+        for (const p of r.parts) {
+          body.set(p, at);
+          at += p.length;
+        }
+        req.resolve({ status: r.status, contentType: r.contentType, body });
         return;
       }
       case CHANNEL.ACK: {

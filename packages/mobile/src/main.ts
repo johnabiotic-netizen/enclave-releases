@@ -10,6 +10,7 @@ import { NekoClient, Overlay } from '@m1k1o/neko';
 import { MAX_PHONE_FILE_BYTES, parsePairingFragment, RELAY_API_PATH } from '@enclave/shared';
 import type {
   ApiError,
+  DownloadedFile,
   MediaInUse,
   Profile,
   StartProfileResponse,
@@ -397,6 +398,11 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   );
 
   shown = p;
+  knownDownloads = null;
+  offerDownload(null);
+  const downloadsPoll = window.setInterval(() => void pollDownloads(), DOWNLOADS_POLL_MS);
+  void pollDownloads();
+  detach.push(() => window.clearInterval(downloadsPoll));
   wanted = { ...NOTHING_WANTED };
   declined = { camera: false, microphone: false, file: false };
   const poll = window.setInterval(() => void pollMedia(), MEDIA_POLL_MS);
@@ -419,6 +425,8 @@ function closeViewer(): void {
   wanted = { ...NOTHING_WANTED };
   showAsk();
   stage.replaceChildren();
+  offerDownload(null);
+  files.hidden = true;
   viewer.classList.remove('open');
   document.title = 'Enclave';
 }
@@ -1039,6 +1047,138 @@ fileInput.onchange = async () => {
     wanted = { ...wanted, filePicker: false };
     showAsk();
   }
+};
+
+// ------------------------------------------------------------------ downloads
+
+// When the profile finishes a download, offer to save it on the phone. The file comes from
+// the PC (through the relay's encrypted tunnel, or over Tailscale) and the phone's browser
+// saves it, usually to its Downloads folder.
+const DOWNLOADS_POLL_MS = 3000;
+const got = document.getElementById('got')!;
+const gotText = document.getElementById('got-text')!;
+const files = document.getElementById('files')!;
+const filesList = document.getElementById('files-list')!;
+/** Downloads already there (name and time) when the profile was opened or last checked. */
+let knownDownloads: Set<string> | null = null;
+let offered: DownloadedFile | null = null;
+let saving = false;
+
+const downloadKey = (f: DownloadedFile) => `${f.name}\n${f.modifiedAt}`;
+
+function size(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function offerDownload(file: DownloadedFile | null): void {
+  offered = file;
+  got.hidden = !file;
+  if (file) gotText.textContent = `Downloaded ${file.name}`;
+}
+
+async function pollDownloads(): Promise<void> {
+  const p = shown;
+  if (!p || client?.state.connection.status !== 'connected') return;
+  let list: DownloadedFile[];
+  try {
+    list = await api<DownloadedFile[]>('GET', `/profiles/${p.id}/downloads`);
+  } catch {
+    return; // missed one check
+  }
+  if (shown !== p) return;
+  const keys = new Set(list.map(downloadKey));
+  // The first look only learns what is there; after that, a new file is offered.
+  if (knownDownloads) {
+    const fresh = list.find((f) => !knownDownloads!.has(downloadKey(f)));
+    if (fresh) offerDownload(fresh);
+  }
+  knownDownloads = keys;
+  if (!files.hidden) showFiles(list);
+}
+
+async function saveToPhone(file: DownloadedFile): Promise<void> {
+  const p = shown;
+  if (!p || saving) return;
+  saving = true;
+  setStatus(`Saving ${file.name}`);
+  const path = `/v1/profiles/${p.id}/downloads/${encodeURIComponent(file.name)}`;
+  try {
+    let blob: Blob;
+    if (viaRelay) {
+      if (!link) throw new Error('This phone is not paired with a PC.');
+      link.onProgress = (_ch, done, total) =>
+        setStatus(`Saving ${file.name}: ${Math.floor((done / Math.max(total, 1)) * 100)}%`);
+      const res = await link.request('GET', path);
+      if (res.status >= 400) {
+        const body = JSON.parse(new TextDecoder().decode(res.body) || '{}') as Partial<ApiError>;
+        throw new Error(body.error?.message ?? `The PC answered HTTP ${res.status}.`);
+      }
+      blob = new Blob([res.body as Uint8Array<ArrayBuffer>]);
+    } else {
+      const res = await fetch(path, { headers: { Authorization: `Bearer ${token()}` } });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as Partial<ApiError>;
+        throw new Error(body.error?.message ?? `The PC answered HTTP ${res.status}.`);
+      }
+      blob = await res.blob();
+    }
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: file.name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    setStatus('');
+  } catch (e) {
+    setStatus(e instanceof Error ? e.message : String(e));
+  } finally {
+    if (link) link.onProgress = () => {};
+    saving = false;
+  }
+}
+
+function showFiles(list: DownloadedFile[]): void {
+  filesList.replaceChildren(
+    ...(list.length
+      ? list.map((f) =>
+          el(
+            'div',
+            { className: 'file' },
+            el(
+              'div',
+              {},
+              el('div', { className: 'name' }, f.name),
+              el('div', { className: 'meta' }, size(f.bytes)),
+            ),
+            el('button', { onclick: () => void saveToPhone(f) }, 'Save'),
+          ),
+        )
+      : [el('p', { className: 'note' }, 'Nothing downloaded in this profile yet.')]),
+  );
+}
+
+document.getElementById('got-save')!.onclick = () => {
+  const f = offered;
+  offerDownload(null);
+  if (f) void saveToPhone(f);
+};
+document.getElementById('got-later')!.onclick = () => offerDownload(null);
+document.getElementById('downloads')!.onclick = async () => {
+  const p = shown;
+  if (!p) return;
+  files.hidden = false;
+  filesList.replaceChildren(el('p', { className: 'note' }, 'Reading.'));
+  try {
+    showFiles(await api<DownloadedFile[]>('GET', `/profiles/${p.id}/downloads`));
+  } catch (e) {
+    filesList.replaceChildren(
+      el('p', { className: 'error' }, e instanceof Error ? e.message : String(e)),
+    );
+  }
+};
+document.getElementById('files-close')!.onclick = () => {
+  files.hidden = true;
 };
 
 document.getElementById('close')!.onclick = () => {
