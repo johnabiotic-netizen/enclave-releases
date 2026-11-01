@@ -180,4 +180,4 @@ Still true (not fixable in software):
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 
 ## Next action
-Stage 6, phone linking (`stages/stage-6-phone-linking.md`): run its "Verify first" checks before building. Open: the owner's review of the app's look and wording (Stage 5 test 5; fix whatever they flag). Still open from Stage 3 (owner): a clean German IP for Profile 1.
+Stage 7 beta: psalmywise installs 0.3.0 on a fresh PC (the Fresh-PC test); fix what they hit. The next installer (0.3.1) carries the notices and profile export and import. Open for the owner: the next Stage 7 item, an easier install (a bundled WSL distro with Docker Engine instead of Docker Desktop, so older Windows like this PC works), which is a large piece and needs the owner's go-ahead. Still open from Stage 3 (owner): a clean German IP for Profile 1.
