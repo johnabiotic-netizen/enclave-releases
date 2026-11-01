@@ -108,6 +108,13 @@ Spec: `stages/stage-5-windows-app.md`
 - Disk space is tight. C: hit 0 GB on 2026-10-26 during an image build, which crashed WSL; clearing the npm cache (6.5 GB) recovered it. On 2026-10-31 a rebuild left C: at 0.27 GB free; `fstrim` inside the distro, `wsl --shutdown` and diskpart `compact vdisk` (owner, admin) shrank `ext4.vhdx` from 31 GB to 19.2 GB, leaving 14.2 GB free. WSL's disk (`ext4.vhdx`, about 16 GB) never shrinks by itself. Keep about 8 GB free inside Docker for rebuilds, run `docker builder prune` after builds, and plan to compact the disk (owner step, admin) or free more space on C:.
 - For the owner: acceptance test 3 says profiles show different canvas values, but Camoufox no longer adds canvas noise, so canvas is the same across profiles on one image (see DECISIONS.md). Stage 3 decides.
 
+## Stage 5 acceptance evidence (2026-11-01)
+- Test 1, fresh Windows with only Docker Desktop, no terminal: NOT RUN. There is no fresh Windows machine here, and the browser image cannot be set up on one yet (our Camoufox build has no public download; Stage 7 publishes the image and adds the download to Setup, DECISIONS 2026-10-31). What was checked: the installer installs per user without admin; the installed app, with no .env, found Docker in WSL by itself and ran everything; Setup detects a stopped Docker with its fix and recovers on Recheck.
+- Test 2, create, start, view, stop, delete from the UI: PASS (Playwright smoke test, 37 s, and by hand in the app).
+- Test 3, no secrets in plain text: PASS. Agent token, profile proxy and stream passwords and the default proxy are kept with safeStorage (DPAPI); no password text in app-settings.json or secrets.sealed; plain secrets.json files sealed and removed at start.
+- Test 4, closing the app: PASS, documented (DECISIONS 2026-10-31): closing the window keeps profiles running in the tray; Quit Enclave stops them cleanly.
+- Test 5, UI matches the design system and copy rules: built to ui/design-system.md and ui/copy-guidelines.md (one accent, status seam, Inter and IBM Plex Mono only for machine data, sentence case, no em dashes, no filler); waiting for the owner's review.
+
 ## Stage 4 acceptance evidence (2026-10-31)
 - Test 1, live video: PASS. Owner's real phone (Android, Starlink Wi-Fi), `phone-check.html` in "Phone test": live and moving, upright phone not squashed, not too zoomed, unmirrored like a webcam, no blackouts after the three fixes (see Camera above).
 - Test 2, front/back: PASS. Owner, real phone: Flip switches cameras while the page watches.
@@ -146,4 +153,4 @@ Still true (not fixable in software):
 - Browser image: Google is now the default search engine (Camoufox ships with none; `set_search_engine.py`).
 
 ## Next action
-Stage 4 complete (2026-10-31). Next: Stage 5, Windows app (`stages/stage-5-windows-app.md`): run its "Verify first" checks before building. Carry into Stage 5: the "switch to your phone" notice (DECISIONS 2026-10-31), our own PC viewer with input mode from real pointer events (notes above), and the agent embedded in the Electron main process. Still open from Stage 3 (owner): a clean German IP for Profile 1.
+Stage 5 tasks done (2026-11-01); Enclave 0.1.0 is installed on the owner's PC (Start menu, desktop). Waiting for the owner: try the app and review the screens (acceptance test 5), and decide whether Stage 5 closes with test 1 carried to Stage 7 (no fresh Windows machine here; the image download comes with publishing it). Then Stage 6, phone linking. Still open from Stage 3 (owner): a clean German IP for Profile 1.
