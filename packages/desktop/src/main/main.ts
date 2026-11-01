@@ -21,7 +21,7 @@ import {
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
 import { SettingsFile, type AppSettings } from './settings.js';
-import { runSetupChecks } from './setup.js';
+import { findWslDocker, runSetupChecks } from './setup.js';
 import type {
   AgentReply,
   AgentState,
@@ -32,9 +32,19 @@ import type {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+// The app's own data folder holds the key safeStorage encrypts every secret with (Chromium's
+// "Local State"). Electron names that folder after the app, so a rename would lose the key and
+// with it every saved password. It is fixed here: %APPDATA%\Enclave, whatever the app is called.
+app.setPath('userData', path.join(app.getPath('appData'), 'Enclave'));
+
 // A developer run from the repo uses the repo's .env (Docker in WSL, phone mode, test proxy).
 const repoEnv = path.resolve(here, '../../../.env');
 if (!app.isPackaged && existsSync(repoEnv)) process.loadEnvFile(repoEnv);
+// Installed: the phone app and the Windows Firefox reference ship next to the app.
+if (app.isPackaged) {
+  process.env.ENCLAVE_MOBILE_DIR = path.join(process.resourcesPath, 'mobile');
+  process.env.ENCLAVE_REFERENCE_DIR = path.join(process.resourcesPath, 'reference');
+}
 
 let agent: RunningAgent | null = null;
 let token = '';
@@ -88,6 +98,14 @@ async function bootAgent(): Promise<void> {
     home = base.home;
     const settings = new SettingsFile(home);
     const saved = await settings.read();
+    // No Docker Desktop and nothing configured: use the WSL distro that has Docker Engine.
+    if (!saved.wslDistro && !process.env.ENCLAVE_WSL_DISTRO && !process.env.DOCKER_HOST) {
+      const distro = await findWslDocker();
+      if (distro) {
+        saved.wslDistro = distro;
+        await settings.write(saved);
+      }
+    }
     await checkEncryption();
     token = await settings.agentToken(process.env.AGENT_TOKEN);
     const config = loadConfig({
@@ -113,12 +131,17 @@ function phoneSetting(saved: AppSettings): string | undefined {
 }
 
 /** Restarts the agent inside the app (settings changed). Running profiles keep running. */
-async function restartAgent(): Promise<void> {
-  const old = agent;
-  agent = null;
-  setState({ status: 'starting' });
-  await old?.close().catch(() => {});
-  await bootAgent();
+let restarting: Promise<void> | null = null;
+function restartAgent(): Promise<void> {
+  // One restart at a time; a second request waits for the one under way.
+  restarting ??= (async () => {
+    const old = agent;
+    agent = null;
+    setState({ status: 'starting' });
+    await old?.close().catch(() => {});
+    await bootAgent();
+  })().finally(() => (restarting = null));
+  return restarting;
 }
 
 function describeStartError(err: unknown): string {

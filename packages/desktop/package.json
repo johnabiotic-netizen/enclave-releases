@@ -8,24 +8,66 @@
   "scripts": {
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.main.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.main.json",
+    "dist": "node build.mjs && electron-builder --win nsis --x64 --publish never"
   },
-  "dependencies": {
+  "devDependencies": {
     "@enclave/agent": "workspace:*",
     "@enclave/shared": "workspace:*",
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@m1k1o/neko": "3.2.0",
-    "flag-icons": "7.6.0",
-    "react": "19.3.1",
-    "react-dom": "19.3.1"
-  },
-  "devDependencies": {
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "electron": "45.1.0",
+    "electron-builder": "26.18.1",
     "esbuild": "0.28.2",
+    "flag-icons": "7.6.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "vite": "8.3.5"
+  },
+  "productName": "Enclave",
+  "author": "Enclave",
+  "build": {
+    "appId": "app.enclave.desktop",
+    "productName": "Enclave",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../mobile/dist",
+        "to": "mobile"
+      },
+      {
+        "from": "../../testing/reference/windows-firefox-158",
+        "to": "reference"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": "nsis",
+      "icon": "dist/icon.ico",
+      "artifactName": "Enclave-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Enclave",
+      "installerIcon": "dist/icon.ico",
+      "uninstallerIcon": "dist/icon.ico",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

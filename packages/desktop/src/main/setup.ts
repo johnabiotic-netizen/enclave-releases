@@ -66,6 +66,20 @@ async function dockerInWsl(distro: string): Promise<boolean> {
   return r.code === 0 && /dockerd/.test(r.out);
 }
 
+/**
+ * On a PC without Docker Desktop: the WSL distro that has Docker Engine installed, if one does
+ * (the owner's PC runs Docker Engine in Ubuntu-24.04).
+ */
+export async function findWslDocker(): Promise<string | undefined> {
+  if (dockerDesktopInstalled()) return undefined;
+  const w = await wsl();
+  for (const distro of w.distros) {
+    if (/docker-desktop/i.test(distro)) continue;
+    if (await dockerInWsl(distro)) return distro;
+  }
+  return undefined;
+}
+
 export interface AgentFacts {
   /** The agent is up and reached Docker. */
   dockerOk: boolean;

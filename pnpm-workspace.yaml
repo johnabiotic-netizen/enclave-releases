@@ -15,3 +15,5 @@ allowBuilds:
   # electron: its install script downloads the Electron binary for this version (checksummed
   # against the package's checksums.json); the desktop app needs it.
   electron: true
+  # electron-winstaller (via electron-builder): only for Squirrel installers; Enclave builds NSIS.
+  electron-winstaller: false

@@ -25,10 +25,15 @@ export function App() {
   const [agent, setAgent] = useState<AgentState>({ status: 'starting' });
   // Once the app has run, a restart of its service (a settings change) keeps the screens.
   const [phoneApp, setPhoneApp] = useState<string | null | undefined>(undefined);
+  // Once the service has failed to start, Setup stays on screen while its Recheck restarts the
+  // service (a "starting" in between must not unmount Setup, whose mount runs a check: that
+  // looped, restarting the service without end).
+  const [failedOnce, setFailedOnce] = useState(false);
   useEffect(() => {
     const take = (s: AgentState) => {
       setAgent(s);
       if (s.status === 'running') setPhoneApp(s.phoneApp);
+      if (s.status === 'failed') setFailedOnce(true);
     };
     void window.enclave.agentState().then(take);
     return window.enclave.onAgentState(take);
@@ -37,7 +42,7 @@ export function App() {
   if (phoneApp === undefined) {
     // Enclave's service could not start (Docker not running, for one): the setup checker says
     // what is missing; once a Recheck gets the service up, the app opens as usual.
-    if (agent.status === 'failed') {
+    if (failedOnce) {
       return (
         <div className="shell no-rail">
           <main className="main">

@@ -11,8 +11,9 @@ import react from '@vitejs/plugin-react';
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 rmSync(here('./dist/'), { recursive: true, force: true });
 
-// Main process: an ES module for Node 24 (Electron 45). Packages stay external and load from
-// node_modules, the agent included.
+// Main process: one ES module for Node 24 (Electron 45) with the agent and every package in
+// it, so the installed app needs no node_modules. Native add-ons are optional in the packages
+// that mention them (ssh2's crypto, cpu-features) and stay out.
 await esbuild({
   entryPoints: [here('./src/main/main.ts')],
   outfile: here('./dist/main.js'),
@@ -20,7 +21,17 @@ await esbuild({
   platform: 'node',
   format: 'esm',
   target: 'node24',
-  packages: 'external',
+  external: ['electron', 'cpu-features', '*.node'],
+  // CommonJS packages inside an ES module still need require, __filename and __dirname.
+  banner: {
+    js: [
+      "import { createRequire as __enclaveRequire } from 'node:module';",
+      "import { fileURLToPath as __enclaveToPath } from 'node:url';",
+      'const require = __enclaveRequire(import.meta.url);',
+      'const __filename = __enclaveToPath(import.meta.url);',
+      "const __dirname = __filename.replace(/[\\/][^\\/]*$/, '');",
+    ].join(String.fromCharCode(10)),
+  },
   sourcemap: true,
 });
 
