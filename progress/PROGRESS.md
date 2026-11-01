@@ -118,7 +118,14 @@ Spec: `stages/stage-6-phone-linking.md`
 - Acceptance, local evidence (2026-11-01, relay and coturn on this PC, Edge as the phone): 1 pairing PASS (the phone remembers it across runs); 3 TURN fallback PASS (TURN-only and TCP-only phones); 4 security PASS (unknown device refused by the relay and by the PC; revoke during a stream closed it within 2 s on both sides); 5 no browsing data PASS (capture of the relay's sockets, frames decoded: only REGISTER/HELLO/PAIRING/SESSION messages and ciphertext; no profile name, id, stream password, agent token, API path or signaling). 2 cross network PASS (2026-11-01, owner): the real phone on mobile data only, the PC on home Wi-Fi, through relay.kybridia.com; opened a profile and used it, "feels okay". The relay shows 1 account, the PC and the phone; coturn saw TURN sessions (and refused the carrier's private 10.42.x address, as configured). Sign-ups closed after the owner's account was made. Owner to try the phone camera and a file upload through the relay.
 - Owner, 2026-11-01: file upload from the phone through the relay works on a real site.
 - [x] Downloads out of a profile (owner asked, 2026-11-01): to the phone (notice and list, through the tunnel in pieces) and to the PC (Save to PC into Downloads). Built, tested on the PC side (DECISIONS 2026-11-01), Windows app 0.2.2 installed, phone app deployed. Owner checked both, 2026-11-01: tinified.zip saved on the phone (through the relay) and on the PC.
-## Stage 7: Launch  [ ]
+## Stage 7: Launch  [~]
+Spec: `stages/stage-7-launch.md`. Owner (2026-11-01): a free beta among testers first, no payments yet (DECISIONS 2026-11-01).
+- [x] Browser source published (MPL): github.com/johnabiotic-netizen/enclave-browser-source.
+- [~] Browser image on ghcr.io/johnabiotic-netizen/enclave-browser (upload running), pinned by digest in the app; Setup downloads it with progress (built and typechecked; to verify on a PC without the image).
+- [x] Relay: single-use invites (deploy/relay/invite.sh), invite mode on, owner's shared code off; admin refused from the internet (404). Test: an invite makes one account, a second use is refused.
+- [x] Tester guide: docs/setup/beta-tester.md.
+- [ ] Fresh-PC test (Stage 5 test 1 and Stage 7 test 1): a tester's PC from nothing to a running profile.
+- [ ] Later (after the beta): payment provider (confirm acceptance first), code signing (OV certificate; Microsoft's service is US and Canada only), pricing by profiles running at once, encrypted backups (R2), privacy policy and terms, landing page.
 
 ## Blockers
 - (none). Docker resolved 2026-10-26: Docker Desktop can't run on this PC (Windows 11 21H2, which can't be upgraded), so Docker Engine 29.9.2 now runs inside WSL `Ubuntu-24.04` (see DECISIONS.md). Verified: `wsl docker run --rm hello-world` works, and the distro stays running with no terminal open. After a PC restart, run any `wsl` command (e.g. `wsl docker ps`) once to start it.
