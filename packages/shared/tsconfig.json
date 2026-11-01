@@ -4,15 +4,8 @@
     "composite": true,
     "rootDir": "src",
     "outDir": "dist",
-    "lib": [
-      "ES2023",
-      "DOM"
-    ]
+    "lib": ["ES2023", "DOM"]
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "src/**/*.test.ts"
-  ]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }

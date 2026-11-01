@@ -2,8 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import type { Profile, SystemResponse } from '@enclave/shared';
-import type { AppSettingsView } from '../shared/bridge';
+import type { AppSettingsView, PhoneMode } from '../shared/bridge';
 import { api } from './api';
+import { RelayPanel } from './Phone';
+
+const PHONE_CHOICES: [PhoneMode, string, string][] = [
+  [
+    'relay',
+    'Through your Enclave relay',
+    'Works on any network. Each phone pairs once by scanning a QR code.',
+  ],
+  [
+    'tailscale',
+    'Over Tailscale',
+    'Needs Tailscale on this PC and the phone, signed in to the same account.',
+  ],
+  ['off', 'Off', 'No phone can open profiles on this PC.'],
+];
 
 /** Open source parts Enclave ships, with their licences. */
 const NOTICES: [string, string][] = [
@@ -126,22 +141,26 @@ export function Settings({ profiles }: { profiles: Profile[] | null }) {
 
         <section className="settings-group" aria-labelledby="s-phone">
           <h2 id="s-phone">Phone access</h2>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={view.phone}
-              disabled={saving !== null}
-              onChange={(e) => void save('phone', { phone: e.target.checked })}
-            />
-            <span>
-              Let my phone open profiles over Tailscale
-              <small>
-                Needs Tailscale on this PC and the phone, signed in to the same account. Applies to
-                profiles started after the change.
-              </small>
-            </span>
-          </label>
+          <div className="choices" role="radiogroup" aria-labelledby="s-phone">
+            {PHONE_CHOICES.map(([mode, title, detail]) => (
+              <label className="toggle" key={mode}>
+                <input
+                  type="radio"
+                  name="phone"
+                  checked={view.phone === mode}
+                  disabled={saving !== null}
+                  onChange={() => void save('phone', { phone: mode })}
+                />
+                <span>
+                  {title}
+                  <small>{detail}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="muted small">A change applies to profiles started after it.</p>
           {saving === 'phone' && <p className="muted">Restarting Enclave&apos;s service.</p>}
+          {view.phone === 'relay' && saving !== 'phone' && <RelayPanel />}
         </section>
 
         <section className="settings-group" aria-labelledby="s-use">

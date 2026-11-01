@@ -141,7 +141,7 @@ export class RelayLink {
 
   async status(): Promise<RelayStatus> {
     const s = this.saved;
-    if (!s) return { signedIn: false, connected: false, devices: [] };
+    if (!s) return { enabled: this.active, signedIn: false, connected: false, devices: [] };
     // Last seen comes from the relay; the list itself is this PC's own.
     const remote = await this.call<RelayDevice[]>('GET', '/devices').catch(() => null);
     const devices: PairedPhone[] = s.phones.map((p) => ({
@@ -151,6 +151,7 @@ export class RelayLink {
       lastSeenAt: remote?.find((d) => d.id === p.id)?.lastSeenAt ?? null,
     }));
     return {
+      enabled: this.active,
       signedIn: true,
       url: s.url,
       email: s.email,

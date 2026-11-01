@@ -172,6 +172,8 @@ export interface PairedPhone {
 
 // GET /relay
 export interface RelayStatus {
+  /** Phone access goes through the relay (the app's phone setting). */
+  enabled: boolean;
   signedIn: boolean;
   /** The relay's address, e.g. https://relay.example.com. */
   url?: string;

@@ -10,11 +10,15 @@ export interface AgentReply {
   body: unknown;
 }
 
+/** Through the Enclave relay (Stage 6), over Tailscale (Stage 2), or off. */
+export type PhoneMode = 'relay' | 'tailscale' | 'off';
+
 /** The Settings screen's values (the default proxy in plain text: only this window sees it). */
 export interface AppSettingsView {
   idleMinutes: number;
   defaultProxy: string;
-  phone: boolean;
+  /** How a phone reaches this PC's profiles. */
+  phone: PhoneMode;
   dataFolder: string;
   versions: { app: string; electron: string; chromium: string; node: string };
 }
@@ -22,7 +26,7 @@ export interface AppSettingsView {
 export interface AppSettingsChange {
   idleMinutes?: number;
   defaultProxy?: string;
-  phone?: boolean;
+  phone?: PhoneMode;
 }
 
 /** One row of the setup checker. */

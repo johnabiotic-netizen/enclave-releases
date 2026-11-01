@@ -104,6 +104,14 @@ Spec: `stages/stage-5-windows-app.md`
 Spec: `stages/stage-6-phone-linking.md`
 - [x] Verify first (2026-11-01): coturn 4.18.0 with time-limited credentials; neko needs ICE lite off and backend TURN servers; hosting on a small VPS with the owner's domain (owner, DECISIONS 2026-11-01).
 - [ ] Owner: create the VPS and buy the domain (steps given 2026-11-01).
+- [x] `packages/relay` (2026-11-01): Fastify + ws; accounts (argon2id), PCs, devices in one JSON file; pairing; sessions; revoke; serves the phone app. 7 tests (accounts with invite, PC sign-in, pairing refused and accepted, code used once, cross-site socket refused, frames passed only within a session, revoke cuts at once and for good, nothing but accounts/PCs/devices on disk). End-to-end encrypted tunnel in `packages/shared/src/tunnel.ts` (7 tests: order, a PC holding another key, tampering, replay, key save).
+- [x] Agent outbound link (`packages/agent/src/relay/`): one WebSocket to the relay, reconnects with backoff, answers sessions with an allow-list (phone app's API calls and running profiles' stream servers). `ENCLAVE_PHONE=relay`.
+- [x] Pairing: QR code from the Windows app (code for the relay, secret and PC key hash for the phone); both ends check the other's key; the phone keeps a non-extractable key in IndexedDB.
+- [x] Session tokens: a random session id per connection, fresh tunnel keys per session; the stream password per profile start still applies.
+- [x] Media path: neko without ICE lite plus the relay's STUN/TURN; neko's own group may send UDP and reach TURN, the browser may not (DECISIONS 2026-11-01). Verified locally (simulated phone, local coturn): direct (host/prflx, 2 to 33 ms), TURN over UDP and TURN over TCP; phone camera and mic reach the profile through TURN.
+- [x] Device management UI: Settings, Phone access (relay, Tailscale, off), sign in or make the account, Pair a phone (QR, 2 minutes, closes when the phone pairs), paired phones with last seen, Unpair, Sign out. Screenshots checked.
+- [~] Deploy: `deploy/relay/` (compose with relay, Caddy 2.11.7, coturn 4.18.0; `setup-server.sh`; `deploy.sh`) and `docs/setup/relay-deploy.md` written; relay image built and run in WSL, compose and coturn config checked. Waiting for the server and the domain.
+- Acceptance, local evidence (2026-11-01, relay and coturn on this PC, Edge as the phone): 1 pairing PASS (the phone remembers it across runs); 3 TURN fallback PASS (TURN-only and TCP-only phones); 4 security PASS (unknown device refused by the relay and by the PC; revoke during a stream closed it within 2 s on both sides); 5 no browsing data PASS (capture of the relay's sockets, frames decoded: only REGISTER/HELLO/PAIRING/SESSION messages and ciphertext; no profile name, id, stream password, agent token, API path or signaling). 2 cross network: needs the deployed relay and the real phone on mobile data.
 ## Stage 7: Launch  [ ]
 
 ## Blockers

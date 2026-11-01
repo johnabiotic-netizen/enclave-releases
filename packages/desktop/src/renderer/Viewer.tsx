@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { NekoClient, Overlay } from '@m1k1o/neko';
-import type { MediaInUse, Profile, StreamInfo } from '@enclave/shared';
+import type { MediaInUse, Profile, RelayStatus, StreamInfo } from '@enclave/shared';
 import { api } from './api';
 import { Flag } from './Flag';
 import { country, exitIp, SEAM, STATE_WORD, type ShownState } from './format';
@@ -247,6 +247,13 @@ function usePhoneNeeded(profile: Profile, running: boolean): PhoneNeeded {
 
 function PhonePanel(props: { profile: Profile; phoneApp: string | null; onClose(): void }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Through the relay, the phone app is at the relay's address (paired phones only).
+  const [relay, setRelay] = useState<RelayStatus | null>(null);
+  useEffect(() => {
+    void api<RelayStatus>('GET', '/relay').then(setRelay, () => {});
+  }, []);
+  const viaRelay = relay?.enabled && relay.signedIn ? relay : null;
+  const address = viaRelay?.url ?? props.phoneApp;
   useEffect(() => {
     const away = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) props.onClose();
@@ -257,25 +264,29 @@ function PhonePanel(props: { profile: Profile; phoneApp: string | null; onClose(
   const [copied, setCopied] = useState(false);
   return (
     <div className="popover phone-panel" ref={ref}>
-      {props.phoneApp ? (
+      {address ? (
         <>
           <p>
             Open the Enclave app on your phone and choose <strong>{props.profile.name}</strong>. It
             shows the same browser, with the same tabs and the same IP.
           </p>
-          <p className="mono small">{props.phoneApp}</p>
+          <p className="mono small">{address}</p>
           <button
             className="button small"
-            onClick={() =>
-              void navigator.clipboard.writeText(props.phoneApp!).then(() => setCopied(true))
-            }
+            onClick={() => void navigator.clipboard.writeText(address).then(() => setCopied(true))}
           >
             {copied ? 'Copied' : 'Copy address'}
           </button>
-          <p className="muted small">Pairing with a QR code comes with phone linking.</p>
+          {viaRelay && viaRelay.devices.length === 0 && (
+            <p className="muted small">No phone is paired yet. Pair one in Settings.</p>
+          )}
         </>
       ) : (
-        <p>Phone access is off on this PC. Turn it on in Settings.</p>
+        <p>
+          {relay?.enabled
+            ? 'Sign in to your relay in Settings, then pair your phone.'
+            : 'Phone access is off on this PC. Turn it on in Settings.'}
+        </p>
       )}
     </div>
   );

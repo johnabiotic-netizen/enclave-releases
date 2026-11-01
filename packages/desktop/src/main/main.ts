@@ -20,7 +20,7 @@ import {
 } from 'electron';
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
-import { SettingsFile, type AppSettings } from './settings.js';
+import { SettingsFile, type AppSettings, type PhoneMode } from './settings.js';
 import { findWslDocker, runSetupChecks } from './setup.js';
 import type {
   AgentReply,
@@ -129,6 +129,12 @@ async function bootAgent(): Promise<void> {
   }
 }
 
+/** The phone mode the service runs with, as the settings screen shows it. */
+function phoneMode(saved: AppSettings): PhoneMode {
+  const m = phoneSetting(saved);
+  return m === 'relay' || m === 'tailscale' ? m : 'off';
+}
+
 function phoneSetting(saved: AppSettings): string | undefined {
   if (saved.phone === 'off') return '';
   return saved.phone ?? process.env.ENCLAVE_PHONE;
@@ -224,7 +230,7 @@ ipcMain.handle('settings:get', async (): Promise<AppSettingsView> => {
   return {
     idleMinutes: saved.idleMinutes ?? (Number(process.env.ENCLAVE_IDLE_MINUTES) || 20),
     defaultProxy: await file.defaultProxy(),
-    phone: phoneSetting(saved) === 'tailscale',
+    phone: phoneMode(saved),
     dataFolder: home,
     versions: {
       app: app.getVersion(),
@@ -247,8 +253,11 @@ ipcMain.handle('settings:set', async (_e, change: AppSettingsChange) => {
     saved.idleMinutes = n;
   }
   if (change.phone !== undefined) {
-    const next = change.phone ? 'tailscale' : 'off';
-    restart ||= next !== (phoneSetting(saved) === 'tailscale' ? 'tailscale' : 'off');
+    const next = change.phone;
+    if (next !== 'relay' && next !== 'tailscale' && next !== 'off') {
+      throw new Error('Choose how your phone reaches this PC.');
+    }
+    restart ||= next !== phoneMode(saved);
     saved.phone = next;
   }
   await file.write(saved);

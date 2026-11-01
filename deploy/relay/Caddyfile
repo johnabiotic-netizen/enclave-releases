@@ -1,0 +1,6 @@
+# HTTPS for the relay (and its WebSockets), with a Let's Encrypt certificate for RELAY_DOMAIN.
+{$RELAY_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy relay:8790
+}

@@ -1,0 +1,14 @@
+# Only the relay image builds from the repo root (packages/relay/Dockerfile).
+**/node_modules
+**/dist
+**/dist-bundle
+**/*.tsbuildinfo
+**/release
+.git
+.env
+.env.*
+!.env.example
+profiles
+testing
+images
+progress

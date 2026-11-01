@@ -1,0 +1,63 @@
+# The Enclave relay on a small server (docs/setup/relay-deploy.md): the relay itself, Caddy
+# for HTTPS (certificates from Let's Encrypt), and coturn for TURN. Settings come from .env
+# next to this file (copy .env.example).
+#
+#   docker compose up -d --build
+
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: packages/relay/Dockerfile
+    image: enclave-relay:0.1.0
+    restart: unless-stopped
+    environment:
+      RELAY_SIGNUP: ${RELAY_SIGNUP:-invite}
+      RELAY_INVITE_CODE: ${RELAY_INVITE_CODE:-}
+      RELAY_TRUST_PROXY: '1'
+      TURN_SECRET: ${TURN_SECRET}
+      TURN_HOST: ${RELAY_DOMAIN}
+      TURN_IP: ${TURN_IP}
+      TURN_PORT: '3478'
+    volumes:
+      - relay-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    # Only Caddy reaches it; nothing is published.
+    expose: ['8790']
+
+  caddy:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    restart: unless-stopped
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [relay]
+
+  coturn:
+    image: coturn/coturn:4.18.0@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3
+    restart: unless-stopped
+    # TURN hands out relay ports from a range: host networking avoids publishing thousands of ports.
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --static-auth-secret=${TURN_SECRET}
+      - --realm=${RELAY_DOMAIN}
+      - --external-ip=${TURN_IP}
+
+volumes:
+  relay-data:
+  caddy-data:
+  caddy-config:

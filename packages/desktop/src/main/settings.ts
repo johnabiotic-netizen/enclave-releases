@@ -6,13 +6,18 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { safeStorage } from 'electron';
 
+export type PhoneMode = 'relay' | 'tailscale' | 'off';
+
 export interface AppSettings {
   /** The agent token, encrypted (base64). Made on first run. */
   agentTokenEnc?: string;
   /** WSL distro running Docker Engine, on a PC without Docker Desktop. */
   wslDistro?: string;
-  /** Phone access over Tailscale, or off. Unset: as the environment says (developer .env). */
-  phone?: 'tailscale' | 'off';
+  /**
+   * Phone access: through the Enclave relay, over Tailscale, or off. Unset: as the environment
+   * says (developer .env).
+   */
+  phone?: PhoneMode;
   /** Idle stop for new profiles, in minutes. */
   idleMinutes?: number;
   /** The proxy the create wizard starts with, encrypted (base64). */

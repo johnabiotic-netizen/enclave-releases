@@ -9,7 +9,7 @@
 // With a relay url (no #pair=), it reuses PROFILE_DIR from an earlier run (paired already).
 // Env: EDGE_PATH, PROFILE_DIR (Edge's data folder, kept between runs), RELAY_ONLY=1 (the phone
 // may use only TURN: a phone on a network that blocks direct connections), TCP_ONLY=1 (TURN
-// over TCP only: a network that blocks UDP), SHOT=<file.png>.
+// over TCP only: a network that blocks UDP), SHARE=1 (share the fake camera and mic), SHOT=<file.png>.
 import { spawn } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import fs from 'node:fs';
@@ -142,6 +142,13 @@ try {
     await sleep(500);
   }
   if (!playing) throw new Error('The stream did not play.');
+  if (process.env.SHARE === '1') {
+    // The phone camera and mic into the profile, as the Camera and Mic buttons do.
+    await evaluate(
+      `document.getElementById("camera").click(); document.getElementById("mic").click(); true`,
+    );
+    log('sharing camera and mic');
+  }
   const end = Date.now() + Number(seconds) * 1000;
   let frames = 0;
   while (Date.now() < end) {
