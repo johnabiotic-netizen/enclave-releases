@@ -36,6 +36,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // "Local State"). Electron names that folder after the app, so a rename would lose the key and
 // with it every saved password. It is fixed here: %APPDATA%\Enclave, whatever the app is called.
 app.setPath('userData', path.join(app.getPath('appData'), 'Enclave'));
+// Developer runs only: the UI tests start a separate Enclave with its own folders (e2e/).
+if (!app.isPackaged && process.env.ENCLAVE_TEST_USER_DATA) {
+  app.setPath('userData', process.env.ENCLAVE_TEST_USER_DATA);
+}
 
 // A developer run from the repo uses the repo's .env (Docker in WSL, phone mode, test proxy).
 const repoEnv = path.resolve(here, '../../../.env');

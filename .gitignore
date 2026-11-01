@@ -15,3 +15,4 @@ out/
 *.tsbuildinfo
 __pycache__/
 release/
+e2e-results/

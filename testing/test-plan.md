@@ -5,7 +5,7 @@ Testing is per stage. The authority on what "done" means is each stage spec's ac
 ## Automated
 - `packages/shared`: type tests compile.
 - `packages/agent`: Vitest unit tests for proxy parsing (all three formats), the safety check logic (mock the network), fingerprint validation against the JSON schema, and idle stop timing.
-- `packages/desktop` (Stage 5): Playwright smoke tests for create, start, view, stop, delete.
+- `packages/desktop` (Stage 5): Playwright smoke test for create, start, view, stop, delete (`e2e/smoke.spec.ts`; needs Docker, the image and TEST_PROXY; run with `pnpm build` then `pnpm --filter @enclave/desktop test:e2e`).
 - `packages/relay` (Stage 6): unit tests for pairing, session issuance, and revoke.
 
 ## Manual, every time the browser image changes
