@@ -1,7 +1,10 @@
 #!/bin/sh
 # Runs as root when WSL starts this system (wsl.conf [boot]): starts Docker Engine.
+# WSL gives boot commands a bare environment: dockerd finds containerd, runc and its
+# helpers on PATH.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 mkdir -p /var/log /var/run
-if [ ! -S /var/run/docker.sock ] || ! socat -u OPEN:/dev/null UNIX-CONNECT:/var/run/docker.sock 2>/dev/null; then
+if ! socat -u OPEN:/dev/null UNIX-CONNECT:/var/run/docker.sock 2>/dev/null; then
   rm -f /var/run/docker.sock /var/run/docker.pid
-  nohup /usr/local/bin/dockerd >>/var/log/dockerd.log 2>&1 &
+  nohup dockerd >>/var/log/dockerd.log 2>&1 &
 fi

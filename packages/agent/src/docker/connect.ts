@@ -1,11 +1,12 @@
 // How the agent reaches Docker on Windows.
 //
 // Docker Desktop: its named pipe, //./pipe/docker_engine.
-// Docker Engine inside a WSL distro (the owner's PC, see progress/DECISIONS.md): Windows has
-// no pipe. The agent opens a private named pipe of its own and, for every connection on it,
-// runs `wsl.exe -d <distro> -u root -- docker system dial-stdio`, which connects that
-// process's stdin/stdout to the daemon. Nothing listens on a TCP port, and the distro stays
-// running while a connection is open.
+// Docker Engine inside a WSL distro (the owner's PC, and Enclave's own system from
+// images/wsl, see progress/DECISIONS.md): Windows has no pipe. The agent opens a private named
+// pipe of its own and, for every connection on it, runs a command in the distro that connects
+// its stdin/stdout to the daemon: `docker system dial-stdio` where the docker tool is
+// installed, else socat to the daemon's socket (Enclave's system ships no docker tool).
+// Nothing listens on a TCP port, and the distro stays running while a connection is open.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -14,6 +15,9 @@ import net from 'node:net';
 import Docker from 'dockerode';
 
 const DESKTOP_PIPE = '//./pipe/docker_engine';
+const DIAL =
+  'if command -v docker >/dev/null 2>&1; then exec docker system dial-stdio; ' +
+  'else exec socat - UNIX-CONNECT:/var/run/docker.sock; fi';
 
 export interface DockerConnectOptions {
   /** `DOCKER_HOST` if set: passed to dockerode as is. */
@@ -63,7 +67,7 @@ async function startWslBridge(distro: string): Promise<WslBridge> {
   const server = net.createServer((socket) => {
     const child = spawn(
       'wsl.exe',
-      ['-d', distro, '-u', 'root', '--', 'docker', 'system', 'dial-stdio'],
+      ['-d', distro, '-u', 'root', '-e', 'sh', '-c', DIAL],
       {
         stdio: ['pipe', 'pipe', 'ignore'],
         windowsHide: true,
