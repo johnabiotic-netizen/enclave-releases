@@ -9,6 +9,11 @@ Context: Stage 5 "Verify first". Checked npm, releases.electronjs.org and the El
 Decision: Electron 45.2.1 (Node 24.22.1, Chromium 156; the newest stable, three majors supported), React 19.3.1, Vite 8.3.5, @vitejs/plugin-react 6.1.2, electron-builder 26.18.0, @playwright/test 1.64.1; TypeScript stays at the repo's 6.0.3. Secrets use the async safeStorage API (isAsyncEncryptionAvailable, encryptStringAsync, decryptStringAsync): the sync calls are deprecated in 45 and removed in 46. On Windows it is DPAPI, which protects from other Windows users, not from other programs of the same user. The PC viewer uses @m1k1o/neko 3.2.0 (neko's official client library, as the phone app) directly in the renderer with mouse and keyboard input, not a webview or iframe of neko's page.
 Reason: Node 24 in Electron matches the agent, so the agent runs in the main process unchanged (startAgent). One client library for PC and phone; no second web app to keep in step.
 
+## 2026-11-01  Stage 5 closed; acceptance test 1 moves to Stage 7
+Context: Test 1 needs a fresh Windows PC and a browser image that can be set up there; our Camoufox build has no public download until Stage 7 publishes the image.
+Decision: Owner agreed to close Stage 5 with test 1 carried to Stage 7. The owner reviews the look and wording (test 5) while using the app; flagged items are fixed as they come.
+Reason: Everything else in Stage 5 is built and verified on the owner's PC.
+
 ## 2026-11-01  Update location changes the location keys only, voices included
 Context: specs/profile-schema.md allows timezone, locale, languages and geolocation to change via "Update location". In the saved Camoufox config the language also decides the Windows speech voices (Camoufox draws voices for the locale; a German Windows has German voices), and Firefox's intl.locale.requested.
 Decision: Update location makes a fingerprint for the new place on the profile's own GPU and copies only timezone, locale:language/region/script, geolocation:*, webrtc:ipv4, voices, voices:blockIfNotDefined and the pref intl.locale.requested; the summary fields follow. Offered in the edit form (PATCH updateLocation) and after a refused start (POST /profiles/:id/update-location). Logged as location-updated.
