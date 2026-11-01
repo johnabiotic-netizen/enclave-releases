@@ -215,7 +215,7 @@ RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
 
 COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
 
-ARG NEKO_SHA256=16226fbf6c4e391abfded3386f0c3db0ae5b3c9d5b26ec2b2f1dbaa4f13e0d19
+ARG NEKO_SHA256=e88f09ebf4a922dc1f66b84a36010fbc46b928a6efec236e0358cb2676e9e907
 RUN --mount=type=bind,from=neko-dist,target=/dist/neko \
     set -eux; \
     echo "${NEKO_SHA256}  /dist/neko/neko" | sha256sum -c -; \
