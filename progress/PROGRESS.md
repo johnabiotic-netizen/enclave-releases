@@ -100,7 +100,10 @@ Spec: `stages/stage-5-windows-app.md`
 - [x] H. Tray: close hides to tray, Quit stops profiles cleanly. Verified 2026-10-31: closing the window (as its X does) hid it, kept the tray icon and the agent answering, and showed "Enclave is still running" once (remembered in app-settings.json); Quit Enclave stopped the running Phone test (logged "stopped, requested") and exited with no Enclave process left. Windows ending the session goes the same way (before-quit). The app and tray icons are drawn at build time (PNG and a multi-size ICO).
 - [x] I. Packaging with electron-builder (unsigned installer). Verified 2026-11-01: `pnpm --filter @enclave/desktop dist` builds release/Enclave-Setup-0.1.0.exe (117 MB, NSIS, per user, unsigned); the main process is one bundle with the agent (3.6 MB). The unpacked build, with no .env, found Docker in Ubuntu-24.04 by itself, listed the five profiles, served the phone app over Tailscale (HTTP 200) and played Phone test in the viewer (1920x1080, sound on). The silent install put Enclave in %LOCALAPPDATA%ProgramsEnclave with Start menu and desktop shortcuts, and the installed app works the same. Found on the way: the setup loop and the moved encryption key (DECISIONS 2026-11-01).
 - [x] J. Playwright smoke tests for the main flows. packages/desktop/e2e/smoke.spec.ts (@playwright/test 1.64.1) drives the real app against Docker: create with the test proxy (Check, device, review), Start (seam amber then green), Open (the stream plays), Stop from the menu, Delete with its confirmation. It runs a separate Enclave (own data folders, port 8797, phone off) and deletes its profile even on failure. Verified 2026-11-01: passes in 35 s; the owner's five profiles, running Phone test and installed Enclave untouched, no container or volume left.
-## Stage 6: Phone linking  [ ]
+## Stage 6: Phone linking  [~]
+Spec: `stages/stage-6-phone-linking.md`
+- [x] Verify first (2026-11-01): coturn 4.18.0 with time-limited credentials; neko needs ICE lite off and backend TURN servers; hosting on a small VPS with the owner's domain (owner, DECISIONS 2026-11-01).
+- [ ] Owner: create the VPS and buy the domain (steps given 2026-11-01).
 ## Stage 7: Launch  [ ]
 
 ## Blockers
