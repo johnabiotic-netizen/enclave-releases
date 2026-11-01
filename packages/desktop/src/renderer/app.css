@@ -905,3 +905,23 @@ textarea:focus-visible {
   height: 10px;
   accent-color: var(--accent);
 }
+
+/* ---------------------------------------------------------------- export and import */
+
+.transfer-fields {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+.transfer-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--text-300);
+}
+.transfer-progress progress {
+  width: 100%;
+}
+.dialog .mono {
+  overflow-wrap: anywhere;
+}

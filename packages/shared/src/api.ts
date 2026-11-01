@@ -22,6 +22,9 @@ export const ERROR_CODES = [
   'SECRETS_LOCKED',
   'RELAY_UNREACHABLE',
   'RELAY_REFUSED',
+  'BAD_PROFILE_FILE',
+  'WRONG_PASSPHRASE',
+  'PROFILE_EXISTS',
   'INTERNAL',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -9,6 +9,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   ipcMain,
   Menu,
   nativeImage,
@@ -29,7 +30,10 @@ import type {
   AgentState,
   AppSettingsChange,
   AppSettingsView,
+  ExportResult,
+  ImportResult,
   SetupCheck,
+  TransferProgress,
 } from '../shared/bridge.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -321,6 +325,102 @@ ipcMain.handle('downloads:save', async (_e, profileId: unknown, name: unknown) =
   await writeFile(target, res.rawPayload, { flag: 'wx' });
   await writeFile(`${target}:Zone.Identifier`, '[ZoneTransfer]\r\nZoneId=3\r\n').catch(() => {});
   return { path: target };
+});
+
+// Profile export and import (specs/profile-file.md). The file paths come from Windows' own
+// save and open dialogs here, never from the window, and the agent's HTTP API has no route
+// for them: in Tailscale phone mode a phone holds the API token.
+let exportedFile: string | null = null;
+let importFile: string | null = null;
+let transferring = false;
+
+function sendProgress(progress: TransferProgress): void {
+  win?.webContents.send('transfer:progress', progress);
+}
+
+function failure(err: unknown): { message: string; code?: string } {
+  const e = err as { message?: string; code?: string };
+  return { message: e?.message ?? String(err), ...(e?.code ? { code: e.code } : {}) };
+}
+
+ipcMain.handle(
+  'profiles:export',
+  async (_e, id: unknown, passphrase: unknown): Promise<ExportResult> => {
+    if (!agent) return { status: 'failed', message: 'Enclave is still starting.' };
+    if (transferring) return { status: 'failed', message: 'Another export or import is running.' };
+    if (typeof id !== 'string' || typeof passphrase !== 'string') {
+      return { status: 'failed', message: 'Bad request.' };
+    }
+    let name: string;
+    try {
+      name = (await agent.service.get(id)).name;
+    } catch (err) {
+      return { status: 'failed', ...failure(err) };
+    }
+    const options = {
+      title: `Export ${name}`,
+      defaultPath: path.join(app.getPath('documents'), `${windowsFileName(name)}.enclave`),
+      filters: [{ name: 'Enclave profile', extensions: ['enclave'] }],
+    };
+    const picked = win
+      ? await dialog.showSaveDialog(win, options)
+      : await dialog.showSaveDialog(options);
+    if (picked.canceled || !picked.filePath) return { status: 'canceled' };
+    transferring = true;
+    try {
+      const { bytes } = await agent.service.exportProfile(id, passphrase, picked.filePath, {
+        appVersion: app.getVersion(),
+        onProgress: (done) => sendProgress({ done }),
+      });
+      exportedFile = picked.filePath;
+      return { status: 'saved', path: picked.filePath, bytes };
+    } catch (err) {
+      return { status: 'failed', ...failure(err) };
+    } finally {
+      transferring = false;
+    }
+  },
+);
+
+ipcMain.handle('profiles:pick-import', async (): Promise<string | null> => {
+  const options = {
+    title: 'Import a profile',
+    properties: ['openFile' as const],
+    filters: [{ name: 'Enclave profile', extensions: ['enclave'] }],
+  };
+  const picked = win
+    ? await dialog.showOpenDialog(win, options)
+    : await dialog.showOpenDialog(options);
+  importFile = picked.canceled ? null : (picked.filePaths[0] ?? null);
+  return importFile ? path.basename(importFile) : null;
+});
+
+ipcMain.handle('profiles:import', async (_e, passphrase: unknown): Promise<ImportResult> => {
+  if (!agent) return { status: 'failed', message: 'Enclave is still starting.' };
+  if (transferring) return { status: 'failed', message: 'Another export or import is running.' };
+  if (!importFile) return { status: 'failed', message: 'Choose a profile file first.' };
+  if (typeof passphrase !== 'string') return { status: 'failed', message: 'Bad request.' };
+  transferring = true;
+  try {
+    const { profile, otherGpu } = await agent.service.importProfile(importFile, passphrase, {
+      onProgress: (done, total) => sendProgress({ done, total }),
+    });
+    importFile = null;
+    return {
+      status: 'imported',
+      id: profile.id,
+      name: profile.name,
+      ...(otherGpu ? { otherGpu } : {}),
+    };
+  } catch (err) {
+    return { status: 'failed', ...failure(err) };
+  } finally {
+    transferring = false;
+  }
+});
+
+ipcMain.handle('profiles:show-exported', () => {
+  if (exportedFile) shell.showItemInFolder(exportedFile);
 });
 
 ipcMain.handle('downloads:show', (_e, target: unknown) => {

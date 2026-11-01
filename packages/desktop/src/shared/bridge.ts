@@ -41,6 +41,28 @@ export interface SetupCheck {
   action?: 'download-image';
 }
 
+/** How an export went. Failures carry a message for the person, not an exception. */
+export type ExportResult =
+  | { status: 'saved'; path: string; bytes: number }
+  | { status: 'canceled' }
+  | { status: 'failed'; message: string };
+
+export type ImportResult =
+  | {
+      status: 'imported';
+      id: string;
+      name: string;
+      /** Made on a PC with another graphics card: imported, but it can't start here. */
+      otherGpu?: { madeOn: string; current: string | null };
+    }
+  | { status: 'failed'; code?: string; message: string };
+
+/** Progress of the export or import under way: bytes so far, and the total when known. */
+export interface TransferProgress {
+  done: number;
+  total?: number;
+}
+
 export interface EnclaveBridge {
   /** Runs every setup check (restarting Enclave's service first if it is not running). */
   setupChecks(): Promise<SetupCheck[]>;
@@ -68,4 +90,16 @@ export interface EnclaveBridge {
   copyText(text: string): Promise<void>;
   /** Called on every change; returns what stops listening. */
   onAgentState(listener: (state: AgentState) => void): () => void;
+  /**
+   * Exports a stopped profile to one encrypted file: asks where to save it, then writes it.
+   * Not in the agent's HTTP API on purpose (specs/profile-file.md).
+   */
+  exportProfile(id: string, passphrase: string): Promise<ExportResult>;
+  /** Asks for a profile file to import; gives its name, or null if none was chosen. */
+  pickProfileFile(): Promise<string | null>;
+  /** Imports the file chosen with pickProfileFile. */
+  importProfile(passphrase: string): Promise<ImportResult>;
+  /** Shows the last exported file in File Explorer. */
+  showExportedFile(): Promise<void>;
+  onTransferProgress(listener: (progress: TransferProgress) => void): () => void;
 }

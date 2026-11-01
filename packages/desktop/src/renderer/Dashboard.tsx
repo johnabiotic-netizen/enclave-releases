@@ -17,6 +17,7 @@ import {
 import { CloseIcon, MoreIcon, PlusIcon } from './icons';
 import type { ProfilesModel } from './useProfiles';
 import { PROXY_LOST } from './Viewer';
+import { ExportDialog, ImportDialog } from './Transfer';
 
 interface Props {
   model: ProfilesModel;
@@ -29,6 +30,12 @@ interface Props {
 
 export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit }: Props) {
   const [deleting, setDeleting] = useState<Profile | null>(null);
+  const [exporting, setExporting] = useState<Profile | null>(null);
+  const [importing, setImporting] = useState<string | null>(null);
+  const pickImport = async () => {
+    const name = await window.enclave.pickProfileFile();
+    if (name) setImporting(name);
+  };
   const { profiles } = model;
   const current = profiles?.find((p) => p.id === selected) ?? null;
 
@@ -47,18 +54,28 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit 
         <header className="page-head">
           <h1>Profiles</h1>
           {profiles.length > 0 && (
-            <button className="button primary" onClick={onCreate}>
-              <PlusIcon /> Create profile
-            </button>
+            <div className="row">
+              <button className="button" onClick={() => void pickImport()}>
+                Import profile
+              </button>
+              <button className="button primary" onClick={onCreate}>
+                <PlusIcon /> Create profile
+              </button>
+            </div>
           )}
         </header>
         {model.loadError && <p className="notice error">{model.loadError}</p>}
         {profiles.length === 0 ? (
           <div className="empty">
             <p>No profiles yet. Create your first sealed profile to get started.</p>
-            <button className="button primary" onClick={onCreate}>
-              Create profile
-            </button>
+            <div className="row">
+              <button className="button primary" onClick={onCreate}>
+                Create profile
+              </button>
+              <button className="button" onClick={() => void pickImport()}>
+                Import a profile file
+              </button>
+            </div>
           </div>
         ) : (
           <ul className="grid" aria-label="Profiles">
@@ -77,6 +94,7 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit 
                 onStop={() => void model.stop(p.id)}
                 onEdit={() => onEdit(p.id)}
                 onDelete={() => setDeleting(p)}
+                onExport={() => setExporting(p)}
               />
             ))}
           </ul>
@@ -92,6 +110,17 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit 
           onOpen={() => onOpen(current.id)}
           onStop={() => void model.stop(current.id)}
           onEdit={() => onEdit(current.id)}
+        />
+      )}
+      {exporting && <ExportDialog profile={exporting} onClose={() => setExporting(null)} />}
+      {importing && (
+        <ImportDialog
+          fileName={importing}
+          onClose={() => setImporting(null)}
+          onImported={(id) => {
+            void model.refresh();
+            onSelect(id);
+          }}
         />
       )}
       {deleting && (
@@ -123,6 +152,7 @@ interface TileProps {
   onStop(): void;
   onEdit(): void;
   onDelete(): void;
+  onExport(): void;
 }
 
 function Tile({ profile: p, state, selected, error, moved, ...on }: TileProps) {
@@ -165,6 +195,7 @@ function Tile({ profile: p, state, selected, error, moved, ...on }: TileProps) {
           onStop={on.onStop}
           onEdit={on.onEdit}
           onDelete={on.onDelete}
+          onExport={on.onExport}
         />
       </div>
     </li>
@@ -178,6 +209,7 @@ function TileMenu(props: {
   onStop(): void;
   onEdit(): void;
   onDelete(): void;
+  onExport(): void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -218,6 +250,14 @@ function TileMenu(props: {
           )}
           <button role="menuitem" onClick={pick(props.onEdit)} disabled={props.busy}>
             Edit
+          </button>
+          <button
+            role="menuitem"
+            onClick={pick(props.onExport)}
+            disabled={props.running || props.busy}
+            title={props.running ? 'Stop the profile before exporting it.' : undefined}
+          >
+            Export
           </button>
           <button
             role="menuitem"

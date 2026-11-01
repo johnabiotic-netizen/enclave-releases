@@ -33,6 +33,8 @@ Relay mode (`ENCLAVE_PHONE=relay`, Stage 6): the agent keeps one outbound WebSoc
 
 Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this API and each running profile's stream to the owner's tailnet over HTTPS; the server still binds 127.0.0.1 only. Paths outside `/v1` serve the phone app's static files without a token.
 
+Not in this API on purpose: exporting and importing a profile file (specs/profile-file.md). The Windows app calls the agent for them directly, with paths from Windows' file dialogs, because a phone in Tailscale mode holds this API's token.
+
 ## Behaviors
 - `POST /profiles` runs the proxy safety check first; on failure returns 422 with details and creates nothing.
 - `start` reruns the safety check; on failure returns 422 and does not start.
@@ -41,4 +43,4 @@ Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this A
 - Every state change is logged (without secrets) to the profile's log file.
 
 ## Error codes
-`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `FILE_PICKER_CLOSED` (a phone file arrived but no file picker is open in the profile), `SECRETS_LOCKED` (the profile's passwords are encrypted for the Windows app and this agent cannot open them, e.g. the CLI), `RELAY_UNREACHABLE` (502: the relay could not be reached or failed), `RELAY_REFUSED` (403: the relay said no, e.g. a wrong password; its message is passed on), `INTERNAL`.
+`DOCKER_DOWN`, `PROXY_UNREACHABLE`, `PROXY_LOCATION_MISMATCH`, `IMAGE_NOT_BUILT`, `GPU_UNAVAILABLE` (no graphics card for profiles, or the profile was made on a different one), `PROFILE_NOT_FOUND`, `PROFILE_RUNNING`, `PROFILE_NOT_RUNNING`, `REAL_IP_LEAK_SUSPECTED`, `FILE_PICKER_CLOSED` (a phone file arrived but no file picker is open in the profile), `SECRETS_LOCKED` (the profile's passwords are encrypted for the Windows app and this agent cannot open them, e.g. the CLI), `RELAY_UNREACHABLE` (502: the relay could not be reached or failed), `RELAY_REFUSED` (403: the relay said no, e.g. a wrong password; its message is passed on), `BAD_PROFILE_FILE` (422: not an Enclave profile file, damaged, cut short, or from a newer Enclave), `WRONG_PASSPHRASE` (422: the passphrase doesn't open a profile file), `PROFILE_EXISTS` (409: importing a profile this PC already has), `INTERNAL`.

@@ -34,6 +34,7 @@ enclave/
     profile-schema.md            what a profile is
     agent-api.md                 the local API contract
     relay-protocol.md            phone pairing and signaling (Stage 6)
+    profile-file.md              exported profile file: format and rules (Stage 7)
     schemas/profile.schema.json  machine-readable profile schema
 
   ui/

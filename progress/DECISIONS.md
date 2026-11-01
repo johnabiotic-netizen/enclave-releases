@@ -2,6 +2,11 @@
 
 One entry per real decision. Newest at the top. Keep each to a few lines: context, decision, reason. Record here whenever you deviate from a spec because reality differed, or when you make a choice the docs left open.
 
+## 2026-11-01  Stage 7: export and import a profile as one encrypted file
+Context: Stage 7 task "Export/import a single profile as an encrypted file". A profile's fingerprint names the graphics card it was made on, and the agent refuses to start it on another (hard rule 2), so a file can't make a profile run on any PC.
+Decision: specs/profile-file.md. Passphrase (10+ characters) through scrypt (N 2^17, r 8, p 1); AES-256-GCM in 1 MiB records with the header and a final flag authenticated; gzip inside. Holds profile.json, the proxy password and the /data volume without caches and lock files, read and written through a created, never started container. Export needs the profile stopped. Import makes a new id, refuses a profile this PC already has (same fingerprint), and on another graphics card imports but says the profile can't start there. App only (IPC with Windows' file dialogs), not in the HTTP API, which a Tailscale phone can reach.
+Reason: A backup and a move to an identical PC without weakening the fixed fingerprint; no outside service or key to keep. Cloud backups (R2) stay for after the beta.
+
 Format:
 ```
 ## 2026-10-31  Stage 5 verify first: Electron 45, async safeStorage, viewer with neko's client library

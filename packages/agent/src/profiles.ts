@@ -1,7 +1,11 @@
 // Profile lifecycle: create (safety check + fingerprint), start, stop, delete, idle stop.
 
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { PassThrough, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip, createGzip } from 'node:zlib';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +37,17 @@ import { evaluateAudit, summarize, type Finding, type Reference } from './audit-
 import { ProxyTester, type ProxyTestJob } from './proxy-tester.js';
 import { AgentError, InputError } from './errors.js';
 import { stripLocation } from './strip-location.js';
+import {
+  checkPassphrase,
+  createManifestSplit,
+  createOpenStream,
+  createSealStream,
+  createTarFilter,
+  keepOnExport,
+  keepOnImport,
+  manifestBlock,
+  type ProfileFileManifest,
+} from './profile-file.js';
 import { nekoLogin, nekoReachable, nekoSessions } from './neko.js';
 import { describeProxy, judgeProxyCheck, parseProxy, type RawProxyCheck } from './proxy.js';
 import { PROXY_SECRET_REF, type ProfileSecrets, type ProfileStore } from './store.js';
@@ -522,6 +537,166 @@ export class ProfileService {
       await this.store.remove(id);
       this.forget(id);
     });
+  }
+
+  /**
+   * Writes the profile to one encrypted file (profile-file.ts): its settings, its proxy
+   * password and its browser data without caches. The profile must be stopped, so the browser
+   * has saved everything. The app calls this directly; it is not in the HTTP API, which a
+   * phone in Tailscale mode can reach.
+   */
+  async exportProfile(
+    id: string,
+    passphrase: string,
+    file: string,
+    options: { appVersion: string; onProgress?: (bytes: number) => void },
+  ): Promise<{ bytes: number }> {
+    checkPassphrase(passphrase);
+    return this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      const box = await this.runtime.inspect(containerName(id));
+      if (box?.State?.Running) {
+        throw new AgentError(
+          'PROFILE_RUNNING',
+          'Stop the profile before exporting it, so its browser saves everything first.',
+        );
+      }
+      const secrets = await this.store.getSecrets(id);
+      const manifest: ProfileFileManifest = {
+        format: 1,
+        exportedAt: new Date().toISOString(),
+        appVersion: options.appVersion,
+        profile: { ...profile, status: stoppedStatus() },
+        secrets: secrets.proxyPassword ? { proxyPassword: secrets.proxyPassword } : {},
+      };
+      const partial = `${file}.part`;
+      let read = 0;
+      try {
+        await this.runtime.withVolume(volumeName(id), true, async (c) => {
+          const tar = (await c.getArchive({ path: '/data' })) as unknown as NodeJS.ReadableStream;
+          const gzip = createGzip({ level: 6 });
+          gzip.write(manifestBlock(manifest));
+          await pipeline(
+            tar,
+            counter((n) => {
+              read += n;
+              options.onProgress?.(read);
+            }),
+            createTarFilter(keepOnExport),
+            gzip,
+            await createSealStream(passphrase),
+            createWriteStream(partial),
+          );
+        });
+        await rename(partial, file);
+      } catch (err) {
+        await rm(partial, { force: true });
+        throw err;
+      }
+      const { size } = await stat(file);
+      await this.store.log(id, 'exported', { bytes: size });
+      return { bytes: size };
+    });
+  }
+
+  /**
+   * Makes a new profile from an exported file: same settings, fingerprint and browser data,
+   * a new id. Refused when this PC already has the profile (two copies would be two devices
+   * with one identity). `otherGpu` is set when the profile was made on a different graphics
+   * card: it is imported, but won't start on this PC.
+   */
+  async importProfile(
+    file: string,
+    passphrase: string,
+    options: { onProgress?: (done: number, total: number) => void } = {},
+  ): Promise<{ profile: Profile; otherGpu?: { madeOn: string; current: string | null } }> {
+    checkPassphrase(passphrase);
+    await this.runtime.assertReady();
+    let total: number;
+    try {
+      total = (await stat(file)).size;
+    } catch {
+      throw new InputError("That file can't be found.");
+    }
+    let done = 0;
+    const split = createManifestSplit();
+    const tail = new PassThrough();
+    const flowing = pipeline(
+      createReadStream(file),
+      counter((n) => {
+        done += n;
+        options.onProgress?.(done, total);
+      }),
+      createOpenStream(passphrase),
+      createGunzip(),
+      split.stream,
+      createTarFilter(keepOnImport),
+      tail,
+    ).catch((err: unknown) => {
+      tail.destroy();
+      throw plainError(err);
+    });
+    flowing.catch(() => {});
+    const stopFlowing = async () => {
+      tail.destroy();
+      await flowing.catch(() => {});
+    };
+
+    let imported: Profile;
+    let manifest: ProfileFileManifest;
+    try {
+      // A wrong passphrase fails the stream before the manifest ever arrives.
+      manifest = await Promise.race([split.manifest, flowing.then(() => split.manifest)]);
+      imported = validImport(manifest);
+    } catch (err) {
+      await stopFlowing();
+      throw plainError(err);
+    }
+    const same = (await this.list()).find(
+      (p) => JSON.stringify(p.fingerprint) === JSON.stringify(imported.fingerprint),
+    );
+    if (same) {
+      await stopFlowing();
+      throw new AgentError(
+        'PROFILE_EXISTS',
+        `This PC already has this profile, as "${same.name}". Delete that one first to restore the copy.`,
+        { id: same.id },
+      );
+    }
+
+    const id = this.store.newId();
+    const now = new Date().toISOString();
+    const profile: Profile = { ...imported, id, updatedAt: now, status: stoppedStatus() };
+    await this.runtime.ensureVolume(volumeName(id), id);
+    try {
+      await this.runtime.withVolume(volumeName(id), false, async (c) => {
+        // A decryption error ends the upload early: report that error, not Docker's.
+        const [up, flow] = await Promise.allSettled([c.putArchive(tail, { path: '/' }), flowing]);
+        if (flow.status === 'rejected') throw flow.reason;
+        if (up.status === 'rejected') throw up.reason;
+      });
+      await this.store.saveSecrets(
+        id,
+        manifest.secrets?.proxyPassword ? { proxyPassword: manifest.secrets.proxyPassword } : {},
+      );
+      await this.store.save(profile);
+    } catch (err) {
+      await stopFlowing();
+      await this.runtime.removeVolume(volumeName(id));
+      await this.store.remove(id).catch(() => {});
+      throw err;
+    }
+    await this.store.log(id, 'imported', {
+      name: profile.name,
+      exportedAt: manifest.exportedAt,
+      userAgent: profile.fingerprint.userAgent,
+    });
+
+    const madeOn = profile.fingerprint.webgl?.hostAdapter;
+    const current = await detectGpu(this.config.gpu).catch(() => null);
+    return typeof madeOn === 'string' && madeOn !== current
+      ? { profile, otherGpu: { madeOn, current } }
+      : { profile };
   }
 
   async checkProfileProxy(id: string): Promise<ProxyCheckResult> {
@@ -1227,6 +1402,67 @@ export class ProfileService {
       if (this.locks.get(id) === run) this.locks.delete(id);
     }
   }
+}
+
+function stoppedStatus(): ProfileStatus {
+  return {
+    state: 'stopped',
+    containerId: null,
+    streamPort: null,
+    lastError: null,
+    lastStartedAt: null,
+  };
+}
+
+/** Counts the bytes going through. */
+function counter(onBytes: (n: number) => void): Transform {
+  return new Transform({
+    transform(chunk: Buffer, _enc, done) {
+      onBytes(chunk.length);
+      done(null, chunk);
+    },
+  });
+}
+
+/** Errors from inside a profile file's streams: ours pass, the rest read as damage. */
+function plainError(err: unknown): Error {
+  if (err instanceof AgentError || err instanceof InputError) return err;
+  const code = (err as NodeJS.ErrnoException)?.code;
+  if (code === 'ENOENT') return new InputError("That file can't be found.");
+  if (
+    (typeof code === 'string' && code.startsWith('Z_')) ||
+    code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+    /^tar:/.test((err as Error)?.message ?? '')
+  ) {
+    return new AgentError(
+      'BAD_PROFILE_FILE',
+      'This profile file is damaged or incomplete. Export the profile again.',
+    );
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/** The profile inside an exported file, checked before anything is written. */
+function validImport(manifest: ProfileFileManifest): Profile {
+  const bad = (what: string) =>
+    new AgentError('BAD_PROFILE_FILE', `This profile file can't be imported: ${what}.`);
+  if (manifest?.format !== 1) throw bad('its format is unknown');
+  const p = manifest.profile;
+  if (!p || typeof p !== 'object') throw bad('it holds no profile');
+  validName(p.name);
+  if (!p.fingerprint || typeof p.fingerprint !== 'object' || !p.fingerprint.userAgent) {
+    throw bad('its device fingerprint is missing');
+  }
+  const proxy = p.proxy;
+  if (
+    !proxy ||
+    typeof proxy.type !== 'string' ||
+    typeof proxy.host !== 'string' ||
+    !Number.isInteger(proxy.port)
+  ) {
+    throw bad('its proxy is missing');
+  }
+  return p;
 }
 
 function validName(name: unknown): string {

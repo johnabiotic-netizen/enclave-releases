@@ -12,12 +12,12 @@
 
 ### Trust
 - [ ] Buy a code signing certificate (OV or EV). Sign the installer and app so Windows SmartScreen does not warn. Document the signing process in `scripts/`.
-- [ ] `THIRD_PARTY_NOTICES.md` complete and shipped.
+- [x] `THIRD_PARTY_NOTICES.md` complete and shipped.
 - [ ] Privacy policy and terms of service (see `docs/08-legal-and-acceptable-use.md`), including acceptable use and the ability to suspend.
 
 ### Backups
 - [ ] Encrypted profile backup to object storage (Backblaze B2 or Cloudflare R2). Key derived on the PC; never upload the key. Restore flow on a new PC.
-- [ ] Export/import a single profile as an encrypted file.
+- [x] Export/import a single profile as an encrypted file (specs/profile-file.md).
 
 ### Licensing and payments
 - [ ] Decide the model: license by number of concurrent running profiles, not stored profiles.

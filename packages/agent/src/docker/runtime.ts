@@ -186,6 +186,32 @@ export class DockerRuntime {
     }
   }
 
+  /**
+   * Runs `fn` with a container that is created but never started, holding `volume` at /data:
+   * enough for Docker to copy files in and out of the volume. Always removed afterwards.
+   */
+  async withVolume<T>(
+    volume: string,
+    readOnly: boolean,
+    fn: (container: Docker.Container) => Promise<T>,
+  ): Promise<T> {
+    const container = await this.docker.createContainer({
+      Image: this.image,
+      Cmd: ['true'],
+      Labels: { [PROFILE_LABEL]: 'one-off' },
+      NetworkDisabled: true,
+      HostConfig: {
+        NetworkMode: 'none',
+        Mounts: [{ Type: 'volume', Source: volume, Target: '/data', ReadOnly: readOnly }],
+      },
+    });
+    try {
+      return await fn(container);
+    } finally {
+      await container.remove({ force: true }).catch(() => {});
+    }
+  }
+
   /** Unpacks a tar (makeTar) at / in a running container. */
   async putArchive(name: string, tar: Buffer): Promise<void> {
     await this.docker.getContainer(name).putArchive(tar, { path: '/' });
