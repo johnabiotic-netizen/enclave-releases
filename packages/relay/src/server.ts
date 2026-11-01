@@ -121,7 +121,11 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
         async (req, reply) => {
           limits.password.take(req.ip);
           if (config.signup === 'closed') {
-            throw new HttpError(403, 'SIGNUP_CLOSED', 'This relay is not taking new accounts.');
+            throw new HttpError(
+              403,
+              'SIGNUP_CLOSED',
+              "This relay isn't taking new accounts. If you already have one, untick Make a new account with this email and sign in.",
+            );
           }
           if (
             config.signup === 'invite' &&
@@ -134,7 +138,7 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
             throw new HttpError(
               409,
               'ACCOUNT_EXISTS',
-              'There is already an account with this email. Sign in instead.',
+              'There is already an account with this email. Untick Make a new account with this email and sign in.',
             );
           }
           await store.addAccount(email, req.body.password);
