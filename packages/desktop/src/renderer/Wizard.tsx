@@ -314,25 +314,34 @@ export function EditProfile(props: { profile: Profile; running: boolean; onDone(
   const [proxy, setProxy] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The new proxy is in another country: where it is, for "Update location". */
+  const [moveTo, setMoveTo] = useState<string | null>(null);
 
-  const save = async () => {
+  const save = async (updateLocation = false) => {
     setSaving(true);
     setError(null);
+    setMoveTo(null);
     const minutes = Number(idle);
     const body: UpdateProfileRequest = {
       ...(name.trim() !== p.name ? { name: name.trim() } : {}),
       ...(notes.trim() !== (p.notes ?? '') ? { notes: notes.trim() } : {}),
       ...(minutes !== p.runtime.idleStopMinutes ? { idleStopMinutes: minutes } : {}),
       ...(changeProxy && proxy.trim() ? { proxy: proxy.trim() } : {}),
+      ...(updateLocation ? { updateLocation: true } : {}),
     };
     try {
       await api<Profile>('PATCH', `/profiles/${p.id}`, body);
       props.onDone();
     } catch (e) {
       if (e instanceof ApiFailure && e.code === 'PROXY_LOCATION_MISMATCH') {
+        const d = e.details as
+          { expected?: { country?: string }; actual?: { country?: string } } | undefined;
+        const there = countryName(d?.actual?.country) ?? 'another country';
+        const here = countryName(d?.expected?.country) ?? 'its own country';
         setError(
-          `${e.message.replace(/ Not starting.*$/, '')} Use a proxy in the profile's own country, or create a new profile for the new location.`,
+          `That proxy connected, but it is in ${there} while this profile is set to ${here}. Update the location or use a proxy in ${here}.`,
         );
+        setMoveTo(there);
       } else setError(nextStep(e));
       setSaving(false);
     }
@@ -395,14 +404,35 @@ export function EditProfile(props: { profile: Profile; running: boolean; onDone(
                   placeholder="socks5://user:pass@host:port"
                 />
                 <small>
-                  The new proxy must be in the same country and time zone as the profile. Saving
-                  checks it first.
+                  Saving checks the proxy first. If it is in another country, you can move the
+                  profile there.
                 </small>
               </>
             )}
             {props.running && <small>Stop the profile to change its proxy.</small>}
           </div>
           {error && <p className="notice error">{error}</p>}
+          {moveTo && (
+            <div className="choice">
+              <strong>Update location</strong>
+              <p>
+                The profile moves to {moveTo}: its time zone, language and location change to match
+                the proxy. Its device fingerprint stays the same otherwise.
+              </p>
+              <div className="row">
+                <button
+                  className="button primary"
+                  onClick={() => void save(true)}
+                  disabled={saving}
+                >
+                  Update location
+                </button>
+                <button className="button quiet" onClick={() => (setMoveTo(null), setError(null))}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         <footer className="wizard-foot">
           <button className="button quiet" onClick={props.onDone} disabled={saving}>
@@ -411,7 +441,7 @@ export function EditProfile(props: { profile: Profile; running: boolean; onDone(
           <button
             className="button primary"
             onClick={() => void save()}
-            disabled={saving || !name.trim() || !idleOk}
+            disabled={saving || !name.trim() || !idleOk || moveTo !== null}
           >
             {saving ? 'Saving' : 'Save changes'}
           </button>

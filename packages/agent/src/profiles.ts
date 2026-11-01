@@ -347,8 +347,12 @@ export class ProfileService {
         const proxy = parseProxy(req.proxy);
         await this.runtime.assertReady();
         const raw = await this.checkProxy(proxy, false);
-        assertLocationMatches(profile.fingerprint, raw);
-        moveGeolocation(profile.fingerprint, raw);
+        if (req.updateLocation && !locationMatches(profile.fingerprint, raw)) {
+          await this.relocate(profile, raw);
+        } else {
+          assertLocationMatches(profile.fingerprint, raw);
+          moveGeolocation(profile.fingerprint, raw);
+        }
         profile.proxy = {
           type: proxy.type,
           host: proxy.host,
@@ -370,6 +374,64 @@ export class ProfileService {
       profile.updatedAt = new Date().toISOString();
       await this.store.save(profile);
       return profile;
+    });
+  }
+
+  /**
+   * "Update location" when the profile's own proxy now exits in another country (a start was
+   * refused for that): the profile moves to where the proxy is. Nothing changes if it already
+   * matches.
+   */
+  async updateLocation(id: string): Promise<Profile> {
+    return this.exclusive(id, async () => {
+      const profile = await this.store.get(id);
+      if (profile.status.state === 'running' || profile.status.state === 'starting') {
+        throw new AgentError('PROFILE_RUNNING', 'Stop the profile before updating its location.');
+      }
+      await this.runtime.assertReady();
+      const proxy = proxyInput(profile, await this.store.getSecrets(id));
+      const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
+      if (!locationMatches(profile.fingerprint, raw)) await this.relocate(profile, raw);
+      profile.proxy.lastCheck = checkResult(raw, true);
+      profile.updatedAt = new Date().toISOString();
+      await this.store.save(profile);
+      return profile;
+    });
+  }
+
+  /**
+   * Moves a profile to the proxy's location (docs/06-proxies.md, specs/profile-schema.md): a
+   * fingerprint is made for the new place on the same GPU, and only its location values are
+   * taken (time zone, language with the Windows voices that go with it, geolocation, WebRTC
+   * IP). Screen, fonts, hardware, WebGL, audio and the rest stay as they were.
+   */
+  private async relocate(profile: Profile, raw: RawProxyCheck): Promise<void> {
+    const fp = profile.fingerprint;
+    const before = { country: fp.locale.split('-')[1], timezone: fp.timezone, locale: fp.locale };
+    const fresh = await this.generateFingerprint(raw, await this.requireSameGpu(fp));
+    fp.timezone = fresh.timezone;
+    fp.locale = fresh.locale;
+    if (fresh.languages) fp.languages = fresh.languages;
+    else delete fp.languages;
+    if (fresh.geolocation) fp.geolocation = fresh.geolocation;
+    else delete fp.geolocation;
+    const config = fp.raw?.config;
+    const prefs = fp.raw?.prefs;
+    if (config && fresh.raw) {
+      for (const key of LOCATION_CONFIG_KEYS) {
+        if (key in fresh.raw.config) config[key] = fresh.raw.config[key];
+        else delete config[key];
+      }
+    }
+    if (prefs && fresh.raw) {
+      for (const key of LOCATION_PREF_KEYS) {
+        if (key in fresh.raw.prefs) prefs[key] = fresh.raw.prefs[key];
+        else delete prefs[key];
+      }
+    }
+    await this.store.log(profile.id, 'location-updated', {
+      from: before,
+      to: { country: raw.country, timezone: fp.timezone, locale: fp.locale },
     });
   }
 
@@ -1118,10 +1180,34 @@ function checkResult(raw: RawProxyCheck, ok: boolean): ProxyCheckResult {
   };
 }
 
+/**
+ * The fingerprint values that follow the profile's location ("Update location"): Camoufox's
+ * config keys for time zone, language, geolocation, the WebRTC IP, and the Windows speech
+ * voices (a PC's voices come with its language); and Firefox's requested locale.
+ */
+const LOCATION_CONFIG_KEYS = [
+  'timezone',
+  'locale:language',
+  'locale:region',
+  'locale:script',
+  'geolocation:latitude',
+  'geolocation:longitude',
+  'geolocation:accuracy',
+  'webrtc:ipv4',
+  'voices',
+  'voices:blockIfNotDefined',
+];
+const LOCATION_PREF_KEYS = ['intl.locale.requested'];
+
+function locationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): boolean {
+  const country = fingerprint.locale.split('-')[1]?.toUpperCase();
+  return raw.timezone === fingerprint.timezone && (!country || raw.country === country);
+}
+
 /** Hard rule 3: the proxy's location must still match the saved fingerprint. */
 function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): void {
   const country = fingerprint.locale.split('-')[1]?.toUpperCase();
-  if (raw.timezone === fingerprint.timezone && (!country || raw.country === country)) return;
+  if (locationMatches(fingerprint, raw)) return;
   throw new AgentError(
     'PROXY_LOCATION_MISMATCH',
     `The proxy is now in ${raw.country} (${raw.timezone}), but this profile was made for ${country ?? '?'} (${fingerprint.timezone}). Not starting, to keep the profile consistent.`,

@@ -66,8 +66,18 @@ export interface UpdateProfileRequest {
   notes?: string;
   idleStopMinutes?: number;
   proxy?: ProxySpec;
+  /**
+   * With a new proxy in another country: move the profile there ("Update location"). Only the
+   * location changes (time zone, language and its Windows voices, geolocation); the rest of
+   * the fingerprint stays. Without it such a proxy is refused (PROXY_LOCATION_MISMATCH).
+   */
+  updateLocation?: boolean;
 }
 export type UpdateProfileResponse = Profile;
+
+// POST /profiles/:id/update-location: the profile's own proxy now exits in another country
+// (a start was refused with PROXY_LOCATION_MISMATCH); move the profile there.
+export type UpdateLocationResponse = Profile;
 
 // DELETE /profiles/:id?confirm=true
 export interface DeleteProfileQuery {

@@ -68,6 +68,8 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit 
                 state={model.shownState(p)}
                 selected={p.id === selected}
                 error={model.actionError[p.id]}
+                moved={Boolean(model.moved[p.id])}
+                onUpdateLocation={() => void model.updateLocation(p.id)}
                 onSelect={() => onSelect(p.id)}
                 onStart={() => void model.start(p.id)}
                 onOpen={() => onOpen(p.id)}
@@ -112,6 +114,8 @@ interface TileProps {
   state: ShownState;
   selected: boolean;
   error: string | undefined;
+  moved: boolean;
+  onUpdateLocation(): void;
   onSelect(): void;
   onStart(): void;
   onOpen(): void;
@@ -120,7 +124,7 @@ interface TileProps {
   onDelete(): void;
 }
 
-function Tile({ profile: p, state, selected, error, ...on }: TileProps) {
+function Tile({ profile: p, state, selected, error, moved, ...on }: TileProps) {
   const busy = state === 'starting' || state === 'stopping';
   const ip = exitIp(p);
   return (
@@ -140,7 +144,11 @@ function Tile({ profile: p, state, selected, error, ...on }: TileProps) {
         )}
       </button>
       <div className="tile-actions">
-        {state === 'running' ? (
+        {moved && state === 'stopped' ? (
+          <button className="button small" onClick={on.onUpdateLocation}>
+            Update location
+          </button>
+        ) : state === 'running' ? (
           <button className="button primary small" onClick={on.onOpen}>
             Open
           </button>

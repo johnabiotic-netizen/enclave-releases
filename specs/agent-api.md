@@ -10,7 +10,8 @@ Base: `http://127.0.0.1:<port>/v1`
 | GET | `/profiles` | - | `Profile[]` (without secrets) |
 | POST | `/profiles` | `{ name, proxy, template?, useTestProxy? }` | `Profile` (runs safety check, generates fingerprint) |
 | GET | `/profiles/:id` | - | `Profile` |
-| PATCH | `/profiles/:id` | `{ name?, notes?, idleStopMinutes?, proxy? }` | `Profile` |
+| PATCH | `/profiles/:id` | `{ name?, notes?, idleStopMinutes?, proxy?, updateLocation? }` | `Profile`. A new proxy in another country is refused (`PROXY_LOCATION_MISMATCH`) unless `updateLocation: true` ("Update location": time zone, language and geolocation follow the proxy, the rest of the fingerprint stays) |
+| POST | `/profiles/:id/update-location` | - | `Profile`: "Update location" after a start was refused because the profile's own proxy now exits in another country; stopped profiles only |
 | DELETE | `/profiles/:id?confirm=true` | - | `{ ok }` (stops container, removes data; refused without `confirm=true`) |
 | POST | `/profiles/:id/start` | - | `{ stream }` after health passes; errors if safety check fails |
 | POST | `/profiles/:id/stop` | - | `{ ok }` |

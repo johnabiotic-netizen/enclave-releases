@@ -7,6 +7,8 @@ export class ApiFailure extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** The agent's error details, if it sent any. */
+    readonly details?: unknown,
   ) {
     super(message);
   }
@@ -24,6 +26,7 @@ export async function api<T>(
       reply.status,
       err?.code ?? 'ERROR',
       err?.message ?? `Request failed (${reply.status}).`,
+      err?.details,
     );
   }
   return reply.body as T;

@@ -125,6 +125,9 @@ export function buildServer(
           return { ok: true };
         },
       );
+      v1.post<{ Params: { id: string } }>('/profiles/:id/update-location', async (req) =>
+        service.updateLocation(req.params.id),
+      );
       v1.post<{ Body: CheckNewProxyRequest }>('/proxy-check', async (req) =>
         service.checkNewProxy(req.body ?? {}),
       );
