@@ -160,7 +160,7 @@ export function Settings({ profiles }: { profiles: Profile[] | null }) {
           </div>
           <p className="muted small">A change applies to profiles started after it.</p>
           {saving === 'phone' && <p className="muted">Restarting Enclave&apos;s service.</p>}
-          {view.phone === 'relay' && saving !== 'phone' && <RelayPanel />}
+          {view.phone === 'relay' && saving !== 'phone' && <RelayPanel profiles={profiles} />}
         </section>
 
         <section className="settings-group" aria-labelledby="s-use">

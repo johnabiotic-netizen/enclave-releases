@@ -161,11 +161,15 @@ export type CheckNewProxyResponse = ProxyCheckResult;
 
 // ------------------------------------------------------------------ phone linking (Stage 6)
 
+/** Which profiles a paired phone may see and open: all of them, or the ones listed (ids). */
+export type PhoneProfiles = 'all' | string[];
+
 /** A phone paired with this PC through the relay. */
 export interface PairedPhone {
   id: string;
   name: string;
   pairedAt: string;
+  profiles: PhoneProfiles;
   /** When the relay last saw it (null: never, or the relay could not be asked). */
   lastSeenAt: string | null;
 }
@@ -197,11 +201,20 @@ export interface RelaySignInRequest {
   inviteCode?: string;
 }
 
-// POST /relay/pairing: a QR code for pairing a phone.
+// POST /relay/pairing: a QR code for pairing a phone, with the profiles it may open.
+export interface RelayPairingRequest {
+  profiles: PhoneProfiles;
+}
 export interface RelayPairingResponse {
   /** What the QR code holds: the relay's address with a one-time code and secret. */
   link: string;
   expiresAt: string;
+}
+
+// PATCH /relay/devices/:id: change which profiles a paired phone may open (at once, open
+// streams of profiles taken away close).
+export interface UpdatePairedPhoneRequest {
+  profiles: PhoneProfiles;
 }
 
 // DELETE /relay/devices/:id: unpair a phone. POST /relay/sign-out: forget the relay.

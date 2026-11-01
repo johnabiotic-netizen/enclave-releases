@@ -22,13 +22,14 @@ Base: `http://127.0.0.1:<port>/v1`
 | GET | `/profiles/:id/logs` | `?tail=200` | `{ lines: string[] }` (never includes secrets) |
 | GET | `/system` | - | `{ ram: { totalBytes, freeBytes }, profilesRunning, dockerOk, virtualizationOk, imageBuilt, testProxyAvailable, profileMemory: [{ id, bytes }] }` (memory each running profile uses now) |
 | POST | `/proxy-check` | `{ proxy?, useTestProxy? }` | `ProxyCheckResult`: the safety check for a proxy not in a profile yet (the create wizard's Check); same errors as a start, saves nothing |
-| GET | `/relay` | - | `RelayStatus`: `{ enabled, signedIn, url?, email?, pcName?, connected, problem?, devices: PairedPhone[] }` (Stage 6; `devices` is this PC's own list, last seen from the relay) |
+| GET | `/relay` | - | `RelayStatus`: `{ enabled, signedIn, url?, email?, pcName?, connected, problem?, devices: PairedPhone[] }` (Stage 6; `devices` is this PC's own list with each phone's `profiles`, last seen from the relay) |
 | POST | `/relay/sign-in` | `{ url, email, password, pcName, createAccount?, inviteCode? }` | `RelayStatus`: registers this PC with the relay (makes the account first with `createAccount`); the password is not kept. A new sign-in replaces the old one and its paired phones |
 | POST | `/relay/sign-out` | - | `{ ok }`: removes this PC from the relay and forgets its keys; every paired phone loses access |
-| POST | `/relay/pairing` | - | `{ link, expiresAt }`: the QR code's link, `<relay>/#pair=<code>.<secret>.<PC key hash>`, usable once for 2 minutes |
+| POST | `/relay/pairing` | `{ profiles: "all" or [profile ids] }` | `{ link, expiresAt }`: the QR code's link, `<relay>/#pair=<code>.<secret>.<PC key hash>`, usable once for 2 minutes |
+| PATCH | `/relay/devices/:id` | `{ profiles: "all" or [profile ids] }` | `{ ok }`: which profiles that phone may open; streams of profiles taken away close at once |
 | DELETE | `/relay/devices/:id` | - | `{ ok }`: unpairs a phone; this PC refuses it at once, the relay drops its sessions |
 
-Relay mode (`ENCLAVE_PHONE=relay`, Stage 6): the agent keeps one outbound WebSocket to the relay and answers paired phones through an end-to-end encrypted tunnel (specs/relay-protocol.md). Through the tunnel a phone reaches only `GET /v1/profiles`, `POST /v1/profiles/:id/start|stop`, `GET /v1/profiles/:id/stream|media`, `POST /v1/profiles/:id/files`, and running profiles' stream servers (`/neko/<id>/api/...`).
+Relay mode (`ENCLAVE_PHONE=relay`, Stage 6): the agent keeps one outbound WebSocket to the relay and answers paired phones through an end-to-end encrypted tunnel (specs/relay-protocol.md). Through the tunnel a phone reaches only `GET /v1/profiles`, `POST /v1/profiles/:id/start|stop`, `GET /v1/profiles/:id/stream|media`, `POST /v1/profiles/:id/files`, and running profiles' stream servers (`/neko/<id>/api/...`), and of the profiles only those the phone may open: others are left out of the list and answered as if they did not exist.
 
 Phone mode (`ENCLAVE_PHONE=tailscale`, Stage 2): `tailscale serve` relays this API and each running profile's stream to the owner's tailnet over HTTPS; the server still binds 127.0.0.1 only. Paths outside `/v1` serve the phone app's static files without a token.
 

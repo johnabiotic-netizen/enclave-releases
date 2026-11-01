@@ -32,6 +32,7 @@ import {
   type PairedPhone,
   type PcToRelay,
   type PcTurn,
+  type PhoneProfiles,
   type RegisterPcResponse,
   type RelayDevice,
   type RelayPairingResponse,
@@ -51,7 +52,21 @@ interface SavedPhone {
   name: string;
   publicKey: string;
   pairedAt: string;
+  /** Missing on phones paired before this was added: they keep all profiles. */
+  profiles?: PhoneProfiles;
 }
+
+/** A checked PhoneProfiles: 'all', or a list of profile ids without repeats. */
+export function phoneProfiles(input: unknown): PhoneProfiles {
+  if (input === 'all') return 'all';
+  const ids = Array.isArray(input) ? input.map(String) : null;
+  if (!ids || ids.length === 0 || ids.some((id) => !PROFILE_ID.test(id))) {
+    throw new InputError('Choose all profiles, or at least one profile.');
+  }
+  return [...new Set(ids)];
+}
+
+const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 interface SavedRelay {
   url: string;
@@ -102,7 +117,10 @@ export class RelayLink {
     string,
     { deviceId: string; tunnel: Tunnel; session: TunnelSession }
   >();
-  private readonly pairings = new Map<string, { secret: string; expiresAt: number }>();
+  private readonly pairings = new Map<
+    string,
+    { secret: string; expiresAt: number; profiles: PhoneProfiles }
+  >();
 
   constructor(
     private readonly home: string,
@@ -148,6 +166,7 @@ export class RelayLink {
       id: p.id,
       name: p.name,
       pairedAt: p.pairedAt,
+      profiles: p.profiles ?? 'all',
       lastSeenAt: remote?.find((d) => d.id === p.id)?.lastSeenAt ?? null,
     }));
     return {
@@ -218,8 +237,9 @@ export class RelayLink {
     await rm(path.join(this.home, SEALED), { force: true });
   }
 
-  async pairing(): Promise<RelayPairingResponse> {
+  async pairing(req: { profiles?: unknown }): Promise<RelayPairingResponse> {
     const s = this.requireSaved();
+    const profiles = phoneProfiles(req.profiles);
     if (!this.connected) {
       throw new AgentError(
         'RELAY_UNREACHABLE',
@@ -230,12 +250,22 @@ export class RelayLink {
     const secret = toBase64Url(randomBytes(PAIRING_SECRET_BYTES));
     const expiresAt = Date.parse(res.expiresAt);
     for (const [code, p] of this.pairings) if (p.expiresAt < Date.now()) this.pairings.delete(code);
-    this.pairings.set(res.code, { secret, expiresAt });
+    this.pairings.set(res.code, { secret, expiresAt, profiles });
     const hash = await pcKeyHash(await exportPublicKey(this.keys!.publicKey));
     return {
       link: formatPairingLink(s.url, { code: res.code, secret, pcKeyHash: hash }),
       expiresAt: res.expiresAt,
     };
+  }
+
+  /** Changes which profiles a paired phone may open; open streams of others close at once. */
+  async setProfiles(deviceId: string, input: unknown): Promise<void> {
+    const s = this.requireSaved();
+    const phone = s.phones.find((p) => p.id === deviceId);
+    if (!phone) throw new InputError('This phone is not paired with this PC.');
+    phone.profiles = phoneProfiles(input);
+    await this.save();
+    for (const x of this.sessions.values()) if (x.deviceId === deviceId) x.session.enforce();
   }
 
   async revoke(deviceId: string): Promise<void> {
@@ -340,6 +370,7 @@ export class RelayLink {
           name: msg.deviceName.slice(0, 60),
           publicKey: msg.publicKey,
           pairedAt: new Date().toISOString(),
+          profiles: pending.profiles,
         });
         await this.save();
       }
@@ -362,8 +393,16 @@ export class RelayLink {
       if (ws?.readyState !== WebSocket.OPEN) return;
       ws.send(Buffer.concat([Buffer.from([TUNNEL_FRAME]), idBytes, bytes]));
     });
-    const session = new TunnelSession(tunnel, this.backend, (reason) =>
-      this.endSession(sessionId, reason),
+    const session = new TunnelSession(
+      tunnel,
+      this.backend,
+      (reason) => this.endSession(sessionId, reason),
+      // Read live: a change in Settings applies to this session at once.
+      // Unpaired since: nothing. Paired before profile lists existed: everything.
+      () => {
+        const p = this.saved?.phones.find((x) => x.id === deviceId);
+        return p ? (p.profiles ?? 'all') : [];
+      },
     );
     this.sessions.set(sessionId, { deviceId, tunnel, session });
   }

@@ -1,10 +1,13 @@
 // Settings, phone access through the Enclave relay (Stage 6): sign in, pair a phone with a QR
-// code, and see or unpair the phones paired with this PC.
+// code, choose which profiles each phone may open, and see or unpair the phones paired with
+// this PC.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import type {
   PairedPhone,
+  PhoneProfiles,
+  Profile,
   RelayPairingResponse,
   RelaySignInRequest,
   RelayStatus,
@@ -19,7 +22,7 @@ function when(iso: string | null): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function RelayPanel() {
+export function RelayPanel({ profiles }: { profiles: Profile[] | null }) {
   const [status, setStatus] = useState<RelayStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -30,6 +33,11 @@ export function RelayPanel() {
   } | null>(null);
   const [paired, setPaired] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  /** Pairing, step one: which profiles the new phone may open (none chosen yet). */
+  const [choosing, setChoosing] = useState<PhoneProfiles | null>(null);
+  /** A paired phone whose profiles are being changed, with the choice so far. */
+  const [editing, setEditing] = useState<{ id: string; profiles: PhoneProfiles } | null>(null);
+  const names = new Map(profiles?.map((p) => [p.id, p.name]));
 
   const load = useCallback(async () => {
     try {
@@ -69,9 +77,12 @@ export function RelayPanel() {
     }
   };
 
-  const pair = () =>
+  const pair = (scope: PhoneProfiles) =>
     run('pair', async () => {
-      const res = await api<RelayPairingResponse>('POST', '/relay/pairing');
+      const res = await api<RelayPairingResponse>('POST', '/relay/pairing', {
+        profiles: scope,
+      });
+      setChoosing(null);
       const qr = qrcode(0, 'M');
       qr.addData(res.link);
       qr.make();
@@ -118,7 +129,24 @@ export function RelayPanel() {
         </dd>
       </dl>
 
-      {pairing ? (
+      {choosing && !pairing ? (
+        <div className="choose">
+          <p>Which profiles can this phone open?</p>
+          <ProfilePicker profiles={profiles} value={choosing} onChange={setChoosing} />
+          <div className="row">
+            <button
+              className="button primary"
+              disabled={busy !== null || (choosing !== 'all' && choosing.length === 0)}
+              onClick={() => void pair(choosing)}
+            >
+              {busy === 'pair' ? 'Making a code' : 'Show QR code'}
+            </button>
+            <button className="button quiet" onClick={() => setChoosing(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : pairing ? (
         <Pairing
           svg={pairing.svg}
           expiresAt={pairing.expiresAt}
@@ -130,9 +158,12 @@ export function RelayPanel() {
           <button
             className="button primary"
             disabled={busy !== null || !status.connected}
-            onClick={() => void pair()}
+            onClick={() => {
+              setPaired(null);
+              setChoosing([]);
+            }}
           >
-            {busy === 'pair' ? 'Making a code' : 'Pair a phone'}
+            Pair a phone
           </button>
           {paired && <span className="ok-text">Paired with {paired}.</span>}
         </div>
@@ -150,8 +181,41 @@ export function RelayPanel() {
                 <small>
                   Paired {when(d.pairedAt)}. Last seen {when(d.lastSeenAt)}.
                 </small>
+                <small>Opens {opens(d.profiles, names)}.</small>
+                {editing?.id === d.id && (
+                  <div className="choose">
+                    <ProfilePicker
+                      profiles={profiles}
+                      value={editing.profiles}
+                      onChange={(v) => setEditing({ id: d.id, profiles: v })}
+                    />
+                    <div className="row">
+                      <button
+                        className="button small primary"
+                        disabled={
+                          busy !== null ||
+                          (editing.profiles !== 'all' && editing.profiles.length === 0)
+                        }
+                        onClick={() =>
+                          void run('profiles', async () => {
+                            await api('PATCH', `/relay/devices/${encodeURIComponent(d.id)}`, {
+                              profiles: editing.profiles,
+                            });
+                            setEditing(null);
+                          })
+                        }
+                      >
+                        Save
+                      </button>
+                      <button className="button small quiet" onClick={() => setEditing(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                    <small>A profile you take away closes on the phone at once.</small>
+                  </div>
+                )}
               </div>
-              {confirm === d.id ? (
+              {editing?.id === d.id ? null : confirm === d.id ? (
                 <div className="row">
                   <span className="muted small">It loses access at once.</span>
                   <button
@@ -171,9 +235,20 @@ export function RelayPanel() {
                   </button>
                 </div>
               ) : (
-                <button className="button small" onClick={() => setConfirm(d.id)}>
-                  Unpair
-                </button>
+                <div className="row">
+                  <button
+                    className="button small"
+                    onClick={() => {
+                      setConfirm(null);
+                      setEditing({ id: d.id, profiles: d.profiles });
+                    }}
+                  >
+                    Change
+                  </button>
+                  <button className="button small" onClick={() => setConfirm(d.id)}>
+                    Unpair
+                  </button>
+                </div>
               )}
             </li>
           ))}
@@ -324,6 +399,65 @@ function Pairing(props: { svg: string; expiresAt: number; onExpired(): void; onC
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+/** What a paired phone may open, in words. */
+function opens(scope: PhoneProfiles, names: Map<string, string>): string {
+  if (scope === 'all') return 'all profiles';
+  const shown = scope.map((id) => names.get(id)).filter((n): n is string => Boolean(n));
+  return shown.length ? shown.join(', ') : 'no profiles';
+}
+
+/** All profiles, or a checklist of them. */
+function ProfilePicker(props: {
+  profiles: Profile[] | null;
+  value: PhoneProfiles;
+  onChange(v: PhoneProfiles): void;
+}) {
+  const list = props.profiles ?? [];
+  const chosen = props.value === 'all' ? [] : props.value;
+  return (
+    <div className="picker">
+      <label className="toggle">
+        <input
+          type="radio"
+          checked={props.value === 'all'}
+          onChange={() => props.onChange('all')}
+        />
+        <span>
+          All profiles
+          <small>Including profiles you make later.</small>
+        </span>
+      </label>
+      <label className="toggle">
+        <input
+          type="radio"
+          checked={props.value !== 'all'}
+          onChange={() => props.onChange(chosen)}
+        />
+        <span>Only these profiles</span>
+      </label>
+      {props.value !== 'all' && (
+        <div className="picker-list">
+          {list.length === 0 && <p className="muted small">No profiles yet.</p>}
+          {list.map((p) => (
+            <label className="toggle" key={p.id}>
+              <input
+                type="checkbox"
+                checked={chosen.includes(p.id)}
+                onChange={(e) =>
+                  props.onChange(
+                    e.target.checked ? [...chosen, p.id] : chosen.filter((id) => id !== p.id),
+                  )
+                }
+              />
+              <span>{p.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

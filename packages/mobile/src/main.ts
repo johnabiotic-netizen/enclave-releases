@@ -43,6 +43,8 @@ const viaRelay = await fetch(`${RELAY_API_PATH}/info`)
 let link: RelayLink | null = null;
 /** Relay mode: what the home screen says while there is no link. */
 let pairing: { busy: boolean; message: string | null } = { busy: false, message: null };
+/** Said once above the profile list (a stream that ended by itself). */
+let homeNotice: string | null = null;
 
 if (viaRelay) {
   routeThroughTunnel(() => link);
@@ -205,9 +207,11 @@ async function refresh(): Promise<void> {
     return;
   }
   const cards = profiles.map((p) => profileCard(p));
-  // A failed new pairing, while an earlier one still works: say so once, above the list.
-  const notice = pairing.message;
+  // Said once, above the list: a failed new pairing (an earlier one still works), or a stream
+  // that ended by itself.
+  const notice = pairing.message ?? homeNotice;
   pairing.message = null;
+  homeNotice = null;
   home.replaceChildren(
     el('h1', {}, 'Profiles'),
     ...(notice ? [el('div', { className: 'error' }, notice)] : []),
@@ -368,6 +372,17 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
     ),
   );
   c.connect();
+
+  // The stream ended for good (the profile was stopped on the PC, or is no longer shared with
+  // this phone): back to the list, saying so, instead of "Connecting" forever.
+  detach.push(
+    c.events.on('connection.closed', () => {
+      if (client !== c) return;
+      closeViewer();
+      homeNotice = `${p.name} closed on this phone. It was stopped on the PC, it's no longer shared with this phone, or the connection was lost.`;
+      void refresh();
+    }),
+  );
 
   // Text copied in the profile goes to the phone's clipboard. Where the phone allows that only
   // right after a tap (iPhone), offer a button that does it. Not for the phone's own paste.

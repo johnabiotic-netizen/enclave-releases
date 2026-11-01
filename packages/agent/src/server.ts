@@ -12,7 +12,9 @@ import {
   type CreateProfileRequest,
   type HealthResponse,
   MAX_PHONE_FILE_BYTES,
+  type RelayPairingRequest,
   type RelaySignInRequest,
+  type UpdatePairedPhoneRequest,
   type UpdateProfileRequest,
 } from '@enclave/shared';
 import { AgentError, InputError } from './errors.js';
@@ -171,7 +173,16 @@ export function buildServer(
           await relay.signOut();
           return { ok: true };
         });
-        v1.post('/relay/pairing', async () => relay.pairing());
+        v1.post<{ Body: RelayPairingRequest }>('/relay/pairing', async (req) =>
+          relay.pairing(req.body ?? { profiles: [] }),
+        );
+        v1.patch<{ Params: { id: string }; Body: UpdatePairedPhoneRequest }>(
+          '/relay/devices/:id',
+          async (req) => {
+            await relay.setProfiles(req.params.id, req.body?.profiles);
+            return { ok: true };
+          },
+        );
         v1.delete<{ Params: { id: string } }>('/relay/devices/:id', async (req) => {
           await relay.revoke(req.params.id);
           return { ok: true };

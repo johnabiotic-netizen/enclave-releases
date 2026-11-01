@@ -1,7 +1,9 @@
 // The PC's side of one phone session through the relay (Stage 6). The tunnel (shared
 // tunnel.ts) is already decrypting; this answers what arrives inside it: the few agent API
 // calls the phone app makes, and the running profiles' stream servers (neko's API and its
-// WebSocket). Nothing else on the PC can be reached this way.
+// WebSocket). Nothing else on the PC can be reached this way, and of the profiles only the
+// ones this phone may open (its PhoneProfiles): others are left out of the list and refused
+// as if they didn't exist.
 
 import {
   BODY_CHUNK_BYTES,
@@ -11,6 +13,8 @@ import {
   packResponse,
   textOf,
   unpackChannel,
+  type PhoneProfiles,
+  type Profile,
   type Tunnel,
 } from '@enclave/shared';
 
@@ -36,10 +40,13 @@ const AGENT_ROUTES: [string, RegExp][] = [
   ['GET', new RegExp(`^/v1/profiles/${ID}/(stream|media)$`)],
   ['POST', new RegExp(`^/v1/profiles/${ID}/files\\?name=[^&#]*$`)],
 ];
+/** The profile an agent API path is about, if any. */
+const PROFILE_PATH = new RegExp(`^/v1/profiles/(${ID})/`);
 const NEKO_HTTP = new RegExp(`^/neko/(${ID})(/api/[\\w/-]*)$`);
 const NEKO_WS = new RegExp(`^/neko/(${ID})/api/ws(\\?token=[\\w%.-]+)?$`);
 
 const SMALL_BODY_BYTES = 64 * 1024;
+const NOT_SHARED = 'This profile is not shared with this phone.';
 
 interface RequestChannel {
   type: 'request';
@@ -54,6 +61,7 @@ interface RequestChannel {
 
 interface SocketChannel {
   type: 'socket';
+  profileId: string;
   ws: WebSocket;
   /** Messages from the phone that arrived before the stream server answered. */
   waiting: string[];
@@ -67,6 +75,8 @@ export class TunnelSession {
     private readonly tunnel: Tunnel,
     private readonly backend: TunnelBackend,
     private readonly onFail: (reason: string) => void,
+    /** Which profiles this phone may open, read at every request (changes apply at once). */
+    private readonly scope: () => PhoneProfiles = () => 'all',
   ) {
     tunnel.onMessage = (bytes) => {
       try {
@@ -84,6 +94,21 @@ export class TunnelSession {
     this.tunnel.close();
     for (const ch of this.channels.values()) if (ch.type === 'socket') ch.ws.close(1000);
     this.channels.clear();
+  }
+
+  private allowed(profileId: string): boolean {
+    const scope = this.scope();
+    return scope === 'all' || scope.includes(profileId);
+  }
+
+  /** Closes the streams of profiles this phone may no longer open (after a change). */
+  enforce(): void {
+    for (const [channel, ch] of this.channels) {
+      if (ch.type !== 'socket' || this.allowed(ch.profileId)) continue;
+      this.channels.delete(channel);
+      ch.ws.close(1000);
+      this.post(CHANNEL.WS_CLOSE, channel, JSON.stringify({ code: 4403, reason: NOT_SHARED }));
+    }
   }
 
   private fail(reason: string): void {
@@ -182,15 +207,31 @@ export class TunnelSession {
     const body = req.chunks.length ? Buffer.concat(req.chunks) : undefined;
     try {
       if (AGENT_ROUTES.some(([m, re]) => m === req.method && re.test(req.path))) {
+        const about = PROFILE_PATH.exec(req.path)?.[1];
+        if (about && !this.allowed(about)) {
+          return this.respond(channel, 404, {
+            error: { code: 'PROFILE_NOT_FOUND', message: 'No such profile on this PC.' },
+          });
+        }
         const res = await this.backend.inject({
           method: req.method,
           url: req.path,
           contentType: req.contentType,
           body,
         });
-        return this.respond(channel, res.status, new Uint8Array(res.body), res.contentType);
+        let out = new Uint8Array(res.body);
+        // The list: only the profiles this phone may open.
+        if (!about && res.status === 200 && this.scope() !== 'all') {
+          const list = JSON.parse(res.body.toString('utf8')) as Profile[];
+          out = new TextEncoder().encode(JSON.stringify(list.filter((p) => this.allowed(p.id))));
+        }
+        return this.respond(channel, res.status, out, res.contentType);
       }
       const neko = NEKO_HTTP.exec(req.path);
+      if (neko && !this.allowed(neko[1]!)) {
+        // 401: neko's client takes it as the end of the session and stops retrying.
+        return this.respond(channel, 401, { message: NOT_SHARED });
+      }
       if (neko && (req.method === 'GET' || req.method === 'POST')) {
         const port = await this.backend.streamPort(neko[1]!);
         const res = await fetch(`http://127.0.0.1:${port}${neko[2]}`, {
@@ -228,6 +269,7 @@ export class TunnelSession {
     const closeWith = (code: number, reason: string) =>
       this.post(CHANNEL.WS_CLOSE, channel, JSON.stringify({ code, reason }));
     if (!m) return closeWith(4404, 'Not available from the phone.');
+    if (!this.allowed(m[1]!)) return closeWith(4403, NOT_SHARED);
     let port: number;
     try {
       port = await this.backend.streamPort(m[1]!);
@@ -236,7 +278,7 @@ export class TunnelSession {
     }
     if (this.closed) return;
     const ws = new WebSocket(`ws://127.0.0.1:${port}/api/ws${m[2] ?? ''}`);
-    const ch: SocketChannel = { type: 'socket', ws, waiting: [] };
+    const ch: SocketChannel = { type: 'socket', profileId: m[1]!, ws, waiting: [] };
     this.channels.set(channel, ch);
     ws.onopen = () => {
       this.post(CHANNEL.WS_OPENED, channel);

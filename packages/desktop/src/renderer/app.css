@@ -843,3 +843,22 @@ textarea:focus-visible {
   color: var(--text-500);
   font-size: 12px;
 }
+.choose {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.choose > p {
+  margin: 0;
+}
+.picker {
+  display: grid;
+  gap: 8px;
+}
+.picker-list {
+  display: grid;
+  gap: 6px;
+  margin-left: 26px;
+  max-height: 220px;
+  overflow-y: auto;
+}
