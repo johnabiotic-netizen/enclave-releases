@@ -24,6 +24,8 @@ const PHONE_CHOICES: [PhoneMode, string, string][] = [
 const NOTICES: [string, string][] = [
   ['Camoufox (Firefox)', 'MPL 2.0'],
   ['neko', 'Apache 2.0'],
+  ['uBlock Origin', 'GPL 3.0'],
+  ['gost', 'MIT'],
   ['Electron', 'MIT'],
   ['Chromium', 'BSD 3-Clause and others'],
   ['Node.js', 'MIT'],
@@ -227,6 +229,11 @@ export function Settings({ profiles }: { profiles: Profile[] | null }) {
               </div>
             ))}
           </dl>
+          <div className="row">
+            <button className="button" onClick={() => void window.enclave.openNotices()}>
+              Open full list
+            </button>
+          </div>
         </section>
       </div>
     </section>

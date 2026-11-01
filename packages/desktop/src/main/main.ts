@@ -286,6 +286,13 @@ ipcMain.handle('app:open-data', async () => {
   if (home) await shell.openPath(home);
 });
 
+// Third party licenses: notices/ in the install folder, or the repo's copy in a developer run.
+ipcMain.handle('app:open-notices', async () => {
+  await shell.openPath(
+    app.isPackaged ? path.join(process.resourcesPath, 'notices') : path.resolve(here, '../notices'),
+  );
+});
+
 // A profile's download into this PC's Downloads folder. The file came from a website, so it
 // gets Windows' "from the internet" mark (as a browser's downloads do) and is never opened
 // by Enclave: opening it is the user's choice, with Windows' own warnings.

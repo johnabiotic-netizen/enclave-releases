@@ -125,6 +125,7 @@ Spec: `stages/stage-7-launch.md`. Owner (2026-11-01): a free beta among testers 
 - [x] Windows app 0.3.0 (beta) installer built. Invite made for the first tester (psalmywise).
 - [x] Relay: single-use invites (deploy/relay/invite.sh), invite mode on, owner's shared code off; admin refused from the internet (404). Test: an invite makes one account, a second use is refused.
 - [x] Tester guide: docs/setup/beta-tester.md.
+- [x] Third party notices (2026-11-01): THIRD_PARTY_NOTICES.md brought up to date (Camoufox 158.0-beta.40 with Enclave patches, neko 3.2.0 with a patch, uBlock Origin, gost, GeoIP, fpgen, Python packages checked from their metadata, Debian sources); scripts/gen-notices.mjs writes packages/desktop/notices/THIRD_PARTY_LICENSES.txt (124 npm packages the app ships, full license texts). Both ship in the installer (resources/notices); Settings, About has Open full list (checked in the app: opens the folder). In the next installer build. Still to check before selling: each GeoIP source's terms.
 - [ ] Fresh-PC test (Stage 5 test 1 and Stage 7 test 1): a tester's PC from nothing to a running profile.
 - [ ] Later (after the beta): payment provider (confirm acceptance first), code signing (OV certificate; Microsoft's service is US and Canada only), pricing by profiles running at once, encrypted backups (R2), privacy policy and terms, landing page.
 

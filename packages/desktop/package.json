@@ -52,6 +52,14 @@
       {
         "from": "../../testing/reference/windows-firefox-158",
         "to": "reference"
+      },
+      {
+        "from": "notices",
+        "to": "notices"
+      },
+      {
+        "from": "../../THIRD_PARTY_NOTICES.md",
+        "to": "notices/THIRD_PARTY_NOTICES.md"
       }
     ],
     "asar": true,

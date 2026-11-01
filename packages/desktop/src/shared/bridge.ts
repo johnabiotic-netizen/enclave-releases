@@ -48,6 +48,8 @@ export interface EnclaveBridge {
   /** Saves; a change to phone access or the idle default restarts the agent inside the app. */
   saveSettings(change: AppSettingsChange): Promise<void>;
   openDataFolder(): Promise<void>;
+  /** Opens the folder with every third party license (notices/ beside the app). */
+  openNotices(): Promise<void>;
   /** A call to the agent's API (paths as in specs/agent-api.md, without /v1). */
   request(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',

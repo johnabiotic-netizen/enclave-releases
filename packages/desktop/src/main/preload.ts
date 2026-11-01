@@ -10,6 +10,7 @@ const bridge: EnclaveBridge = {
   setupChecks: () => ipcRenderer.invoke('setup:check'),
   saveSettings: (change) => ipcRenderer.invoke('settings:set', change),
   openDataFolder: () => ipcRenderer.invoke('app:open-data'),
+  openNotices: () => ipcRenderer.invoke('app:open-notices'),
   copyText: (text) => ipcRenderer.invoke('clipboard:write', text),
   saveDownload: (profileId, name) => ipcRenderer.invoke('downloads:save', profileId, name),
   showInFolder: (path) => ipcRenderer.invoke('downloads:show', path),
