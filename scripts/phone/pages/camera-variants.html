@@ -1,0 +1,130 @@
+<!doctype html>
+<!-- Test-only: opens the profile's camera the ways websites commonly do and measures each
+     picture's brightness, to find a way that comes out black. Writes camera-variants-result.json
+     to /data/downloads (open with open-page.sh --no-prompt, phone camera shared). -->
+<meta charset="utf-8" />
+<title>camera variants</title>
+<pre id="out">running</pre>
+<script>
+  (async () => {
+    const out = document.getElementById('out');
+    const results = [];
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function measure(stream) {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.srcObject = stream;
+      document.body.append(v);
+      await v.play();
+      await sleep(1500);
+      const c = document.createElement('canvas');
+      c.width = 160;
+      c.height = 90;
+      const g = c.getContext('2d');
+      g.drawImage(v, 0, 0, 160, 90);
+      const d = g.getImageData(0, 0, 160, 90).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      v.remove();
+      return { mean: +(sum / (d.length / 4)).toFixed(1), w: v.videoWidth, h: v.videoHeight };
+    }
+    async function attempt(name, get) {
+      const r = { name };
+      let stream;
+      try {
+        stream = await get();
+        const t = stream.getVideoTracks()[0];
+        r.settings = t.getSettings();
+        r.picture = await measure(stream);
+      } catch (e) {
+        r.error = `${e.name}: ${e.message} ${e.constraint ?? ''}`;
+      }
+      for (const t of stream?.getTracks() ?? []) t.stop();
+      results.push(r);
+      out.textContent = JSON.stringify(results, null, 1);
+      await sleep(500);
+    }
+    // Before permission Firefox lists devices without ids; some sites ask with that empty id.
+    const early = (await navigator.mediaDevices.enumerateDevices()).find(
+      (d) => d.kind === 'videoinput',
+    );
+    results.push({ name: 'early id', id: early && early.deviceId });
+    await attempt('deviceId exact (before permission)', () =>
+      navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: early.deviceId } } }),
+    );
+    await attempt('deviceId ideal (before permission)', () =>
+      navigator.mediaDevices.getUserMedia({ video: { deviceId: early.deviceId } }),
+    );
+    await attempt('deviceId default', () =>
+      navigator.mediaDevices.getUserMedia({ video: { deviceId: 'default' } }),
+    );
+    await attempt('fake: true', () =>
+      navigator.mediaDevices.getUserMedia({ video: true, fake: true }),
+    );
+    await attempt('video: true', () => navigator.mediaDevices.getUserMedia({ video: true }));
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cam = devices.find((d) => d.kind === 'videoinput');
+    results.push({
+      name: 'devices',
+      list: devices.map((d) => [d.kind, d.label, d.deviceId.slice(0, 8)]),
+    });
+    await attempt('deviceId exact', () =>
+      navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cam.deviceId } } }),
+    );
+    await attempt('exact 1280x720', () =>
+      navigator.mediaDevices.getUserMedia({
+        video: { width: { exact: 1280 }, height: { exact: 720 } },
+      }),
+    );
+    await attempt('exact 640x480', () =>
+      navigator.mediaDevices.getUserMedia({
+        video: { width: { exact: 640 }, height: { exact: 480 } },
+      }),
+    );
+    await attempt('ideal 4096x2160', () =>
+      navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 4096 }, height: { ideal: 2160 } },
+      }),
+    );
+    await attempt('deviceId + ideal 1920x1080', () =>
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: cam.deviceId },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      }),
+    );
+    await attempt('frameRate ideal 60', () =>
+      navigator.mediaDevices.getUserMedia({ video: { frameRate: { ideal: 60 } } }),
+    );
+    await attempt('audio and video', () =>
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }),
+    );
+    await attempt('clone', async () => {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+      const c = s.getVideoTracks()[0].clone();
+      s.getVideoTracks()[0].stop();
+      return new MediaStream([c]);
+    });
+    await attempt('applyConstraints 640x360', async () => {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+      await s.getVideoTracks()[0].applyConstraints({ width: 640, height: 360 });
+      return s;
+    });
+    await attempt('second at once', async () => {
+      const first = await navigator.mediaDevices.getUserMedia({ video: true });
+      const second = await navigator.mediaDevices.getUserMedia({ video: true });
+      setTimeout(() => first.getTracks().forEach((t) => t.stop()), 4000);
+      return second;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(results, null, 1)], { type: 'application/json' }),
+    );
+    a.download = 'camera-variants-result.json';
+    document.body.append(a);
+    a.click();
+    document.title = 'camera variants done';
+  })();
+</script>

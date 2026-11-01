@@ -45,6 +45,11 @@ RUNTIME_PREFS = {
     # Downloads go to the profile's volume, so they survive the container being recreated.
     "browser.download.folderList": 2,
     "browser.download.dir": "/data/downloads",
+    # The phone camera (zz-enclave-phone-media.patch) is read in the page's own content
+    # process, which the sandbox keeps from opening files: websites got a black camera
+    # (local test pages worked, their process may read files). Exactly this one file is
+    # opened up, read only; it holds the phone camera's latest frame (camfeed.py).
+    "security.sandbox.content.read_path_whitelist": "/dev/shm/enclave-camera",
 }
 DOWNLOADS_DIR = "/data/downloads"
 GL_SHIM = "/opt/enclave/libenclave_gl.so"
