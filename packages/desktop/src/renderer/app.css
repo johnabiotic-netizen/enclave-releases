@@ -896,11 +896,13 @@ textarea:focus-visible {
 
 .download-browser {
   display: grid;
+  justify-items: start;
   gap: 8px;
   max-width: 480px;
   margin: 4px 0 4px 34px;
 }
 .download-browser progress {
+  justify-self: stretch;
   width: 100%;
   height: 10px;
   accent-color: var(--accent);

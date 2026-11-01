@@ -26,6 +26,7 @@ const NOTICES: [string, string][] = [
   ['neko', 'Apache 2.0'],
   ['uBlock Origin', 'GPL 3.0'],
   ['gost', 'MIT'],
+  ['Docker Engine, containerd, runc', 'Apache 2.0'],
   ['Electron', 'MIT'],
   ['Chromium', 'BSD 3-Clause and others'],
   ['Node.js', 'MIT'],

@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { SetupCheck } from '../shared/bridge.js';
+import { SYSTEM_DISTRO } from './wsl-system.js';
 
 interface Run {
   code: number;
@@ -73,7 +74,11 @@ async function dockerInWsl(distro: string): Promise<boolean> {
 export async function findWslDocker(): Promise<string | undefined> {
   if (dockerDesktopInstalled()) return undefined;
   const w = await wsl();
-  for (const distro of w.distros) {
+  // Enclave's own system first: it is only ever set up when the PC had no other Docker.
+  const ordered = [...w.distros].sort((a, b) =>
+    a === SYSTEM_DISTRO ? -1 : b === SYSTEM_DISTRO ? 1 : 0,
+  );
+  for (const distro of ordered) {
     if (/docker-desktop/i.test(distro)) continue;
     if (await dockerInWsl(distro)) return distro;
   }
@@ -97,6 +102,8 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
   const engine = facts.wslDistro && w.distros.includes(facts.wslDistro);
   const engineDocker = engine ? await dockerInWsl(facts.wslDistro!) : false;
   const dockerInstalled = desktop || engineDocker;
+  const ownSystem = facts.wslDistro === SYSTEM_DISTRO;
+  const wslOk = w.installed && w.version2;
 
   const checks: SetupCheck[] = [
     {
@@ -122,11 +129,10 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
           ? 'WSL 2 is installed.'
           : 'WSL is installed but not set to version 2.',
       fix: [
-        'Click Start, type PowerShell, right click Windows PowerShell and choose Run as administrator.',
-        'Run: wsl --update --web-download',
-        'Run: wsl --install --no-distribution',
-        'Restart the PC, then click Recheck.',
+        'Click Turn on WSL. Windows asks for permission: choose Yes, then wait until the window it opens closes.',
+        'Restart the PC, then open Enclave again.',
       ],
+      action: 'turn-on-wsl',
     },
     {
       id: 'docker-installed',
@@ -134,14 +140,21 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
       ok: dockerInstalled,
       detail: desktop
         ? 'Docker Desktop is installed.'
-        : engineDocker
-          ? `Docker Engine runs in WSL (${facts.wslDistro}).`
-          : 'Docker is not installed.',
-      fix: [
-        'Go to docker.com and choose "Download for Windows - AMD64" (right for Intel and AMD; not ARM64).',
-        'Run the installer, keep the WSL 2 option checked, finish, and restart if asked.',
-        'Open Docker Desktop. If it asks you to sign in, click Skip. No account is needed.',
-      ],
+        : ownSystem && engineDocker
+          ? "Enclave's own Docker runs in WSL."
+          : engineDocker
+            ? `Docker Engine runs in WSL (${facts.wslDistro}).`
+            : wslOk
+              ? "Enclave's Linux system isn't set up yet."
+              : 'Set up once WSL is on.',
+      ...(wslOk
+        ? {
+            fix: [
+              'Click Set up. Enclave sets up a small Linux system with Docker in WSL, about 350 MB. It takes a minute or two.',
+            ],
+            action: 'install-system' as const,
+          }
+        : { fix: ['Turn WSL on first (the line above), restart the PC, then come back here.'] }),
     },
     {
       id: 'docker-running',
@@ -150,16 +163,21 @@ export async function runSetupChecks(facts: AgentFacts): Promise<SetupCheck[]> {
       detail: facts.dockerOk
         ? 'Enclave can reach Docker.'
         : (facts.agentError ?? 'Enclave cannot reach Docker.'),
-      fix: desktop
+      fix: ownSystem
         ? [
-            'Open Docker Desktop from the Start menu.',
-            'Wait until the bottom left says "Engine running" in green, then click Recheck.',
-            'Leave Docker Desktop open whenever you use Enclave.',
+            'Click Recheck. Enclave starts its Linux system by itself.',
+            'If it still fails, restart the PC and open Enclave again.',
           ]
-        : [
-            `Open PowerShell and run: wsl -d ${facts.wslDistro ?? 'Ubuntu-24.04'} -u root -- service docker start`,
-            'Then click Recheck.',
-          ],
+        : desktop
+          ? [
+              'Open Docker Desktop from the Start menu.',
+              'Wait until the bottom left says "Engine running" in green, then click Recheck.',
+              'Leave Docker Desktop open whenever you use Enclave.',
+            ]
+          : [
+              `Open PowerShell and run: wsl -d ${facts.wslDistro ?? 'Ubuntu-24.04'} -u root -- service docker start`,
+              'Then click Recheck.',
+            ],
     },
     {
       id: 'image',

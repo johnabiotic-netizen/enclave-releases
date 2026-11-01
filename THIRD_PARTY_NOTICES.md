@@ -36,6 +36,19 @@ Checked 2026-11-01 from the packages' own metadata. All are unmodified.
 | MPL 2.0 | certifi, jinxed |
 | MPL 2.0 and (Apache 2.0 or MIT) | orjson |
 
+## Enclave's WSL system (images/wsl, shipped in the installer)
+
+Imported with `wsl --import` on PCs that have no Docker. Unmodified.
+
+| Component | Version | License | Notes |
+|---|---|---|---|
+| Docker Engine (Moby): dockerd, docker-proxy, docker-init | 29.9.2 (static build from download.docker.com) | Apache 2.0 | https://github.com/moby/moby |
+| containerd, containerd-shim-runc-v2 | as in Docker 29.9.2's static build | Apache 2.0 | https://github.com/containerd/containerd |
+| runc | as in Docker 29.9.2's static build | Apache 2.0 | https://github.com/opencontainers/runc |
+| socat | 1.8.0.3-1+deb13u1 (Debian) | GPL 2.0 | http://www.dest-unreach.org/socat/ ; source at https://snapshot.debian.org/ |
+| iptables | 1.8.11-2 (Debian) | GPL 2.0 | Source at https://snapshot.debian.org/ |
+| Debian 13 base (debian:trixie-slim) | digest f6b08b09... | Various, mostly GPL, LGPL, MIT, BSD | License files in `/usr/share/doc/<package>/copyright` inside the system; sources at https://snapshot.debian.org/. |
+
 ## Relay server (not shipped to users)
 
 Runs on our server only: Caddy 2.11.7 (Apache 2.0), coturn 4.18.0 (BSD 3-Clause), and the

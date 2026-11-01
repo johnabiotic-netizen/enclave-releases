@@ -54,6 +54,11 @@
         "to": "reference"
       },
       {
+        "from": "wsl",
+        "to": "wsl",
+        "filter": ["enclave-wsl.tar.gz"]
+      },
+      {
         "from": "notices",
         "to": "notices"
       },

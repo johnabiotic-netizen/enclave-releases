@@ -37,8 +37,11 @@ export interface SetupCheck {
   detail: string;
   /** The exact steps to fix it, in order. */
   fix: string[];
-  /** The fix is a button in the app instead: download the browser image. */
-  action?: 'download-image';
+  /**
+   * The fix is a button in the app: download the browser image, set up Enclave's own Linux
+   * system with Docker, or turn WSL on.
+   */
+  action?: 'download-image' | 'install-system' | 'turn-on-wsl';
 }
 
 /** How an export went. Failures carry a message for the person, not an exception. */
@@ -64,6 +67,10 @@ export interface TransferProgress {
 }
 
 export interface EnclaveBridge {
+  /** Sets up Enclave's own Linux system with Docker in WSL, then restarts Enclave's service. */
+  installSystem(): Promise<{ ok: boolean; message?: string }>;
+  /** Turns WSL on (Windows asks for permission); a restart finishes it. */
+  turnOnWsl(): Promise<{ ok: boolean; message?: string }>;
   /** Runs every setup check (restarting Enclave's service first if it is not running). */
   setupChecks(): Promise<SetupCheck[]>;
   settings(): Promise<AppSettingsView>;

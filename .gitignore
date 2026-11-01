@@ -18,3 +18,4 @@ release/
 e2e-results/
 packages/relay/data/
 packages/relay/dist-bundle/
+packages/desktop/wsl/*.tar.gz

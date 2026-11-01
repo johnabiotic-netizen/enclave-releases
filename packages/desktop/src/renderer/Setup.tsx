@@ -32,8 +32,8 @@ export function Setup(props: { onReady(): void; firstRun: boolean }) {
       <div className="setup">
         <h1>Setup</h1>
         <p className="muted lead">
-          Enclave runs each profile in its own sealed space on this PC, using Docker. These checks
-          show what is in place and how to fix anything that is not.
+          Enclave runs each profile in its own sealed space on this PC, using Docker in WSL. These
+          checks show what is in place and how to fix anything that is not.
         </p>
         {!checks ? (
           <p className="muted">Checking this PC. This takes a few seconds.</p>
@@ -67,6 +67,22 @@ export function Setup(props: { onReady(): void; firstRun: boolean }) {
                 {!c.ok && open === c.id && c.action === 'download-image' && (
                   <DownloadBrowser onDone={() => void recheck()} />
                 )}
+                {!c.ok && open === c.id && c.action === 'install-system' && (
+                  <SetupAction
+                    label="Set up"
+                    working="Setting up Enclave's Linux system. This takes a minute or two."
+                    run={() => window.enclave.installSystem()}
+                    onDone={() => void recheck()}
+                  />
+                )}
+                {!c.ok && open === c.id && c.action === 'turn-on-wsl' && (
+                  <SetupAction
+                    label="Turn on WSL"
+                    working="Turning on WSL. Choose Yes when Windows asks, then wait for its window to close."
+                    done="WSL is installed. Restart the PC, then open Enclave again."
+                    run={() => window.enclave.turnOnWsl()}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -92,6 +108,45 @@ export function Setup(props: { onReady(): void; firstRun: boolean }) {
 }
 
 const POLL_MS = 1000;
+
+/** A one-click fix: runs it, shows that it is working, then its outcome. */
+function SetupAction(props: {
+  label: string;
+  working: string;
+  done?: string;
+  run(): Promise<{ ok: boolean; message?: string }>;
+  onDone?(): void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await props.run();
+    setBusy(false);
+    if (r.ok) {
+      setFinished(true);
+      props.onDone?.();
+    } else setError(r.message ?? "That didn't work. Try again.");
+  };
+  return (
+    <div className="download-browser">
+      {error && <p className="notice error">{error}</p>}
+      {busy ? (
+        <p className="muted small" role="status">
+          {props.working}
+        </p>
+      ) : finished && props.done ? (
+        <p className="notice">{props.done}</p>
+      ) : (
+        <button className="button primary" onClick={() => void go()}>
+          {error ? 'Try again' : props.label}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** The browser image's one-time download, with its progress. */
 function DownloadBrowser(props: { onDone(): void }) {

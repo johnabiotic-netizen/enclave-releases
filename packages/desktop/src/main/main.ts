@@ -25,6 +25,7 @@ import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
 import { SettingsFile, type AppSettings, type PhoneMode } from './settings.js';
 import { BROWSER_IMAGE } from './image.js';
 import { findWslDocker, runSetupChecks } from './setup.js';
+import { installSystem, SYSTEM_DISTRO, turnOnWsl } from './wsl-system.js';
 import type {
   AgentReply,
   AgentState,
@@ -284,6 +285,31 @@ ipcMain.handle('setup:check', async (): Promise<SetupCheck[]> => {
     wslDistro: lastConfig.wslDistro,
     agentError: state.status === 'failed' ? state.message : undefined,
   });
+});
+
+ipcMain.handle('setup:install-system', async () => {
+  try {
+    await installSystem();
+    const file = new SettingsFile(
+      home || loadConfig({ ...process.env, AGENT_TOKEN: 'x'.repeat(32) }).home,
+    );
+    const saved = await file.read();
+    saved.wslDistro = SYSTEM_DISTRO;
+    await file.write(saved);
+    await restartAgent();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
+});
+
+ipcMain.handle('setup:turn-on-wsl', async () => {
+  try {
+    await turnOnWsl();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: (err as Error).message };
+  }
 });
 
 ipcMain.handle('app:open-data', async () => {
