@@ -20,6 +20,7 @@ enclave/
     07-glossary.md               plain definitions
     08-legal-and-acceptable-use.md  licenses, acceptable use, payments, the guardrail
     setup/windows-setup.md       user-facing Windows + Docker setup
+    setup/beta-tester-no-docker.md  tester steps for a PC with no Docker (Enclave sets up its own)
 
   stages/
     stage-1-local-core.md        build order starts here
