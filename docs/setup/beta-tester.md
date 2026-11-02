@@ -7,6 +7,7 @@ Thanks for testing Enclave. It runs each browser profile in its own sealed space
 - An Android phone or iPhone, for using profiles on the phone.
 - A proxy for each profile you want (host, port, user name and password). A residential proxy in the country you want the profile to appear in works best.
 - The invite code you were sent (it works once).
+- A Windows account that is an administrator. Use the same account for every step and whenever you use Enclave: Docker and your profiles belong to the account that sets them up.
 
 ## 1. Install Docker Desktop
 Enclave uses Docker to keep each profile sealed. Docker Desktop is free for personal use and small businesses.
@@ -20,7 +21,7 @@ If Docker doesn't start, see `docs/setup/windows-setup.md` (it covers WSL and tu
 ## 2. Install Enclave
 1. Run **Enclave-Setup** (the file you were sent).
 2. Windows may show a blue box, **Windows protected your PC**. The beta isn't signed yet. Click **More info**, then **Run anyway**.
-3. Enclave opens on **Setup**. Each line should turn green. On **Browser ready**, click **Fix**, then **Download the browser**. It's about 1.7 GB, once; keep the PC on until it finishes.
+3. Enclave opens on **Setup**. Each line should turn green. On **Browser ready**, click **Fix**, then **Download the browser**. It's about 1.5 GB, once; keep the PC on until it finishes.
 4. When every line is green, click **Go to profiles**.
 
 ## 3. Make your first profile
