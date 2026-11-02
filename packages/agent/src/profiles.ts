@@ -161,8 +161,9 @@ export class ProfileService {
 
   // ---------------------------------------------------------------- queries
 
-  list(): Promise<Profile[]> {
-    return this.store.list();
+  /** The person's profiles: not the proxy tester's temporary ones. */
+  async list(): Promise<Profile[]> {
+    return (await this.store.list()).filter((p) => !p.runtime.temporary);
   }
 
   get(id: string): Promise<Profile> {
@@ -374,7 +375,7 @@ export class ProfileService {
 
   // ---------------------------------------------------------------- create / update / delete
 
-  async create(req: CreateProfileRequest): Promise<Profile> {
+  async create(req: CreateProfileRequest, opts: { temporary?: boolean } = {}): Promise<Profile> {
     const name = validName(req.name);
     const useTestProxy = req.useTestProxy === true;
     const proxy = this.wizardProxy(req.proxy, useTestProxy);
@@ -404,6 +405,7 @@ export class ProfileService {
       runtime: {
         idleStopMinutes: this.config.defaultIdleStopMinutes ?? DEFAULT_IDLE_STOP_MINUTES,
         ...(useTestProxy ? { usesTestProxy: true } : {}),
+        ...(opts.temporary ? { temporary: true } : {}),
       },
       status: {
         state: 'stopped',
@@ -773,7 +775,10 @@ export class ProfileService {
    * location), an audit of Pixelscan alone, then the profile is deleted.
    */
   private async pixelscanProxy(proxy: ProxyInput): Promise<{ verdict: string; proxy: string }> {
-    const temp = await this.create({ name: `proxy test ${proxy.host}:${proxy.port}`, proxy });
+    const temp = await this.create(
+      { name: `proxy test ${proxy.host}:${proxy.port}`, proxy },
+      { temporary: true },
+    );
     try {
       const run = await this.audit(temp.id, ['pixelscan']);
       const value = (item: string) =>
@@ -1145,6 +1150,10 @@ export class ProfileService {
           await this.setStatus(profile, { state: 'stopped', containerId: null, streamPort: null });
           await this.store.log(profile.id, 'reconciled', { was: profile.status.state });
         }
+      }
+      // A proxy test's temporary profile left behind by a crash or a closed app.
+      for (const profile of await this.store.list()) {
+        if (profile.runtime.temporary) await this.delete(profile.id, true).catch(() => {});
       }
     }
     this.monitor = setInterval(() => void this.tick(), MONITOR_INTERVAL_MS);

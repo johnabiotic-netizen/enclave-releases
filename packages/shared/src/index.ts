@@ -6,3 +6,4 @@ export * from './relay.js';
 export * from './tunnel.js';
 export * from './proxy-test.js';
 export * from './proxy-parse.js';
+export * from './audit.js';

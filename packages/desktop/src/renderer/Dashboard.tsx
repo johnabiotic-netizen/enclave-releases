@@ -26,9 +26,10 @@ interface Props {
   onOpen(id: string): void;
   onCreate(): void;
   onEdit(id: string): void;
+  onAudit(id: string): void;
 }
 
-export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit }: Props) {
+export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit, onAudit }: Props) {
   const [deleting, setDeleting] = useState<Profile | null>(null);
   const [exporting, setExporting] = useState<Profile | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
@@ -95,6 +96,7 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit 
                 onEdit={() => onEdit(p.id)}
                 onDelete={() => setDeleting(p)}
                 onExport={() => setExporting(p)}
+                onAudit={() => onAudit(p.id)}
               />
             ))}
           </ul>
@@ -153,6 +155,7 @@ interface TileProps {
   onEdit(): void;
   onDelete(): void;
   onExport(): void;
+  onAudit(): void;
 }
 
 function Tile({ profile: p, state, selected, error, moved, ...on }: TileProps) {
@@ -196,6 +199,7 @@ function Tile({ profile: p, state, selected, error, moved, ...on }: TileProps) {
           onEdit={on.onEdit}
           onDelete={on.onDelete}
           onExport={on.onExport}
+          onAudit={on.onAudit}
         />
       </div>
     </li>
@@ -210,6 +214,7 @@ function TileMenu(props: {
   onEdit(): void;
   onDelete(): void;
   onExport(): void;
+  onAudit(): void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -250,6 +255,9 @@ function TileMenu(props: {
           )}
           <button role="menuitem" onClick={pick(props.onEdit)} disabled={props.busy}>
             Edit
+          </button>
+          <button role="menuitem" onClick={pick(props.onAudit)} disabled={props.busy}>
+            Check fingerprint
           </button>
           <button
             role="menuitem"

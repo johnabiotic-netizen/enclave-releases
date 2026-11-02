@@ -56,7 +56,8 @@ Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json
   "runtime": {
     "idleStopMinutes": 20,
     "screenMatchesFingerprint": true,
-    "usesTestProxy": false          // optional: made with TEST_PROXY (PC's own IP), not for real accounts
+    "usesTestProxy": false,         // optional: made with TEST_PROXY (PC's own IP), not for real accounts
+    "temporary": false              // optional: made by the proxy tester for one Pixelscan check, deleted after it; not listed, and deleted at the next agent start if left behind
   },
 
   "status": {

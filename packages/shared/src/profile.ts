@@ -10,6 +10,9 @@ export interface ProfileRuntime {
   screenMatchesFingerprint?: boolean;
   /** Made with the built-in TEST_PROXY: exits through the PC's own IP. Not for real accounts. */
   usesTestProxy?: boolean;
+  /** Made by the proxy tester for one Pixelscan check and deleted after it. Not listed; one
+   * left behind by a crash is deleted when the agent starts. */
+  temporary?: boolean;
 }
 
 export const PROFILE_STATES = ['stopped', 'starting', 'running', 'error'] as const;

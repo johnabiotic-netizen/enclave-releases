@@ -6,6 +6,7 @@ import type { AgentState } from '../shared/bridge';
 import { Dashboard } from './Dashboard';
 import { ProfilesIcon, ProxyIcon, SettingsIcon, SetupIcon } from './icons';
 import { ProxyTesterPage } from './ProxyTester';
+import { AuditPage } from './Audit';
 import { useProfiles } from './useProfiles';
 import { Settings } from './Settings';
 import { Setup } from './Setup';
@@ -19,6 +20,7 @@ type View =
   | { kind: 'viewer'; id: string }
   | { kind: 'create'; proxy?: string }
   | { kind: 'proxies' }
+  | { kind: 'audit'; id: string }
   | { kind: 'edit'; id: string }
   | { kind: 'settings' }
   | { kind: 'setup' };
@@ -92,7 +94,8 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
   }, []);
   const nav = (kind: 'profiles' | 'proxies' | 'settings' | 'setup') => setView({ kind });
   const on = (kind: View['kind']) =>
-    view.kind === kind || (kind === 'profiles' && ['viewer', 'create', 'edit'].includes(view.kind));
+    view.kind === kind ||
+    (kind === 'profiles' && ['viewer', 'create', 'edit', 'audit'].includes(view.kind));
 
   return (
     <div className="shell">
@@ -120,6 +123,7 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
             onOpen={(id) => setView({ kind: 'viewer', id })}
             onCreate={() => setView({ kind: 'create' })}
             onEdit={(id) => setView({ kind: 'edit', id })}
+            onAudit={(id) => setView({ kind: 'audit', id })}
           />
         )}
         {view.kind === 'create' && (
@@ -163,6 +167,12 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
                 onStop={() => void model.stop(profile.id)}
               />
             );
+          })()}
+        {view.kind === 'audit' &&
+          (() => {
+            const profile = model.profiles?.find((p) => p.id === view.id);
+            if (!profile) return null;
+            return <AuditPage profile={profile} onBack={() => nav('profiles')} />;
           })()}
         {view.kind === 'proxies' && (
           <ProxyTesterPage onCreate={(proxy) => setView({ kind: 'create', proxy })} />

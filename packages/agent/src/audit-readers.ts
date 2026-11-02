@@ -1,18 +1,10 @@
 // Turns an audit run's raw page results into findings (testing/test-suite.md). Each
 // reader looks for exact fields; a field it cannot find is "look" (a person checks the
 // screenshot), never a guess.
+import type { Finding, Verdict } from '@enclave/shared';
 import type { AuditCheckResult, AuditReport } from './profiles.js';
 
-export type Verdict = 'pass' | 'fail' | 'look' | 'info';
-
-export interface Finding {
-  check: string;
-  item: string;
-  verdict: Verdict;
-  value?: string;
-  expected?: string;
-  note?: string;
-}
+export type { Finding, Verdict } from '@enclave/shared';
 
 /** Real Windows Firefox of Camoufox's version on this PC (testing/reference/). */
 export interface Reference {
