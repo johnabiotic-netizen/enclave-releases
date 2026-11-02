@@ -19,7 +19,7 @@ Enclave uses Docker to keep each profile sealed. Docker Desktop is free for pers
 If Docker doesn't start, see `docs/setup/windows-setup.md` (it covers WSL and turning on virtualization), or tell us what it says.
 
 ## 2. Install Enclave
-1. Run **Enclave-Setup** (the file you were sent).
+1. Download **Enclave-Setup-0.3.3.exe** from https://github.com/johnabiotic-netizen/enclave-releases/releases/tag/v0.3.3 and run it.
 2. Windows may show a blue box, **Windows protected your PC**. The beta isn't signed yet. Click **More info**, then **Run anyway**.
 3. Enclave opens on **Setup**. Each line should turn green. On **Browser ready**, click **Fix**, then **Download the browser**. It's about 1.5 GB, once; keep the PC on until it finishes.
 4. When every line is green, click **Go to profiles**.
