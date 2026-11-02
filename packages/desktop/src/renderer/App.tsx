@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react';
 import type { AgentState } from '../shared/bridge';
 import { Dashboard } from './Dashboard';
-import { ProfilesIcon, SettingsIcon, SetupIcon } from './icons';
+import { ProfilesIcon, ProxyIcon, SettingsIcon, SetupIcon } from './icons';
+import { ProxyTesterPage } from './ProxyTester';
 import { useProfiles } from './useProfiles';
 import { Settings } from './Settings';
 import { Setup } from './Setup';
@@ -16,7 +17,8 @@ import { CreateWizard, EditProfile } from './Wizard';
 type View =
   | { kind: 'profiles' }
   | { kind: 'viewer'; id: string }
-  | { kind: 'create' }
+  | { kind: 'create'; proxy?: string }
+  | { kind: 'proxies' }
   | { kind: 'edit'; id: string }
   | { kind: 'settings' }
   | { kind: 'setup' };
@@ -88,7 +90,7 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
       () => {},
     );
   }, []);
-  const nav = (kind: 'profiles' | 'settings' | 'setup') => setView({ kind });
+  const nav = (kind: 'profiles' | 'proxies' | 'settings' | 'setup') => setView({ kind });
   const on = (kind: View['kind']) =>
     view.kind === kind || (kind === 'profiles' && ['viewer', 'create', 'edit'].includes(view.kind));
 
@@ -98,6 +100,9 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
         <span className="brand" aria-hidden="true" />
         <RailButton label="Profiles" active={on('profiles')} onClick={() => nav('profiles')}>
           <ProfilesIcon />
+        </RailButton>
+        <RailButton label="Proxies" active={on('proxies')} onClick={() => nav('proxies')}>
+          <ProxyIcon />
         </RailButton>
         <RailButton label="Settings" active={on('settings')} onClick={() => nav('settings')}>
           <SettingsIcon />
@@ -119,6 +124,7 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
         )}
         {view.kind === 'create' && (
           <CreateWizard
+            {...(view.proxy ? { proxy: view.proxy } : {})}
             onDone={(id) => {
               void model.refresh();
               if (id) setSelected(id);
@@ -158,6 +164,9 @@ function Shell({ phoneApp }: { phoneApp: string | null }) {
               />
             );
           })()}
+        {view.kind === 'proxies' && (
+          <ProxyTesterPage onCreate={(proxy) => setView({ kind: 'create', proxy })} />
+        )}
         {view.kind === 'settings' && <Settings profiles={model.profiles} />}
         {view.kind === 'setup' && (
           <Setup

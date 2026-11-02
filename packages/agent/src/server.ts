@@ -18,7 +18,8 @@ import {
   type UpdateProfileRequest,
 } from '@enclave/shared';
 import { AgentError, InputError } from './errors.js';
-import type { ProfileService, ProxyTestRequest } from './profiles.js';
+import type { ProfileService } from './profiles.js';
+import type { ProxyTestRequest } from '@enclave/shared';
 import type { DockerRuntime } from './docker/runtime.js';
 import type { RelayLink } from './relay/link.js';
 import type { ImageDownloader } from './image-download.js';

@@ -22,6 +22,8 @@ import {
   type Profile,
   type ProfileStatus,
   type ProxyCheckResult,
+  type ProxyReport,
+  type ProxyTestRequest,
   type ProxyInput,
   type ProxySpec,
   type StreamInfo,
@@ -34,7 +36,7 @@ import { makeTar, type TarEntry } from './docker/tar.js';
 import { detectGpu, gpuContainerSettings } from './gpu.js';
 import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
-import { ProxyTester, type ProxyTestJob } from './proxy-tester.js';
+import { lookupReputation, ProxyTester, type ProxyTestJob } from './proxy-tester.js';
 import { AgentError, InputError } from './errors.js';
 import { stripLocation } from './strip-location.js';
 import {
@@ -347,11 +349,18 @@ export class ProfileService {
    * The safety check for a proxy that is not in a profile yet (the create wizard's Check):
    * the same check a profile's start runs. Throws the same errors; saves nothing.
    */
-  async checkNewProxy(req: CheckNewProxyRequest): Promise<ProxyCheckResult> {
+  /** The wizard's Check proxy: the safety check, and what IP databases say about the exit IP. */
+  async checkNewProxy(req: CheckNewProxyRequest): Promise<ProxyReport> {
     const useTestProxy = req.useTestProxy === true;
     const proxy = this.wizardProxy(req.proxy, useTestProxy);
     await this.runtime.assertReady();
-    return checkResult(await this.checkProxy(proxy, useTestProxy), true);
+    const result: ProxyReport = checkResult(await this.checkProxy(proxy, useTestProxy), true);
+    // Not for the test proxy: that is this PC's own connection.
+    if (result.exitIp && !useTestProxy) {
+      const reputation = (await lookupReputation([result.exitIp])).get(result.exitIp);
+      if (reputation) result.reputation = reputation;
+    }
+    return result;
   }
 
   private wizardProxy(spec: ProxySpec | undefined, useTestProxy: boolean): ProxyInput {
@@ -1655,15 +1664,6 @@ export interface AuditReport {
   finishedAt: string;
   checks: AuditCheckResult[];
   error?: string;
-}
-
-export interface ProxyTestRequest {
-  proxies?: string[];
-  like?: { profileId: string; ports: [number, number] };
-  /** Minutes before the sticky re-check (default 5, 0 skips it). */
-  stickyMinutes?: number;
-  /** Also run Pixelscan per working proxy (about 1.5 minutes each). */
-  pixelscan?: boolean;
 }
 
 export interface AuditJob {

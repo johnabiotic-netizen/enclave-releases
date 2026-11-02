@@ -29,6 +29,14 @@ export const ProfilesIcon = () => (
   </Icon>
 );
 
+/** A globe with a route through it: proxies. */
+export const ProxyIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5s1.1-6.1 3.5-8.5Z" />
+  </Icon>
+);
+
 export const SettingsIcon = () => (
   <Icon>
     <circle cx="12" cy="12" r="3" />

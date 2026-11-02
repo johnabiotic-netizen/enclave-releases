@@ -2,6 +2,7 @@
 
 import type { Profile } from './profile.js';
 import type { ProxyCheckResult, ProxySpec } from './proxy.js';
+import type { ProxyReport } from './proxy-test.js';
 
 export const DEFAULT_AGENT_PORT = 8787;
 /** Where the Windows app's own pages come from (its app:// scheme); neko lets it in. */
@@ -186,7 +187,7 @@ export interface CheckNewProxyRequest {
   proxy?: ProxySpec;
   useTestProxy?: boolean;
 }
-export type CheckNewProxyResponse = ProxyCheckResult;
+export type CheckNewProxyResponse = ProxyReport;
 
 // ------------------------------------------------------------------ phone linking (Stage 6)
 

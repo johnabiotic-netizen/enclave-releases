@@ -1,14 +1,18 @@
 // Screen 3 (ui/screens.md): create a profile in steps, or edit one.
 
 import { useEffect, useState } from 'react';
-import type {
-  CheckNewProxyRequest,
-  CreateProfileRequest,
-  Profile,
-  ProxyCheckResult,
-  SystemResponse,
-  UpdateProfileRequest,
+import {
+  addressKind,
+  rateProxy,
+  reportToRated,
+  type CheckNewProxyRequest,
+  type CreateProfileRequest,
+  type Profile,
+  type ProxyReport,
+  type SystemResponse,
+  type UpdateProfileRequest,
 } from '@enclave/shared';
+import { DeepCheck, RatingBadge } from './ProxyTester';
 import { api, ApiFailure } from './api';
 import { Flag } from './Flag';
 import { countryName } from './format';
@@ -21,7 +25,7 @@ const PROXY_FORMATS =
 type Check =
   | { state: 'idle' }
   | { state: 'checking' }
-  | { state: 'ok'; result: ProxyCheckResult; checkedFor: string }
+  | { state: 'ok'; result: ProxyReport; checkedFor: string }
   | { state: 'failed'; message: string };
 
 /** What to try after a failed check, by the agent's error code. */
@@ -34,11 +38,15 @@ function nextStep(e: unknown): string {
   return e.message;
 }
 
-export function CreateWizard(props: { onDone(id: string | null): void }) {
+export function CreateWizard(props: {
+  /** A proxy to start from (the proxy tester's Create profile). */
+  proxy?: string;
+  onDone(id: string | null): void;
+}) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
-  const [proxy, setProxy] = useState('');
+  const [proxy, setProxy] = useState(props.proxy ?? '');
   const [testProxy, setTestProxy] = useState(false);
   const [testProxyAvailable, setTestProxyAvailable] = useState(false);
   const [check, setCheck] = useState<Check>({ state: 'idle' });
@@ -64,7 +72,7 @@ export function CreateWizard(props: { onDone(id: string | null): void }) {
     setCheck({ state: 'checking' });
     const body: CheckNewProxyRequest = testProxy ? { useTestProxy: true } : { proxy: proxy.trim() };
     try {
-      const result = await api<ProxyCheckResult>('POST', '/proxy-check', body);
+      const result = await api<ProxyReport>('POST', '/proxy-check', body);
       setCheck({ state: 'ok', result, checkedFor: proxyKey });
     } catch (e) {
       setCheck({ state: 'failed', message: nextStep(e) });
@@ -191,7 +199,12 @@ export function CreateWizard(props: { onDone(id: string | null): void }) {
                   <span className="muted">This takes a few seconds.</span>
                 )}
               </div>
-              {check.state === 'ok' && checked && <CheckResult result={check.result} />}
+              {check.state === 'ok' && checked && (
+                <>
+                  <CheckResult result={check.result} testProxy={testProxy} />
+                  {!testProxy && <DeepCheck key={proxyKey} proxy={proxyKey} />}
+                </>
+              )}
               {check.state === 'failed' && <p className="notice error">{check.message}</p>}
             </>
           )}
@@ -270,10 +283,20 @@ export function CreateWizard(props: { onDone(id: string | null): void }) {
   );
 }
 
-function CheckResult({ result }: { result: ProxyCheckResult }) {
+function CheckResult({ result, testProxy }: { result: ProxyReport; testProxy: boolean }) {
+  const rating = rateProxy(reportToRated(result));
+  const rep = result.reputation;
+  const kind = rep ? addressKind(rep) : null;
   return (
-    <div className="check-ok">
-      <strong>Proxy works</strong>
+    <div className={`check-ok rated ${rating.level}`}>
+      {testProxy ? <strong>Proxy works</strong> : <RatingBadge level={rating.level} />}
+      {!testProxy && rating.notes.length > 0 && (
+        <ul className="rating-notes">
+          {rating.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
       <dl className="facts">
         <dt>Exit IP</dt>
         <dd>
@@ -283,6 +306,27 @@ function CheckResult({ result }: { result: ProxyCheckResult }) {
         <dd>{countryName(result.country)}</dd>
         <dt>Time zone</dt>
         <dd>{result.timezone}</dd>
+        {rep?.city && (
+          <>
+            <dt>City</dt>
+            <dd>{rep.city}</dd>
+          </>
+        )}
+        {rep?.isp && (
+          <>
+            <dt>Provider</dt>
+            <dd>
+              {rep.isp}
+              {rep.asn ? <span className="muted mono"> {rep.asn}</span> : null}
+            </dd>
+          </>
+        )}
+        {kind && (
+          <>
+            <dt>Address type</dt>
+            <dd>{kind}</dd>
+          </>
+        )}
         {result.latencyMs !== undefined && (
           <>
             <dt>Response</dt>
@@ -290,6 +334,11 @@ function CheckResult({ result }: { result: ProxyCheckResult }) {
           </>
         )}
       </dl>
+      {!rep && !testProxy && (
+        <p className="muted small">
+          The IP database lookup didn&apos;t answer, so the address type is unknown.
+        </p>
+      )}
     </div>
   );
 }

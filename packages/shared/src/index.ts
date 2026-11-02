@@ -4,3 +4,5 @@ export * from './profile.js';
 export * from './proxy.js';
 export * from './relay.js';
 export * from './tunnel.js';
+export * from './proxy-test.js';
+export * from './proxy-parse.js';

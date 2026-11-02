@@ -4,50 +4,9 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describeProxy, judgeProxyCheck, type RawProxyCheck } from './proxy.js';
-import type { ProxyInput } from '@enclave/shared';
+import type { ProxyInput, ProxyReputation, ProxyTestJob, ProxyTestResult } from '@enclave/shared';
 
-/** What the tester records for one proxy. */
-export interface ProxyTestResult {
-  proxy: string;
-  ok: boolean;
-  /** Why it failed the safety check, if it did. */
-  problem?: string;
-  exitIp?: string;
-  country?: string;
-  timezone?: string;
-  latencyMs?: number;
-  /** Exit IP at the second check, when a sticky check ran. */
-  exitIpLater?: string;
-  sticky?: boolean;
-  /** ip-api.com: city, ISP and its flags. Only the IP address is sent. */
-  city?: string;
-  isp?: string;
-  asn?: string;
-  hosting?: boolean;
-  proxyFlag?: boolean;
-  mobile?: boolean;
-  /** Pixelscan in a temporary profile on this proxy: its verdict and proxy card. */
-  pixelscan?: string;
-  pixelscanProxy?: string;
-  /** Lower is better: failing, flagged or unsticky proxies sort last. */
-  score: number;
-}
-
-export interface ProxyTestJob {
-  id: string;
-  state: 'running' | 'done' | 'failed';
-  startedAt: string;
-  finishedAt?: string;
-  total: number;
-  checked: number;
-  /** "first check", "waiting for the sticky check", "sticky check", "reputation". */
-  phase: string;
-  results?: ProxyTestResult[];
-  reportDir?: string;
-  /** The summary table, best first (also in the report folder). */
-  table?: string;
-  error?: string;
-}
+export type { ProxyTestJob, ProxyTestResult } from '@enclave/shared';
 
 export interface ProxyTestOptions {
   /** Minutes between the two checks; 0 skips the sticky check. */
@@ -105,27 +64,41 @@ export class ProxyTester {
     proxies: ProxyInput[],
     options: ProxyTestOptions,
   ): Promise<ProxyTestResult[]> {
-    const first = await this.checkAll(proxies, () => job.checked++);
-    const results: ProxyTestResult[] = proxies.map((p, i) => fromCheck(p, first[i]!));
+    // Every row from the start, filled in as its check finishes, so a client sees progress.
+    const results: ProxyTestResult[] = proxies.map((p, index) => ({
+      index,
+      proxy: describeProxy(p),
+      pending: true,
+      ok: false,
+      score: 0,
+    }));
+    job.results = results;
+    await this.checkAll(proxies, (i, raw) => {
+      results[i] = fromCheck(i, proxies[i]!, raw);
+      job.checked++;
+    });
 
-    if (options.stickyMinutes > 0) {
-      job.phase = 'waiting for the sticky check';
-      await new Promise((r) => setTimeout(r, options.stickyMinutes * 60_000));
-      job.phase = 'sticky check';
-      const working = results.map((r, i) => ({ r, p: proxies[i]! })).filter((x) => x.r.ok);
-      const later = await this.checkAll(
-        working.map((x) => x.p),
-        () => {},
-      );
-      working.forEach(({ r }, i) => {
-        const ip = later[i]?.exitIp;
-        if (ip) r.exitIpLater = ip;
-        r.sticky = ip !== undefined && ip === r.exitIp;
-      });
-    }
-
+    // Reputation before the sticky wait, so the table is useful while it waits.
     job.phase = 'reputation';
     await addReputation(results);
+
+    if (options.stickyMinutes > 0 && results.some((r) => r.ok)) {
+      job.phase = 'waiting for the sticky check';
+      const wait = options.stickyMinutes * 60_000;
+      job.stickyAt = new Date(Date.now() + wait).toISOString();
+      await new Promise((r) => setTimeout(r, wait));
+      delete job.stickyAt;
+      job.phase = 'sticky check';
+      const working = results.map((r, i) => ({ r, p: proxies[i]! })).filter((x) => x.r.ok);
+      await this.checkAll(
+        working.map((x) => x.p),
+        (i, raw) => {
+          const r = working[i]!.r;
+          if (raw.exitIp) r.exitIpLater = raw.exitIp;
+          r.sticky = raw.exitIp !== undefined && raw.exitIp === r.exitIp;
+        },
+      );
+    }
 
     if (options.pixelscan) {
       // One at a time: each is a browser start and a page scan, about 1.5 minutes.
@@ -153,41 +126,45 @@ export class ProxyTester {
     }
 
     for (const r of results) r.score = score(r);
-    results.sort((a, b) => a.score - b.score || (a.latencyMs ?? 1e9) - (b.latencyMs ?? 1e9));
+    // A copy, sorted: the job's rows stay in request order until the job is done.
+    const sorted = [...results];
+    sorted.sort((a, b) => a.score - b.score || (a.latencyMs ?? 1e9) - (b.latencyMs ?? 1e9));
 
     const dir = path.join(
       this.reportsDir,
-      `${job.startedAt.replace(/[:.]/g, '-')}-proxy-test-${results.length}`,
+      `${job.startedAt.replace(/[:.]/g, '-')}-proxy-test-${sorted.length}`,
     );
     await mkdir(dir, { recursive: true });
-    await writeFile(path.join(dir, 'results.json'), JSON.stringify(results, null, 2));
-    await writeFile(path.join(dir, 'summary.txt'), `${proxyTestTable(results)}\n`);
+    await writeFile(path.join(dir, 'results.json'), JSON.stringify(sorted, null, 2));
+    await writeFile(path.join(dir, 'summary.txt'), `${proxyTestTable(sorted)}\n`);
     job.reportDir = dir;
-    job.table = proxyTestTable(results);
-    return results;
+    job.table = proxyTestTable(sorted);
+    return sorted;
   }
 
-  /** Runs the safety check on every proxy, PARALLEL at a time, in input order. */
-  private async checkAll(proxies: ProxyInput[], onDone: () => void): Promise<RawProxyCheck[]> {
-    const out: RawProxyCheck[] = new Array(proxies.length);
+  /** Runs the safety check on every proxy, PARALLEL at a time; each result as it comes. */
+  private async checkAll(
+    proxies: ProxyInput[],
+    onDone: (index: number, raw: RawProxyCheck) => void,
+  ): Promise<void> {
     let next = 0;
     const worker = async () => {
       while (next < proxies.length) {
         const i = next++;
-        out[i] = await this.check(proxies[i]!).catch((e: unknown) => ({
+        const raw = await this.check(proxies[i]!).catch((e: unknown): RawProxyCheck => ({
           error: e instanceof Error ? e.message : String(e),
         }));
-        onDone();
+        onDone(i, raw);
       }
     };
     await Promise.all(Array.from({ length: Math.min(PARALLEL, proxies.length) }, worker));
-    return out;
   }
 }
 
-function fromCheck(proxy: ProxyInput, raw: RawProxyCheck): ProxyTestResult {
+function fromCheck(index: number, proxy: ProxyInput, raw: RawProxyCheck): ProxyTestResult {
   const verdict = judgeProxyCheck(raw);
   return {
+    index,
     proxy: describeProxy(proxy),
     ok: verdict.ok,
     ...(verdict.ok ? {} : { problem: verdict.message }),
@@ -210,9 +187,11 @@ interface IpApiAnswer {
   hosting?: boolean;
 }
 
-/** ip-api.com batch lookup (free tier: plain HTTP, 100 IPs per request). */
-async function addReputation(results: ProxyTestResult[]): Promise<void> {
-  const ips = [...new Set(results.map((r) => r.exitIp).filter((ip): ip is string => !!ip))];
+/**
+ * ip-api.com batch lookup (free tier: plain HTTP, 100 IPs per request). Only IP addresses are
+ * sent. IPs it couldn't look up are missing from the map; reputation is extra information.
+ */
+export async function lookupReputation(ips: string[]): Promise<Map<string, ProxyReputation>> {
   const answers = new Map<string, IpApiAnswer>();
   for (let i = 0; i < ips.length; i += IP_API_BATCH) {
     try {
@@ -226,12 +205,30 @@ async function addReputation(results: ProxyTestResult[]): Promise<void> {
       // Reputation is extra information; the rest of the report stands without it.
     }
   }
+  const out = new Map<string, ProxyReputation>();
+  for (const [ip, a] of answers) {
+    if (a.status !== 'success') continue;
+    out.set(ip, {
+      ...(a.city ? { city: a.city } : {}),
+      ...(a.isp ? { isp: a.isp } : {}),
+      ...(a.as ? { asn: a.as.split(' ')[0]! } : {}),
+      ...(a.hosting !== undefined ? { hosting: a.hosting } : {}),
+      ...(a.proxy !== undefined ? { proxy: a.proxy } : {}),
+      ...(a.mobile !== undefined ? { mobile: a.mobile } : {}),
+    });
+  }
+  return out;
+}
+
+async function addReputation(results: ProxyTestResult[]): Promise<void> {
+  const ips = [...new Set(results.map((r) => r.exitIp).filter((ip): ip is string => !!ip))];
+  const found = await lookupReputation(ips);
   for (const r of results) {
-    const a = r.exitIp ? answers.get(r.exitIp) : undefined;
-    if (!a || a.status !== 'success') continue;
+    const a = r.exitIp ? found.get(r.exitIp) : undefined;
+    if (!a) continue;
     if (a.city) r.city = a.city;
     if (a.isp) r.isp = a.isp;
-    if (a.as) r.asn = a.as.split(' ')[0]!;
+    if (a.asn) r.asn = a.asn;
     if (a.hosting !== undefined) r.hosting = a.hosting;
     if (a.proxy !== undefined) r.proxyFlag = a.proxy;
     if (a.mobile !== undefined) r.mobile = a.mobile;
