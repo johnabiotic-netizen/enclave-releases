@@ -1156,3 +1156,13 @@ textarea:focus-visible {
   max-width: 420px;
   overflow-wrap: anywhere;
 }
+.control-release {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  opacity: 0.85;
+}
+.control-release:hover {
+  opacity: 1;
+}

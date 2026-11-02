@@ -377,7 +377,7 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
       (status) => {
         if (status === 'connected' && !asked) {
           asked = true;
-          c.request();
+          takeControl(c);
         }
         // A reconnect is a new connection: share the microphone again.
         if (status === 'connected' && mic) mic.stop = c.shareMedia(mic.stream);
@@ -385,6 +385,13 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
       },
       { fireImmediately: true },
     ),
+  );
+  // The PC asks for control (its Take control, or a click there): hand it over. Both screens
+  // are the same person's, so whichever is used gets control.
+  detach.push(
+    c.events.on('room.control.request', () => {
+      if (c.controlling) c.release();
+    }),
   );
   c.connect();
 
@@ -445,6 +452,20 @@ function closeViewer(): void {
   document.title = 'Enclave';
 }
 
+/**
+ * Takes control. While another viewer has it, neko only passes the request on to that
+ * viewer, which hands control over (see the room.control.request handler); so ask, and ask
+ * again until control arrives.
+ */
+function takeControl(c: NekoClient): void {
+  c.request();
+  let tries = 0;
+  const again = window.setInterval(() => {
+    if (client !== c || c.controlling || ++tries > 10) return window.clearInterval(again);
+    c.request();
+  }, 300);
+}
+
 // Who uses the profile: this phone or the PC. Only one viewer has control at a time; the
 // other only watches. The button takes control, or gives it back so the PC can use it.
 const controlButton = document.getElementById('control')!;
@@ -464,7 +485,7 @@ function showControl(c: NekoClient): void {
 controlButton.onclick = () => {
   if (!client) return;
   if (client.controlling) client.release();
-  else client.request();
+  else takeControl(client);
 };
 
 function setStatus(text: string): void {
@@ -573,7 +594,7 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
     }
     if (e.touches.length > 1) return;
     multi = false;
-    if (!c.controlling) c.request();
+    if (!c.controlling) takeControl(c);
     const t = e.changedTouches[0]!;
     start = { x: t.clientX, y: t.clientY, t: e.timeStamp };
     last = { x: t.clientX, y: t.clientY };
@@ -674,7 +695,7 @@ function attachGestures(box: HTMLElement, c: NekoClient): () => void {
 const XK = { Alt_L: 0xffe9, Control_L: 0xffe3, Left: 0xff51, Right: 0xff53, F5: 0xffc2, v: 0x76 };
 
 function press(...keys: number[]): void {
-  if (!client?.controlling) client?.request();
+  if (client && !client.controlling) takeControl(client);
   for (const k of keys) client?.input.key(k, true);
   for (const k of [...keys].reverse()) client?.input.key(k, false);
 }
@@ -695,7 +716,7 @@ document.getElementById('paste')!.onclick = async () => {
     );
   }
   if (!text) return setStatus('Nothing to paste. Copy some text on the phone first.');
-  if (!client.controlling) client.request();
+  if (!client.controlling) takeControl(client);
   await client.preparePaste(text);
   press(XK.Control_L, XK.v);
 };

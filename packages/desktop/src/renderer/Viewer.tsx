@@ -103,12 +103,31 @@ export function Viewer({ profile, state, phoneApp, onBack, onStart, onStop }: Pr
   );
 }
 
+/**
+ * Takes control. While another viewer has it, neko only passes the request on to that
+ * viewer, which hands control over (its room.control.request handler); so ask, and ask again
+ * until control arrives.
+ */
+function takeControl(client: NekoClient): void {
+  client.request();
+  let tries = 0;
+  const again = window.setInterval(() => {
+    if (client.controlling || !client.connected || ++tries > 10) {
+      window.clearInterval(again);
+      return;
+    }
+    client.request();
+  }, 300);
+}
+
 function Stream({ profile }: { profile: Profile }) {
   const box = useRef<HTMLDivElement>(null);
   const [link, setLink] = useState<Link>('connecting');
   const [error, setError] = useState<string | null>(null);
   /** Another viewer (the phone) has control; this one only watches until it takes it back. */
   const [watching, setWatching] = useState(false);
+  /** This viewer has control and a phone is watching too: it can hand control over. */
+  const [canRelease, setCanRelease] = useState(false);
   const clientRef = useRef<NekoClient | null>(null);
 
   useEffect(() => {
@@ -141,7 +160,7 @@ function Stream({ profile }: { profile: Profile }) {
               setLink(status === 'connected' ? 'connected' : asked ? 'reconnecting' : 'connecting');
               if (status === 'connected' && !asked) {
                 asked = true;
-                client.request();
+                takeControl(client);
               }
             },
             { fireImmediately: true },
@@ -156,6 +175,26 @@ function Stream({ profile }: { profile: Profile }) {
             setWatching,
             { fireImmediately: true },
           ),
+        );
+        off.push(
+          client.store.subscribe(
+            (s) =>
+              s.connection.status === 'connected' &&
+              s.control.host_id !== null &&
+              s.control.host_id === s.session_id &&
+              Object.values(s.sessions).some(
+                (x) => x.id !== s.session_id && x.profile.name === 'phone' && x.state.is_connected,
+              ),
+            setCanRelease,
+            { fireImmediately: true },
+          ),
+        );
+        // The phone asks for control (its pointer button, or a tap): hand it over. Both screens
+        // are the same person's, so whichever is used gets control.
+        off.push(
+          client.events.on('room.control.request', () => {
+            if (client.controlling) client.release();
+          }),
         );
         // Text copied in the profile goes to the PC's clipboard at once, so the PC's clipboard
         // always holds whichever side copied last. A paste (Ctrl+V) then always means the PC's
@@ -175,7 +214,7 @@ function Stream({ profile }: { profile: Profile }) {
         };
         // Whoever uses the mouse here takes control back from the phone.
         const take = () => {
-          if (!client.controlling) client.request();
+          if (!client.controlling) takeControl(client);
         };
         inner.addEventListener('mousedown', take, true);
         off.push(() => inner.removeEventListener('mousedown', take, true));
@@ -203,10 +242,22 @@ function Stream({ profile }: { profile: Profile }) {
       {watching && (
         <p className="banner control-banner">
           Your phone has control of {profile.name}. Clicking in the browser takes it back.
-          <button className="button small" onClick={() => clientRef.current?.request()}>
+          <button
+            className="button small"
+            onClick={() => clientRef.current && takeControl(clientRef.current)}
+          >
             Take control
           </button>
         </p>
+      )}
+      {canRelease && (
+        <button
+          className="button small control-release"
+          onClick={() => clientRef.current?.release()}
+          title="Lets your phone use the profile without asking"
+        >
+          Give control to phone
+        </button>
       )}
       <div className="stream" ref={box} />
       {link !== 'connected' && (
