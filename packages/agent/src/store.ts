@@ -21,6 +21,9 @@ export interface ProfileSecrets {
     expiresAt: string;
     /** Phone mode: the PC's tailnet name the stream is relayed at. */
     phoneHost?: string;
+    /** Relay mode: started while the PC was linked, with the relay's TURN server, so a phone
+     * can open it. A run started before the link can't be opened on a phone until a restart. */
+    viaRelay?: boolean;
   };
 }
 

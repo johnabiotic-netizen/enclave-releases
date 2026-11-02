@@ -53,7 +53,12 @@ export function Viewer({ profile, state, phoneApp, onBack, onStart, onStop }: Pr
             <PhoneIcon /> Open on phone
           </button>
           {phoneOpen && (
-            <PhonePanel profile={profile} phoneApp={phoneApp} onClose={() => setPhoneOpen(false)} />
+            <PhonePanel
+              profile={profile}
+              running={running}
+              phoneApp={phoneApp}
+              onClose={() => setPhoneOpen(false)}
+            />
           )}
         </div>
         {running && (
@@ -102,6 +107,9 @@ function Stream({ profile }: { profile: Profile }) {
   const box = useRef<HTMLDivElement>(null);
   const [link, setLink] = useState<Link>('connecting');
   const [error, setError] = useState<string | null>(null);
+  /** Another viewer (the phone) has control; this one only watches until it takes it back. */
+  const [watching, setWatching] = useState(false);
+  const clientRef = useRef<NekoClient | null>(null);
 
   useEffect(() => {
     const area = box.current;
@@ -109,6 +117,7 @@ function Stream({ profile }: { profile: Profile }) {
     let disposed = false;
     const off: (() => void)[] = [];
     const client = new NekoClient({ inputMode: 'mouse', autoplay: true });
+    clientRef.current = client;
 
     void (async () => {
       try {
@@ -122,17 +131,29 @@ function Stream({ profile }: { profile: Profile }) {
         area.replaceChildren(inner);
         off.push(client.transport.attach(inner));
         off.push(new Overlay(client).attach(inner));
+        // Control once, when the stream first comes up. Not again after a reconnect: that
+        // would take control away from a phone in the middle of its use.
         let asked = false;
         off.push(
           client.store.subscribe(
             (s) => s.connection.status,
             (status) => {
               setLink(status === 'connected' ? 'connected' : asked ? 'reconnecting' : 'connecting');
-              if (status === 'connected') {
+              if (status === 'connected' && !asked) {
                 asked = true;
                 client.request();
               }
             },
+            { fireImmediately: true },
+          ),
+        );
+        off.push(
+          client.store.subscribe(
+            (s) =>
+              s.connection.status === 'connected' &&
+              s.control.host_id !== null &&
+              s.control.host_id !== s.session_id,
+            setWatching,
             { fireImmediately: true },
           ),
         );
@@ -172,12 +193,21 @@ function Stream({ profile }: { profile: Profile }) {
       for (const f of off.splice(0)) f();
       client.release();
       client.disconnect();
+      clientRef.current = null;
       area.replaceChildren();
     };
   }, [profile.id]);
 
   return (
     <div className="stream-area">
+      {watching && (
+        <p className="banner control-banner">
+          Your phone has control of {profile.name}. Clicking in the browser takes it back.
+          <button className="button small" onClick={() => clientRef.current?.request()}>
+            Take control
+          </button>
+        </p>
+      )}
       <div className="stream" ref={box} />
       {link !== 'connected' && (
         <p className="stream-status">
@@ -245,13 +275,27 @@ function usePhoneNeeded(profile: Profile, running: boolean): PhoneNeeded {
   return needed;
 }
 
-function PhonePanel(props: { profile: Profile; phoneApp: string | null; onClose(): void }) {
+function PhonePanel(props: {
+  profile: Profile;
+  running: boolean;
+  phoneApp: string | null;
+  onClose(): void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   // Through the relay, the phone app is at the relay's address (paired phones only).
   const [relay, setRelay] = useState<RelayStatus | null>(null);
+  // Whether this run can open on a phone: not when it started before phone access was on.
+  const [phoneReady, setPhoneReady] = useState(true);
   useEffect(() => {
     void api<RelayStatus>('GET', '/relay').then(setRelay, () => {});
   }, []);
+  useEffect(() => {
+    if (!props.running) return;
+    void api<StreamInfo>('GET', `/profiles/${props.profile.id}/stream`).then(
+      (s) => setPhoneReady(s.phone),
+      () => {},
+    );
+  }, [props.running, props.profile.id]);
   const viaRelay = relay?.enabled && relay.signedIn ? relay : null;
   const address = viaRelay?.url ?? props.phoneApp;
   useEffect(() => {
@@ -270,6 +314,12 @@ function PhonePanel(props: { profile: Profile; phoneApp: string | null; onClose(
             Open the Enclave app on your phone and choose <strong>{props.profile.name}</strong>. It
             shows the same browser, with the same tabs and the same IP.
           </p>
+          {!phoneReady && (
+            <p className="notice error">
+              {props.profile.name} was started before phone access was on, so your phone can&apos;t
+              open it yet. Stop it and start it again.
+            </p>
+          )}
           <p className="mono small">{address}</p>
           <button
             className="button small"

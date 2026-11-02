@@ -151,6 +151,9 @@
         stroke-linecap: round;
         stroke-linejoin: round;
       }
+      #bar button.on {
+        color: var(--accent);
+      }
       #bar button.live {
         color: var(--danger);
       }
@@ -405,6 +408,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5" />
             <path d="M20 3.5v5h-5" />
+          </svg>
+        </button>
+        <button id="control" aria-label="Take control" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 3.5l12.5 7-5.5 1.5-2.5 5.5z" />
           </svg>
         </button>
         <button id="keyboard" aria-label="Keyboard">

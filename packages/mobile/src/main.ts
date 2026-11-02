@@ -321,6 +321,14 @@ let overlay: Overlay | null = null;
 const detach: (() => void)[] = [];
 
 async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
+  // Through the relay, a run started before the PC linked to it has no way to the phone (no
+  // TURN server): it would say Connecting for ever. A restart gives it one. (A PC on Enclave
+  // 0.3.2 or older doesn't say, so only an explicit false counts.)
+  if (viaRelay && stream.phone === false) {
+    throw new Error(
+      `${p.name} was started before your PC linked to the relay, so it can't open on a phone yet. Stop it and start it again, then open it.`,
+    );
+  }
   // Through the relay, the stream server is reached through the tunnel (relay.ts).
   const streamUrl = viaRelay ? `${TUNNEL_ORIGIN}/neko/${p.id}` : stream.phoneUrl;
   if (!streamUrl) {
@@ -358,9 +366,15 @@ async function openStream(p: Profile, stream: StreamInfo): Promise<void> {
   let asked = false;
   detach.push(
     c.store.subscribe(
+      (s) => `${s.connection.status} ${s.control.host_id} ${s.session_id}`,
+      () => showControl(c),
+      { fireImmediately: true },
+    ),
+  );
+  detach.push(
+    c.store.subscribe(
       (s) => s.connection.status,
       (status) => {
-        setStatus(status === 'connected' ? '' : 'Connecting to the PC');
         if (status === 'connected' && !asked) {
           asked = true;
           c.request();
@@ -430,6 +444,28 @@ function closeViewer(): void {
   viewer.classList.remove('open');
   document.title = 'Enclave';
 }
+
+// Who uses the profile: this phone or the PC. Only one viewer has control at a time; the
+// other only watches. The button takes control, or gives it back so the PC can use it.
+const controlButton = document.getElementById('control')!;
+
+function showControl(c: NekoClient): void {
+  if (client !== c) return;
+  const connected = c.state.connection.status === 'connected';
+  const mine = connected && c.controlling;
+  controlButton.classList.toggle('on', mine);
+  controlButton.setAttribute('aria-pressed', String(mine));
+  controlButton.setAttribute('aria-label', mine ? 'Give control back to the PC' : 'Take control');
+  if (!connected) return setStatus('Connecting to the PC');
+  const other = !mine && c.state.control.host_id !== null;
+  setStatus(other ? 'The PC has control. Tap the pointer button to take it.' : '');
+}
+
+controlButton.onclick = () => {
+  if (!client) return;
+  if (client.controlling) client.release();
+  else client.request();
+};
 
 function setStatus(text: string): void {
   statusLine.textContent = text;

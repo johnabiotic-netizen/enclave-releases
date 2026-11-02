@@ -95,6 +95,9 @@ export interface StreamInfo {
   url: string;
   /** Phone mode (Stage 2): the same stream over Tailscale, e.g. https://pc.tail1234.ts.net:52100/. */
   phoneUrl?: string;
+  /** This run can be opened on a phone: it started while phone access was on (Tailscale) or
+   * while the PC was linked to its relay. Otherwise a restart is needed first. */
+  phone: boolean;
   password: string;
   expiresAt: string;
 }

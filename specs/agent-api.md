@@ -15,7 +15,7 @@ Base: `http://127.0.0.1:<port>/v1`
 | DELETE | `/profiles/:id?confirm=true` | - | `{ ok }` (stops container, removes data; refused without `confirm=true`) |
 | POST | `/profiles/:id/start` | - | `{ stream }` after health passes; errors if safety check fails |
 | POST | `/profiles/:id/stop` | - | `{ ok }` |
-| GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2) |
+| GET | `/profiles/:id/stream` | - | `{ url, phoneUrl?, phone, password, expiresAt }` for the viewer (`phoneUrl` in phone mode, Stage 2; `phone`: this run can be opened on a phone, false when it started before phone access was on or before the PC linked to its relay, and then a restart is needed) |
 | GET | `/profiles/:id/media` | - | `{ camera, microphone, filePicker, phoneCamera, phoneMicrophone }`: whether a page in the running profile is using its camera or microphone now, whether it has a file picker open, and whether a phone is sharing its camera or microphone into it (Stage 4; the phone app offers to share them or a file; the Windows app asks the user to switch to the phone when nothing is shared) |
 | POST | `/profiles/:id/files?name=<file name>` | the file, `application/octet-stream`, up to 100 MB | `{ ok }`: removes where a photo or video was taken (GPS, location), puts the file in the profile and picks it in the open file picker (Stage 4); `FILE_PICKER_CLOSED` if none is open |
 | POST | `/profiles/:id/check-proxy` | - | `ProxyCheckResult` |

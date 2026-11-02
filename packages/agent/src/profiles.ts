@@ -999,6 +999,7 @@ export class ProfileService {
           adminPassword: randomPassword(),
           expiresAt: new Date(Date.now() + STREAM_TTL_MS).toISOString(),
           ...(tailnet ? { phoneHost: tailnet.host } : {}),
+          ...(turn ? { viaRelay: true } : {}),
         };
         await this.store.saveSecrets(id, { ...secrets, stream });
 
@@ -1566,6 +1567,7 @@ function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>)
   return {
     url: `http://127.0.0.1:${port}/`,
     ...(stream.phoneHost ? { phoneUrl: `https://${stream.phoneHost}:${port}/` } : {}),
+    phone: !!stream.phoneHost || stream.viaRelay === true,
     password: stream.userPassword,
     expiresAt: stream.expiresAt,
   };

@@ -620,6 +620,22 @@ textarea:focus-visible {
   background: rgba(229, 96, 77, 0.12);
   color: #f6c3ba;
 }
+/* Over the stream, so the picture keeps its size. */
+.control-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(14, 20, 32, 0.92);
+}
 .stream-area {
   position: relative;
   flex: 1;
