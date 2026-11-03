@@ -5,6 +5,7 @@ import type { Profile, SystemResponse } from '@enclave/shared';
 import type { AppSettingsView, PhoneMode } from '../shared/bridge';
 import { api } from './api';
 import { RelayPanel } from './Phone';
+import { UpdateSettings } from './Update';
 
 const PHONE_CHOICES: [PhoneMode, string, string][] = [
   [
@@ -207,6 +208,11 @@ export function Settings({ profiles }: { profiles: Profile[] | null }) {
               Open folder
             </button>
           </div>
+        </section>
+
+        <section className="settings-group" aria-labelledby="s-updates">
+          <h2 id="s-updates">Updates</h2>
+          <UpdateSettings version={view.versions.app} />
         </section>
 
         <section className="settings-group" aria-labelledby="s-about">

@@ -1,7 +1,7 @@
 // The window's only way to the app: a few calls, no Node, no token.
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { AgentState, EnclaveBridge, TransferProgress } from '../shared/bridge.js';
+import type { AgentState, EnclaveBridge, TransferProgress, UpdateState } from '../shared/bridge.js';
 
 const bridge: EnclaveBridge = {
   request: (method, path, body) => ipcRenderer.invoke('agent:request', method, path, body),
@@ -24,6 +24,14 @@ const bridge: EnclaveBridge = {
     const handler = (_e: IpcRendererEvent, p: TransferProgress) => listener(p);
     ipcRenderer.on('transfer:progress', handler);
     return () => ipcRenderer.removeListener('transfer:progress', handler);
+  },
+  updateState: () => ipcRenderer.invoke('update:state'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateState: (listener) => {
+    const handler = (_e: IpcRendererEvent, s: UpdateState) => listener(s);
+    ipcRenderer.on('update:state', handler);
+    return () => ipcRenderer.removeListener('update:state', handler);
   },
   onAgentState: (listener) => {
     const handler = (_e: IpcRendererEvent, state: AgentState) => listener(state);

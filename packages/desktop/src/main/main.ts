@@ -26,6 +26,7 @@ import { SettingsFile, type AppSettings, type PhoneMode } from './settings.js';
 import { BROWSER_IMAGE } from './image.js';
 import { findWslDocker, runSetupChecks } from './setup.js';
 import { installSystem, SYSTEM_DISTRO, turnOnWsl } from './wsl-system.js';
+import { checkForUpdates, installOnQuit, startUpdater, updateState } from './updater.js';
 import type {
   AgentReply,
   AgentState,
@@ -90,6 +91,7 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle('app', serveRenderer);
     createTray();
     createWindow();
+    startUpdater((s) => win?.webContents.send('update:state', s));
     await bootAgent();
   });
 }
@@ -232,6 +234,9 @@ function showWindow(): void {
 // ---------------------------------------------------------------- the bridge
 
 ipcMain.handle('agent:state', () => state);
+ipcMain.handle('update:state', () => updateState());
+ipcMain.handle('update:check', () => checkForUpdates());
+ipcMain.handle('update:install', () => quitAll(true));
 
 ipcMain.handle('settings:get', async (): Promise<AppSettingsView> => {
   const file = new SettingsFile(home);
@@ -522,8 +527,11 @@ app.on('window-all-closed', () => {
   // Hidden to the tray, not quit (see the window's close handler).
 });
 
-/** Quit Enclave: stops every running profile cleanly (tabs and logins kept), then exits. */
-async function quitAll(): Promise<void> {
+/**
+ * Quit Enclave: stops every running profile cleanly (tabs and logins kept), then exits. A
+ * downloaded update installs on the way out; with `restart` Enclave starts again after it.
+ */
+async function quitAll(restart = false): Promise<void> {
   if (quitting) return;
   quitting = true;
   tray?.setToolTip('Enclave is stopping profiles');
@@ -535,6 +543,7 @@ async function quitAll(): Promise<void> {
     await agent.close().catch(() => {});
   }
   tray?.destroy();
+  if (installOnQuit(restart)) return;
   app.exit(0);
 }
 

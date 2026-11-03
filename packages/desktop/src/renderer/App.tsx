@@ -7,6 +7,7 @@ import { Dashboard } from './Dashboard';
 import { ProfilesIcon, ProxyIcon, SettingsIcon, SetupIcon } from './icons';
 import { ProxyTesterPage } from './ProxyTester';
 import { AuditPage } from './Audit';
+import { UpdateBanner } from './Update';
 import { useProfiles } from './useProfiles';
 import { Settings } from './Settings';
 import { Setup } from './Setup';
@@ -71,6 +72,7 @@ export function App() {
         </p>
       )}
       <Shell phoneApp={phoneApp} />
+      <UpdateBanner />
     </>
   );
 }

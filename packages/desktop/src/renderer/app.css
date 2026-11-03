@@ -1166,3 +1166,27 @@ textarea:focus-visible {
 .control-release:hover {
   opacity: 1;
 }
+
+/* ---------------------------------------------------------------- update */
+
+.update-banner {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  max-width: 380px;
+  padding: 14px 16px;
+  border: 1px solid rgba(76, 141, 255, 0.45);
+  border-radius: 10px;
+  background: var(--bg-700);
+  color: var(--text-300);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.update-banner strong {
+  color: var(--text-100);
+}
+.update-banner .row {
+  justify-content: flex-end;
+}

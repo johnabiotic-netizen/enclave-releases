@@ -97,6 +97,13 @@ export interface EnclaveBridge {
   copyText(text: string): Promise<void>;
   /** Called on every change; returns what stops listening. */
   onAgentState(listener: (state: AgentState) => void): () => void;
+  /** Where the app's own update stands (main/updater.ts). */
+  updateState(): Promise<UpdateState>;
+  /** Asks GitHub for a newer version now. */
+  checkForUpdates(): Promise<void>;
+  /** Stops the profiles, installs the downloaded version, and starts Enclave again. */
+  installUpdate(): Promise<void>;
+  onUpdateState(listener: (state: UpdateState) => void): () => void;
   /**
    * Exports a stopped profile to one encrypted file: asks where to save it, then writes it.
    * Not in the agent's HTTP API on purpose (specs/profile-file.md).
@@ -110,3 +117,14 @@ export interface EnclaveBridge {
   showExportedFile(): Promise<void>;
   onTransferProgress(listener: (progress: TransferProgress) => void): () => void;
 }
+
+/** The app's own update (main/updater.ts). */
+export type UpdateState =
+  /** A developer run: never updates. */
+  | { status: 'off' }
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'current'; checkedAt: string }
+  | { status: 'downloading'; version: string; percent: number }
+  | { status: 'ready'; version: string }
+  | { status: 'failed'; message: string };
