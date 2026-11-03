@@ -1,0 +1,74 @@
+# Enclave's location database (IP address to country, city and time zone), refreshed monthly.
+# Takes the newest release of daijro/geoip-all-in-one (the database Camoufox uses), checks it
+# against the one before it, and publishes it in the release "location-database" with
+# location-database.json, which the Enclave app reads to update itself.
+name: Location database
+
+on:
+  schedule:
+    - cron: "0 6 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: location-database
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE: daijro/geoip-all-in-one
+      RELEASE: location-database
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Newest source release
+        id: src
+        run: |
+          set -euo pipefail
+          tags=$(gh api "repos/$SOURCE/releases?per_page=2" --jq '.[].tag_name')
+          new=$(echo "$tags" | sed -n 1p); old=$(echo "$tags" | sed -n 2p)
+          echo "new=$new" >> "$GITHUB_OUTPUT"; echo "old=$old" >> "$GITHUB_OUTPUT"
+          current=$(gh release download "$RELEASE" -p location-database.json -O - 2>/dev/null | jq -r .tag || true)
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "newest $new, previous $old, published $current"
+
+      - name: Download and check
+        if: steps.src.outputs.new != steps.src.outputs.current
+        run: |
+          set -euo pipefail
+          for t in "${{ steps.src.outputs.new }}" "${{ steps.src.outputs.old }}"; do
+            gh release download "$t" -R "$SOURCE" -p geoip-aio-all.mmdb.zip -O "$t.zip"
+            unzip -q -p "$t.zip" geoip-aio-all.mmdb > "$t.mmdb"
+          done
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet maxminddb==3.2.0
+          /tmp/venv/bin/python scripts/check_location_db.py "${{ steps.src.outputs.new }}.mmdb" "${{ steps.src.outputs.old }}.mmdb"
+
+      - name: Publish
+        if: steps.src.outputs.new != steps.src.outputs.current
+        run: |
+          set -euo pipefail
+          tag="${{ steps.src.outputs.new }}"
+          file="location-database-$tag.mmdb.gz"
+          gzip -9 -n -c "$tag.mmdb" > "$file"
+          jq -n --arg tag "$tag" --arg file "$file" \
+            --arg sha256 "$(sha256sum "$tag.mmdb" | cut -d' ' -f1)" \
+            --arg gzSha256 "$(sha256sum "$file" | cut -d' ' -f1)" \
+            --argjson bytes "$(stat -c %s "$tag.mmdb")" \
+            --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{format: 1, source: "daijro/geoip-all-in-one", tag: $tag, file: $file, sha256: $sha256, gzSha256: $gzSha256, bytes: $bytes, publishedAt: $publishedAt}' \
+            > location-database.json
+          cat location-database.json
+          if ! gh release view "$RELEASE" > /dev/null 2>&1; then
+            gh release create "$RELEASE" --prerelease --title "Location database" \
+              --notes "IP address to location data for Enclave, from daijro/geoip-all-in-one (each source has its own terms). Refreshed monthly; the Enclave app downloads it by itself."
+          fi
+          gh release upload "$RELEASE" "$file" location-database.json --clobber
+          # Older database files: the app only reads the one named in location-database.json.
+          for old in $(gh release view "$RELEASE" --json assets --jq '.assets[].name' | grep '^location-database-.*\.mmdb\.gz$' | grep -vx "$file"); do
+            gh release delete-asset "$RELEASE" "$old" --yes
+          done
