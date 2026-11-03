@@ -5,7 +5,7 @@ Thanks for testing Enclave. It runs each browser profile in its own sealed space
 You'll need a Windows 10 or 11 PC (64-bit) with 8 GB of memory or more and about 15 GB free on C:. You'll also need a phone and a proxy (host, port, username and password). **Use an administrator Windows account, and the same one throughout.**
 
 ## 1. Install Enclave
-1. Download **Enclave-Setup-0.3.4.exe** from https://github.com/johnabiotic-netizen/enclave-releases/releases/tag/v0.3.4 and run it.
+1. Download the newest **Enclave-Setup** from https://github.com/johnabiotic-netizen/enclave-releases/releases/latest and run it. After this, Enclave updates itself.
 2. If Windows shows **Windows protected your PC**, click **More info**, then **Run anyway**.
 
 ## 2. Let Setup finish
