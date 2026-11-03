@@ -2,6 +2,11 @@
 
 One entry per real decision. Newest at the top. Keep each to a few lines: context, decision, reason. Record here whenever you deviate from a spec because reality differed, or when you make a choice the docs left open.
 
+## 2026-11-03  Stage 7: Docker Desktop leaves the tester guide
+Context: The easier install (DECISIONS 2026-11-01) had run Docker and a test container in Enclave's own WSL system, but not a real profile, and not on a PC without Docker. A tester's PC without Docker (Oladoyinbo) set up 0.3.4 from Setup alone and ran a profile (the owner has their screenshot).
+Decision: docs/setup/beta-tester.md, the guide page and the landing page no longer ask for Docker Desktop: install Enclave, then Setup (Turn on WSL, Set up, Download the browser). A PC that already has Docker Desktop or Docker in WSL keeps using it (Setup's order is unchanged).
+Reason: The hardest setup step is gone for testers; Setup already handles both cases.
+
 ## 2026-11-02  Stage 7: proxy report in the create wizard, and a proxy tester screen
 Context: The owner asked for a report on a proxy when it is entered for a new profile, and for the proxy tester (until now CLI only) in the app, for many proxies and port ranges.
 Decision: One rating for both (`rateProxy`, packages/shared/src/proxy-test.ts): not usable only when the safety check fails; a warning for an IP-database listing as proxy or data centre, an answer slower than 1.5 s, an IP that changed between checks, or a Pixelscan verdict other than consistent; otherwise good. The wizard's Check proxy adds the exit IP's reputation (ip-api.com, IP only; not for the test proxy) and offers a Deep check (Pixelscan in a temporary profile, through `/proxy-tests`). The Proxies screen takes one proxy per line, a port may be a range (`expandProxyLines`, up to 1000), names a line that isn't a proxy before sending (the parser moved to shared as `parseProxySpec`), shows rows as they are checked, and opens Create profile with a row's proxy. The sticky check is optional there (5 minutes) and left out of the wizard.
