@@ -83,9 +83,25 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-} else {
+/**
+ * One Enclave at a time. Started by an update's installer (--updated), the old Enclave may
+ * still be closing: wait for it rather than quitting, or the update ends with no Enclave.
+ */
+async function singleInstance(): Promise<boolean> {
+  if (app.requestSingleInstanceLock()) return true;
+  if (!process.argv.includes('--updated')) return false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (app.requestSingleInstanceLock()) return true;
+  }
+  return false;
+}
+
+void singleInstance().then((alone) => {
+  if (!alone) {
+    app.quit();
+    return;
+  }
   app.on('second-instance', () => showWindow());
   void app.whenReady().then(async () => {
     protocol.handle('app', serveRenderer);
@@ -94,7 +110,7 @@ if (!app.requestSingleInstanceLock()) {
     startUpdater((s) => win?.webContents.send('update:state', s));
     await bootAgent();
   });
-}
+});
 
 /** Files of the built renderer only; anything outside it is not found. */
 function serveRenderer(req: Request): Response | Promise<Response> {

@@ -76,5 +76,8 @@ export async function checkForUpdates(): Promise<void> {
 export function installOnQuit(restart: boolean): boolean {
   if (state.status !== 'ready') return false;
   autoUpdater.quitAndInstall(true, restart);
+  // quitAndInstall quits on the next tick; should anything hold the quit up, end anyway so
+  // the installer finds Enclave closed.
+  setTimeout(() => app.exit(0), 3000);
   return true;
 }
