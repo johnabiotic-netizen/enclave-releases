@@ -8,6 +8,7 @@ import { DockerRuntime } from './docker/runtime.js';
 import { phoneAppOrigin, ProfileService } from './profiles.js';
 import { Tailscale } from './tailscale.js';
 import { ImageDownloader } from './image-download.js';
+import { LocationDb } from './location-db.js';
 import { RelayLink } from './relay/link.js';
 import { AGENT_VERSION, buildServer, listen } from './server.js';
 import { ProfileStore, type SecretSealer } from './store.js';
@@ -73,10 +74,21 @@ export async function startAgent(
     AGENT_VERSION,
     options.sealer,
   );
-  const service: ProfileService = new ProfileService(config, store, runtime, phone, () =>
-    relay.turn(),
+  // The location database: a newer one than the image's, kept current (location-db.ts).
+  const locationDb = new LocationDb(runtime, config.home, (event, data) =>
+    console.warn(`[location database] ${event}`, data ?? ''),
+  );
+  await locationDb.load();
+  const service: ProfileService = new ProfileService(
+    config,
+    store,
+    runtime,
+    phone,
+    () => relay.turn(),
+    locationDb,
   );
   await service.startMonitor();
+  locationDb.start();
   const app = buildServer(
     config.token,
     service,
@@ -107,6 +119,7 @@ export async function startAgent(
       relay.stop();
       if (phone && phoneApp) await phone.stopHttps(config.port);
       service.stopMonitor();
+      locationDb.stop();
       await app.close();
       await connection.close();
       keepAlive?.kill();

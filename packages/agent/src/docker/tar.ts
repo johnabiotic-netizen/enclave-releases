@@ -11,30 +11,43 @@ const BLOCK = 512;
 
 export function makeTar(entries: TarEntry[]): Buffer {
   const parts: Buffer[] = [];
-  const mtime = Math.floor(Date.now() / 1000);
   for (const entry of entries) {
     const isDir = entry.name.endsWith('/');
     const data = isDir ? Buffer.alloc(0) : Buffer.from(entry.content ?? '');
-    if (Buffer.byteLength(entry.name) > 100) throw new Error(`tar: name too long: ${entry.name}`);
-
-    const header = Buffer.alloc(BLOCK);
-    header.write(entry.name, 0, 100, 'utf8');
-    header.write(octal(entry.mode, 8), 100, 'ascii');
-    header.write(octal(0, 8), 108, 'ascii'); // uid: root
-    header.write(octal(0, 8), 116, 'ascii'); // gid: root
-    header.write(octal(data.length, 12), 124, 'ascii');
-    header.write(octal(mtime, 12), 136, 'ascii');
-    header.write(' '.repeat(8), 148, 'ascii'); // checksum counted as spaces
-    header.write(isDir ? '5' : '0', 156, 'ascii');
-    header.write('ustar\u000000', 257, 'ascii');
-    let sum = 0;
-    for (const byte of header) sum += byte;
-    header.write(`${sum.toString(8).padStart(6, '0')}\u0000 `, 148, 'ascii');
-
-    parts.push(header, data, Buffer.alloc((BLOCK - (data.length % BLOCK)) % BLOCK));
+    parts.push(tarHeader(entry.name, data.length, entry.mode), data, tarPadding(data.length));
   }
-  parts.push(Buffer.alloc(BLOCK * 2));
+  parts.push(tarEnd());
   return Buffer.concat(parts);
+}
+
+/** One entry's ustar header: for a directory, end the name with `/` and give size 0. */
+export function tarHeader(name: string, size: number, mode: number): Buffer {
+  const isDir = name.endsWith('/');
+  if (Buffer.byteLength(name) > 100) throw new Error(`tar: name too long: ${name}`);
+  const header = Buffer.alloc(BLOCK);
+  header.write(name, 0, 100, 'utf8');
+  header.write(octal(mode, 8), 100, 'ascii');
+  header.write(octal(0, 8), 108, 'ascii'); // uid: root
+  header.write(octal(0, 8), 116, 'ascii'); // gid: root
+  header.write(octal(size, 12), 124, 'ascii');
+  header.write(octal(Math.floor(Date.now() / 1000), 12), 136, 'ascii');
+  header.write(' '.repeat(8), 148, 'ascii'); // checksum counted as spaces
+  header.write(isDir ? '5' : '0', 156, 'ascii');
+  header.write('ustar\u000000', 257, 'ascii');
+  let sum = 0;
+  for (const byte of header) sum += byte;
+  header.write(`${sum.toString(8).padStart(6, '0')}\u0000 `, 148, 'ascii');
+  return header;
+}
+
+/** Zero bytes after an entry's data, up to the next 512-byte block. */
+export function tarPadding(size: number): Buffer {
+  return Buffer.alloc((BLOCK - (size % BLOCK)) % BLOCK);
+}
+
+/** The two empty blocks that end an archive. */
+export function tarEnd(): Buffer {
+  return Buffer.alloc(BLOCK * 2);
 }
 
 function octal(value: number, width: number): string {

@@ -7,6 +7,7 @@ import { PassThrough, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 import net from 'node:net';
+import type Docker from 'dockerode';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -157,7 +158,14 @@ export class ProfileService {
     private readonly phone?: Tailscale,
     /** Phone mode (ENCLAVE_PHONE=relay): the relay's TURN server, while the PC is linked. */
     private readonly relayTurn?: () => PcTurn | null,
+    /** A newer location database than the image's (location-db.ts), mounted into containers. */
+    private readonly locationDb?: { mounts(): Docker.MountSettings[] },
   ) {}
+
+  /** The location database mount, for every container that looks up an IP's location. */
+  private locationMounts(): Docker.MountSettings[] {
+    return this.locationDb?.mounts() ?? [];
+  }
 
   // ---------------------------------------------------------------- queries
 
@@ -839,7 +847,7 @@ export class ProfileService {
           NetworkMode: networkName(id),
           // A fresh browser profile each run, gone with the container.
           Tmpfs: { '/data': 'size=2g' },
-          Mounts: gpu.mounts,
+          Mounts: [...gpu.mounts, ...this.locationMounts()],
           Devices: gpu.devices,
           CapAdd: ['NET_ADMIN'],
           SecurityOpt: ['no-new-privileges'],
@@ -1052,7 +1060,11 @@ export class ProfileService {
               [`${muxPort}/tcp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
               [`${muxPort}/udp`]: [{ HostIp: '127.0.0.1', HostPort: String(muxPort) }],
             },
-            Mounts: [{ Type: 'volume', Source: volumeName(id), Target: '/data' }, ...gpu.mounts],
+            Mounts: [
+              { Type: 'volume', Source: volumeName(id), Target: '/data' },
+              ...gpu.mounts,
+              ...this.locationMounts(),
+            ],
             Devices: gpu.devices,
             // The egress lock needs NET_ADMIN once; the entrypoint drops it before the browser starts.
             CapAdd: ['NET_ADMIN'],
@@ -1273,6 +1285,7 @@ export class ProfileService {
   private async runProxyCheck(proxy: ProxyInput): Promise<RawProxyCheck> {
     const out = await this.runtime.runOneOff({
       cmd: ['bash', '-c', '/opt/enclave/check_proxy.py < /run/check/proxy.json'],
+      mounts: this.locationMounts(),
       files: [
         { name: 'run/check/', mode: 0o700 },
         { name: 'run/check/proxy.json', mode: 0o600, content: JSON.stringify(proxy) },
@@ -1351,6 +1364,7 @@ export class ProfileService {
         raw.exitIp!,
       ],
       networkMode: 'none',
+      mounts: this.locationMounts(),
       timeoutMs: 120_000,
     });
     return JSON.parse(out) as Fingerprint;
