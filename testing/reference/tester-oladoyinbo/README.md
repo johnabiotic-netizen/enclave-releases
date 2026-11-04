@@ -7,3 +7,5 @@
 - audioSum 75.83002272993326; the profile reports 35.749972093850374, the common Firefox value and the owner's.
 
 Personal settings in the file (screen, time zone, fonts, voices) are the tester's own and not used.
+
+`probe-high-performance-attempt.json` (16:47 UTC): the same page after the tester set Windows' graphics preference for that firefox.exe to High performance. Firefox still reported the AMD chip, every WebGL value identical to the first run: the setting didn't apply, or no NVIDIA card is usable on that PC. The tester's adapter list decides which (if none, the profile may render on AMD while claiming NVIDIA).
