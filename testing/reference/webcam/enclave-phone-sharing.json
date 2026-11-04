@@ -1,0 +1,166 @@
+{
+  "takenAt": "2026-11-04T19:13:24.599Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
+  "beforePermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    }
+  ],
+  "label": "HD Webcam",
+  "settings": {
+    "deviceId": "ujwETozG022mJlh+bFPRlA1PWg/DTwll5AVtbesOUyA=",
+    "frameRate": 30,
+    "groupId": "HAZTQyWHSXzAlED5uh22jgOxvRM++BQXhSEhvDAKmzI=",
+    "height": 480,
+    "resizeMode": "crop-and-scale",
+    "width": 640
+  },
+  "capabilities": {
+    "deviceId": "ujwETozG022mJlh+bFPRlA1PWg/DTwll5AVtbesOUyA=",
+    "frameRate": {
+      "max": 30,
+      "min": 0
+    },
+    "groupId": "HAZTQyWHSXzAlED5uh22jgOxvRM++BQXhSEhvDAKmzI=",
+    "height": {
+      "max": 720,
+      "min": 2
+    },
+    "resizeMode": [
+      "none",
+      "crop-and-scale"
+    ],
+    "width": {
+      "max": 1280,
+      "min": 2
+    }
+  },
+  "constraints": {},
+  "afterPermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "HD Webcam",
+      "id": "ujwETozG022m",
+      "group": "HAZTQyWHSXzA"
+    }
+  ],
+  "frames": {
+    "frames": 363,
+    "fps": 18.15,
+    "sizes": [
+      "640x480"
+    ],
+    "intervalMs": {
+      "n": 362,
+      "mean": 54.654,
+      "sd": 53.361,
+      "min": 1.24,
+      "p50": 39.12,
+      "p95": 131.24,
+      "max": 704.3
+    },
+    "diffBetweenFrames": {
+      "n": 362,
+      "mean": 4.463,
+      "sd": 6.147,
+      "min": 0,
+      "p50": 2.403,
+      "p95": 17.78,
+      "max": 34.166
+    },
+    "identicalFrames": 0,
+    "blackFrames": 0,
+    "luma": {
+      "n": 363,
+      "mean": 146.856,
+      "sd": 18.532,
+      "min": 112.643,
+      "p50": 144.513,
+      "p95": 177.571,
+      "max": 200.849
+    },
+    "neighbourDiff": {
+      "n": 363,
+      "mean": 5.381,
+      "sd": 1.497,
+      "min": 1.625,
+      "p50": 5.662,
+      "p95": 7.317,
+      "max": 7.835
+    }
+  },
+  "secondStreamWhileOpen": {
+    "name": "second stream while open",
+    "ok": true,
+    "label": "HD Webcam",
+    "settings": {
+      "deviceId": "ujwETozG022mJlh+bFPRlA1PWg/DTwll5AVtbesOUyA=",
+      "frameRate": 30,
+      "groupId": "HAZTQyWHSXzAlED5uh22jgOxvRM++BQXhSEhvDAKmzI=",
+      "height": 480,
+      "resizeMode": "crop-and-scale",
+      "width": 640
+    }
+  },
+  "after": [
+    {
+      "name": "ideal 1280x720",
+      "ok": true,
+      "label": "HD Webcam",
+      "settings": {
+        "deviceId": "ujwETozG022mJlh+bFPRlA1PWg/DTwll5AVtbesOUyA=",
+        "frameRate": 30,
+        "groupId": "HAZTQyWHSXzAlED5uh22jgOxvRM++BQXhSEhvDAKmzI=",
+        "height": 720,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      }
+    },
+    {
+      "name": "exact 1920 wide",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "width"
+    },
+    {
+      "name": "frameRate exact 60",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "frameRate"
+    },
+    {
+      "name": "facingMode user",
+      "ok": true,
+      "label": "HD Webcam",
+      "settings": {
+        "deviceId": "ujwETozG022mJlh+bFPRlA1PWg/DTwll5AVtbesOUyA=",
+        "frameRate": 30,
+        "groupId": "HAZTQyWHSXzAlED5uh22jgOxvRM++BQXhSEhvDAKmzI=",
+        "height": 480,
+        "resizeMode": "crop-and-scale",
+        "width": 640
+      }
+    },
+    {
+      "name": "facingMode exact environment",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "facingMode"
+    }
+  ]
+}

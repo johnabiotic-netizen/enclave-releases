@@ -10,3 +10,5 @@ Before permission Firefox lists one videoinput and one audioinput with empty lab
 What gives a camera away is not its frame rate (a real webcam indoors runs well under what it claims) but long or uneven gaps, repeated identical frames and pure black frames.
 
 `enclave-no-phone.json`: the same page in an Enclave profile (test proxy, the owner's PC), no phone sharing, 2026-11-04. Label, settings, capabilities and refusals equal the real camera's (this profile's cameras: "Lenovo EasyCamera" and "c922 Pro Stream Webcam"). But all 507 frames are pure black and 506 identical to the one before, at 25 fps with gaps up to 282 ms: no real camera does that.
+
+`enclave-phone-sharing.json`: the same page in the owner's profile with the owner's phone camera shared through the relay, 2026-11-04 19:13 UTC. Static values equal the real camera's ("HD Webcam"); 18.2 fps, no black frames; frame gaps p50 39 ms, sd 53 ms, p95 131 ms, max 704 ms, min 1 ms; difference to the previous frame down to 0.000 (near repeats).
