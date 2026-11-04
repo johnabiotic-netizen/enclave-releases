@@ -1,5 +1,7 @@
 # Design system
 
+> **Changed 2026-11-04 (owner's choice, DECISIONS 2026-11-04): the desktop app uses the "Glow" direction.** A deep violet-black ground lit by soft aurora light (violet, cyan, a little pink), frosted glass surfaces (rail, panels, profile cells), pill buttons, and one violet-to-cyan gradient for primary actions. Each profile's state is a glowing chip on its cell, and a running cell glows softly in its status colour. Type: Sora for the interface, JetBrains Mono for machine data. Tokens: `packages/desktop/src/renderer/styles.css`; components: the "glow theme" section of `app.css`. Status colours still mean status only; contrast, focus rings, reduced motion and the copy rules below still hold. The phone app and the landing page still use the original direction below until they are restyled.
+
 A design brief for the desktop app, the phone PWA, and the landing page. The goal is a tool that feels like a secure, calm control room for sensitive identities. Not a flashy "hacker" aesthetic, not a generic SaaS card grid.
 
 ## Brand idea

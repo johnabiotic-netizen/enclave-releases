@@ -1,18 +1,25 @@
 /* Enclave design tokens (ui/design-system.md). One accent; status colours only for status. */
 :root {
-  --bg-900: #0e1420;
-  --bg-800: #141c2b;
-  --bg-700: #1c2638;
-  --line: #2a3647;
-  --text-100: #eaf0f7;
-  --text-300: #a7b4c6;
-  --text-500: #6b7a8f;
-  --accent: #4c8dff;
-  --ok: #35c27a;
-  --warn: #e8b13a;
-  --err: #e5604d;
-  --font: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+  /* Glow (DECISIONS 2026-11-04): a deep violet-black ground lit by soft aurora light, frosted
+     glass surfaces, one violet-to-cyan gradient for primary actions. */
+  --bg-900: #07060f;
+  --bg-800: #110f1e;
+  --bg-700: #1a1730;
+  --glass: rgba(255, 255, 255, 0.05);
+  --glass-strong: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text-100: #f1f0ff;
+  --text-300: #c9c5e8;
+  --text-500: #8a86ad;
+  --accent: #8b73ff;
+  --accent-2: #22d3ee;
+  --grad: linear-gradient(135deg, #7c5cff, #22d3ee);
+  --ok: #6ee7b7;
+  --warn: #fcd34d;
+  --err: #fb7185;
+  --font: 'Sora Variable', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
   color-scheme: dark;
 }
 
@@ -28,7 +35,20 @@ body,
 }
 
 body {
-  background: var(--bg-900);
+  background:
+    radial-gradient(700px 420px at 10% 0%, rgba(124, 92, 255, 0.28) 0%, rgba(124, 92, 255, 0) 70%),
+    radial-gradient(
+      800px 520px at 100% 30%,
+      rgba(34, 211, 238, 0.16) 0%,
+      rgba(34, 211, 238, 0) 70%
+    ),
+    radial-gradient(
+      640px 420px at 45% 115%,
+      rgba(236, 72, 153, 0.14) 0%,
+      rgba(236, 72, 153, 0) 70%
+    ),
+    var(--bg-900);
+  background-attachment: fixed;
   color: var(--text-100);
   font: 14px/1.5 var(--font);
   -webkit-font-smoothing: antialiased;
@@ -36,6 +56,11 @@ body {
 
 button {
   font: inherit;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
 }
 
 :focus-visible {
