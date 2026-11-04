@@ -1,0 +1,179 @@
+{
+  "takenAt": "2026-11-04T18:36:26.076Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
+  "beforePermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    }
+  ],
+  "label": "ManyCam Virtual Webcam",
+  "settings": {
+    "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+    "frameRate": 30,
+    "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+    "height": 480,
+    "resizeMode": "crop-and-scale",
+    "width": 640
+  },
+  "capabilities": {
+    "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+    "frameRate": {
+      "max": 30,
+      "min": 0
+    },
+    "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+    "height": {
+      "max": 2160,
+      "min": 2
+    },
+    "resizeMode": [
+      "none",
+      "crop-and-scale"
+    ],
+    "width": {
+      "max": 3840,
+      "min": 2
+    }
+  },
+  "constraints": {},
+  "afterPermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "ManyCam Virtual Webcam",
+      "id": "blhSWb59mQ8E",
+      "group": "0x5jD4RaCiwI"
+    },
+    {
+      "kind": "videoinput",
+      "label": "HP HD Camera",
+      "id": "RgiTlRxkElzn",
+      "group": "3sgIvtO+OHSd"
+    },
+    {
+      "kind": "videoinput",
+      "label": "OBS Virtual Camera",
+      "id": "N7R+NQSWA3VI",
+      "group": "JpmsaVH2YvBC"
+    }
+  ],
+  "frames": {
+    "frames": 536,
+    "fps": 26.8,
+    "sizes": [
+      "640x480"
+    ],
+    "intervalMs": {
+      "n": 535,
+      "mean": 37.391,
+      "sd": 34.285,
+      "min": 6.66,
+      "p50": 33.44,
+      "p95": 52.44,
+      "max": 590.48
+    },
+    "diffBetweenFrames": {
+      "n": 535,
+      "mean": 4.356,
+      "sd": 0.365,
+      "min": 0,
+      "p50": 4.38,
+      "p95": 4.704,
+      "max": 6.068
+    },
+    "identicalFrames": 1,
+    "blackFrames": 0,
+    "luma": {
+      "n": 536,
+      "mean": 18.815,
+      "sd": 0.329,
+      "min": 18.069,
+      "p50": 18.949,
+      "p95": 19.199,
+      "max": 19.478
+    },
+    "neighbourDiff": {
+      "n": 536,
+      "mean": 5.042,
+      "sd": 0.496,
+      "min": 1.951,
+      "p50": 5.08,
+      "p95": 5.416,
+      "max": 9.145
+    }
+  },
+  "secondStreamWhileOpen": {
+    "name": "second stream while open",
+    "ok": true,
+    "label": "ManyCam Virtual Webcam",
+    "settings": {
+      "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+      "frameRate": 30,
+      "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+      "height": 480,
+      "resizeMode": "crop-and-scale",
+      "width": 640
+    }
+  },
+  "after": [
+    {
+      "name": "ideal 1280x720",
+      "ok": true,
+      "label": "ManyCam Virtual Webcam",
+      "settings": {
+        "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+        "frameRate": 30,
+        "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+        "height": 720,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      }
+    },
+    {
+      "name": "exact 1920 wide",
+      "ok": true,
+      "label": "ManyCam Virtual Webcam",
+      "settings": {
+        "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+        "frameRate": 30,
+        "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+        "height": 1080,
+        "resizeMode": "crop-and-scale",
+        "width": 1920
+      }
+    },
+    {
+      "name": "frameRate exact 60",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "frameRate"
+    },
+    {
+      "name": "facingMode user",
+      "ok": true,
+      "label": "ManyCam Virtual Webcam",
+      "settings": {
+        "deviceId": "blhSWb59mQ8EJdV0f/zCgUKYNeApNdh3VgG1MZVCQeU=",
+        "frameRate": 30,
+        "groupId": "0x5jD4RaCiwIMSL5MO2mhgehMIGUjcvYvtqvw4AbUrU=",
+        "height": 480,
+        "resizeMode": "crop-and-scale",
+        "width": 640
+      }
+    }
+  ]
+}

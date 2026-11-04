@@ -1,0 +1,183 @@
+{
+  "takenAt": "2026-11-04T18:37:34.745Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
+  "beforePermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    }
+  ],
+  "label": "HP HD Camera",
+  "settings": {
+    "deviceId": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0=",
+    "frameRate": 30,
+    "groupId": "KXfv2Yp2Gt2y0CsyTtL6s9RVkAHPQrZvxQ8oolamRlM=",
+    "height": 480,
+    "resizeMode": "crop-and-scale",
+    "width": 640
+  },
+  "capabilities": {
+    "deviceId": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0=",
+    "frameRate": {
+      "max": 30,
+      "min": 0
+    },
+    "groupId": "KXfv2Yp2Gt2y0CsyTtL6s9RVkAHPQrZvxQ8oolamRlM=",
+    "height": {
+      "max": 720,
+      "min": 2
+    },
+    "resizeMode": [
+      "none",
+      "crop-and-scale"
+    ],
+    "width": {
+      "max": 1280,
+      "min": 2
+    }
+  },
+  "constraints": {
+    "deviceId": {
+      "exact": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0="
+    },
+    "mediaSource": "camera"
+  },
+  "afterPermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "ManyCam Virtual Webcam",
+      "id": "blhSWb59mQ8E",
+      "group": "+6zLsgUj/HUb"
+    },
+    {
+      "kind": "videoinput",
+      "label": "HP HD Camera",
+      "id": "RgiTlRxkElzn",
+      "group": "KXfv2Yp2Gt2y"
+    },
+    {
+      "kind": "videoinput",
+      "label": "OBS Virtual Camera",
+      "id": "N7R+NQSWA3VI",
+      "group": "iTJAXj5SRrAO"
+    }
+  ],
+  "frames": {
+    "frames": 332,
+    "fps": 16.6,
+    "sizes": [
+      "640x480"
+    ],
+    "intervalMs": {
+      "n": 331,
+      "mean": 60.17,
+      "sd": 8.759,
+      "min": 20.42,
+      "p50": 63.56,
+      "p95": 68.22,
+      "max": 110.7
+    },
+    "diffBetweenFrames": {
+      "n": 331,
+      "mean": 1.592,
+      "sd": 3.101,
+      "min": 1.097,
+      "p50": 1.228,
+      "p95": 3.315,
+      "max": 56.781
+    },
+    "identicalFrames": 0,
+    "blackFrames": 0,
+    "luma": {
+      "n": 332,
+      "mean": 122.059,
+      "sd": 3.536,
+      "min": 60.628,
+      "p50": 122.514,
+      "p95": 123.414,
+      "max": 126.66
+    },
+    "neighbourDiff": {
+      "n": 332,
+      "mean": 7.495,
+      "sd": 0.599,
+      "min": 7.14,
+      "p50": 7.326,
+      "p95": 8.898,
+      "max": 10.638
+    }
+  },
+  "secondStreamWhileOpen": {
+    "name": "second stream while open",
+    "ok": true,
+    "label": "HP HD Camera",
+    "settings": {
+      "deviceId": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0=",
+      "frameRate": 30,
+      "groupId": "KXfv2Yp2Gt2y0CsyTtL6s9RVkAHPQrZvxQ8oolamRlM=",
+      "height": 480,
+      "resizeMode": "crop-and-scale",
+      "width": 640
+    }
+  },
+  "after": [
+    {
+      "name": "ideal 1280x720",
+      "ok": true,
+      "label": "HP HD Camera",
+      "settings": {
+        "deviceId": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0=",
+        "frameRate": 30,
+        "groupId": "KXfv2Yp2Gt2y0CsyTtL6s9RVkAHPQrZvxQ8oolamRlM=",
+        "height": 720,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      }
+    },
+    {
+      "name": "exact 1920 wide",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": ""
+    },
+    {
+      "name": "frameRate exact 60",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "frameRate"
+    },
+    {
+      "name": "facingMode user",
+      "ok": true,
+      "label": "HP HD Camera",
+      "settings": {
+        "deviceId": "RgiTlRxkElznEpbJgZUexT+e/DUmcYXp27+orC/TcT0=",
+        "frameRate": 30,
+        "groupId": "KXfv2Yp2Gt2y0CsyTtL6s9RVkAHPQrZvxQ8oolamRlM=",
+        "height": 480,
+        "resizeMode": "crop-and-scale",
+        "width": 640
+      }
+    },
+    {
+      "name": "facingMode exact environment",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "facingMode"
+    }
+  ]
+}
