@@ -1,0 +1,167 @@
+{
+  "takenAt": "2026-11-04T19:04:48.552Z",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
+  "beforePermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    }
+  ],
+  "label": "Lenovo EasyCamera",
+  "settings": {
+    "deviceId": "RSHffcB8FJxDnFaOwbETZAuvBZisgiidBLxfPEj+gWI=",
+    "frameRate": 30,
+    "groupId": "HD3mXEGxVtON70Au0SXRCpGbb70fl1wCIzZ2m0KRprw=",
+    "height": 480,
+    "resizeMode": "crop-and-scale",
+    "width": 640
+  },
+  "capabilities": {
+    "deviceId": "RSHffcB8FJxDnFaOwbETZAuvBZisgiidBLxfPEj+gWI=",
+    "frameRate": {
+      "max": 30,
+      "min": 0
+    },
+    "groupId": "HD3mXEGxVtON70Au0SXRCpGbb70fl1wCIzZ2m0KRprw=",
+    "height": {
+      "max": 720,
+      "min": 2
+    },
+    "resizeMode": ["none", "crop-and-scale"],
+    "width": {
+      "max": 1280,
+      "min": 2
+    }
+  },
+  "constraints": {},
+  "afterPermission": [
+    {
+      "kind": "audioinput",
+      "label": "",
+      "id": "",
+      "group": ""
+    },
+    {
+      "kind": "videoinput",
+      "label": "Lenovo EasyCamera",
+      "id": "RSHffcB8FJxD",
+      "group": "HD3mXEGxVtON"
+    },
+    {
+      "kind": "videoinput",
+      "label": "c922 Pro Stream Webcam",
+      "id": "Z6wigQmeTX39",
+      "group": "I5glHIa5x580"
+    }
+  ],
+  "frames": {
+    "frames": 507,
+    "fps": 25.35,
+    "sizes": ["640x480"],
+    "intervalMs": {
+      "n": 506,
+      "mean": 39.326,
+      "sd": 27.523,
+      "min": 2.3,
+      "p50": 33.84,
+      "p95": 78.5,
+      "max": 282.42
+    },
+    "diffBetweenFrames": {
+      "n": 506,
+      "mean": 0,
+      "sd": 0,
+      "min": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "identicalFrames": 506,
+    "blackFrames": 507,
+    "luma": {
+      "n": 507,
+      "mean": 0,
+      "sd": 0,
+      "min": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "neighbourDiff": {
+      "n": 507,
+      "mean": 0,
+      "sd": 0,
+      "min": 0,
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "secondStreamWhileOpen": {
+    "name": "second stream while open",
+    "ok": true,
+    "label": "Lenovo EasyCamera",
+    "settings": {
+      "deviceId": "RSHffcB8FJxDnFaOwbETZAuvBZisgiidBLxfPEj+gWI=",
+      "frameRate": 30,
+      "groupId": "HD3mXEGxVtON70Au0SXRCpGbb70fl1wCIzZ2m0KRprw=",
+      "height": 480,
+      "resizeMode": "crop-and-scale",
+      "width": 640
+    }
+  },
+  "after": [
+    {
+      "name": "ideal 1280x720",
+      "ok": true,
+      "label": "Lenovo EasyCamera",
+      "settings": {
+        "deviceId": "RSHffcB8FJxDnFaOwbETZAuvBZisgiidBLxfPEj+gWI=",
+        "frameRate": 30,
+        "groupId": "HD3mXEGxVtON70Au0SXRCpGbb70fl1wCIzZ2m0KRprw=",
+        "height": 720,
+        "resizeMode": "crop-and-scale",
+        "width": 1280
+      }
+    },
+    {
+      "name": "exact 1920 wide",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "width"
+    },
+    {
+      "name": "frameRate exact 60",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "frameRate"
+    },
+    {
+      "name": "facingMode user",
+      "ok": true,
+      "label": "Lenovo EasyCamera",
+      "settings": {
+        "deviceId": "RSHffcB8FJxDnFaOwbETZAuvBZisgiidBLxfPEj+gWI=",
+        "frameRate": 30,
+        "groupId": "HD3mXEGxVtON70Au0SXRCpGbb70fl1wCIzZ2m0KRprw=",
+        "height": 480,
+        "resizeMode": "crop-and-scale",
+        "width": 640
+      }
+    },
+    {
+      "name": "facingMode exact environment",
+      "ok": false,
+      "error": "OverconstrainedError: Constraints could not be satisfied.",
+      "constraint": "facingMode"
+    }
+  ]
+}

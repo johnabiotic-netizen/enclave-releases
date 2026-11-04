@@ -35,10 +35,7 @@
       "max": 2160,
       "min": 2
     },
-    "resizeMode": [
-      "none",
-      "crop-and-scale"
-    ],
+    "resizeMode": ["none", "crop-and-scale"],
     "width": {
       "max": 3840,
       "min": 2
@@ -74,9 +71,7 @@
   "frames": {
     "frames": 536,
     "fps": 26.8,
-    "sizes": [
-      "640x480"
-    ],
+    "sizes": ["640x480"],
     "intervalMs": {
       "n": 535,
       "mean": 37.391,
