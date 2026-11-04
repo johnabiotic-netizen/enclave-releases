@@ -1,6 +1,6 @@
 {
   "name": "@enclave/desktop",
-  "version": "0.3.7",
+  "version": "0.3.9",
   "private": true,
   "description": "Enclave for Windows: the agent, the profile screens and the viewer in one app.",
   "type": "module",
