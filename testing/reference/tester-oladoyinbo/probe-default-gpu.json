@@ -1,0 +1,212 @@
+{
+  "takenAt": "2026-11-04T16:36:27.575Z",
+  "navigator": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:158.0) Gecko/20100101 Firefox/158.0",
+    "platform": "Win32",
+    "oscpu": "Windows NT 10.0; Win64; x64",
+    "appVersion": "5.0 (Windows)",
+    "buildID": "20181001000000",
+    "language": "en-US",
+    "languages": [
+      "en-US",
+      "en"
+    ],
+    "hardwareConcurrency": 16,
+    "maxTouchPoints": 0,
+    "webdriver": false,
+    "doNotTrack": "unspecified",
+    "globalPrivacyControl": false,
+    "pdfViewerEnabled": true,
+    "plugins": [
+      "PDF Viewer",
+      "Chrome PDF Viewer",
+      "Chromium PDF Viewer",
+      "Microsoft Edge PDF Viewer",
+      "WebKit built-in PDF"
+    ],
+    "mimeTypes": 2
+  },
+  "screen": {
+    "width": 1536,
+    "height": 864,
+    "availWidth": 1536,
+    "availHeight": 816,
+    "colorDepth": 24,
+    "pixelDepth": 24,
+    "devicePixelRatio": 1.25,
+    "outerWidth": 1294,
+    "outerHeight": 741,
+    "screenX": 3,
+    "screenY": 3
+  },
+  "time": {
+    "timeZone": "Europe/Berlin",
+    "locale": "en-US",
+    "januaryOffset": -60,
+    "julyOffset": -120
+  },
+  "webgl": {
+    "vendor": "Google Inc. (AMD)",
+    "renderer": "ANGLE (AMD, Radeon R9 200 Series Direct3D11 vs_5_0 ps_5_0), or similar",
+    "params": {
+      "MAX_TEXTURE_SIZE": 16384,
+      "MAX_RENDERBUFFER_SIZE": 16384,
+      "MAX_VIEWPORT_DIMS": [
+        32767,
+        32767
+      ],
+      "MAX_VERTEX_ATTRIBS": 16,
+      "MAX_VERTEX_UNIFORM_VECTORS": 4096,
+      "MAX_FRAGMENT_UNIFORM_VECTORS": 1024,
+      "MAX_VARYING_VECTORS": 30,
+      "MAX_COMBINED_TEXTURE_IMAGE_UNITS": 32,
+      "MAX_TEXTURE_IMAGE_UNITS": 16,
+      "MAX_VERTEX_TEXTURE_IMAGE_UNITS": 16,
+      "MAX_CUBE_MAP_TEXTURE_SIZE": 16384,
+      "ALIASED_LINE_WIDTH_RANGE": [
+        1,
+        1
+      ],
+      "ALIASED_POINT_SIZE_RANGE": [
+        1,
+        1024
+      ],
+      "STENCIL_VALUE_MASK": 4294967295,
+      "STENCIL_WRITEMASK": 4294967295,
+      "STENCIL_BACK_VALUE_MASK": 4294967295,
+      "STENCIL_BACK_WRITEMASK": 4294967295,
+      "SHADING_LANGUAGE_VERSION": "WebGL GLSL ES 1.0",
+      "VERSION": "WebGL 1.0",
+      "VENDOR": "Mozilla",
+      "RENDERER": "ANGLE (AMD, Radeon R9 200 Series Direct3D11 vs_5_0 ps_5_0), or similar"
+    },
+    "extensions": [
+      "ANGLE_instanced_arrays",
+      "EXT_blend_minmax",
+      "EXT_color_buffer_half_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_frag_depth",
+      "EXT_polygon_offset_clamp",
+      "EXT_shader_texture_lod",
+      "EXT_sRGB",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_element_index_uint",
+      "OES_fbo_render_mipmap",
+      "OES_standard_derivatives",
+      "OES_texture_float",
+      "OES_texture_float_linear",
+      "OES_texture_half_float",
+      "OES_texture_half_float_linear",
+      "OES_vertex_array_object",
+      "WEBGL_color_buffer_float",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_depth_texture",
+      "WEBGL_draw_buffers",
+      "WEBGL_lose_context",
+      "WEBGL_provoking_vertex"
+    ]
+  },
+  "webgl2": {
+    "vendor": "Google Inc. (AMD)",
+    "renderer": "ANGLE (AMD, Radeon R9 200 Series Direct3D11 vs_5_0 ps_5_0), or similar",
+    "params": {
+      "MAX_TEXTURE_SIZE": 16384,
+      "MAX_RENDERBUFFER_SIZE": 16384,
+      "MAX_VIEWPORT_DIMS": [
+        32767,
+        32767
+      ],
+      "MAX_VERTEX_ATTRIBS": 16,
+      "MAX_VERTEX_UNIFORM_VECTORS": 4096,
+      "MAX_FRAGMENT_UNIFORM_VECTORS": 1024,
+      "MAX_VARYING_VECTORS": 30,
+      "MAX_COMBINED_TEXTURE_IMAGE_UNITS": 32,
+      "MAX_TEXTURE_IMAGE_UNITS": 16,
+      "MAX_VERTEX_TEXTURE_IMAGE_UNITS": 16,
+      "MAX_CUBE_MAP_TEXTURE_SIZE": 16384,
+      "ALIASED_LINE_WIDTH_RANGE": [
+        1,
+        1
+      ],
+      "ALIASED_POINT_SIZE_RANGE": [
+        1,
+        1024
+      ],
+      "STENCIL_VALUE_MASK": 4294967295,
+      "STENCIL_WRITEMASK": 4294967295,
+      "STENCIL_BACK_VALUE_MASK": 4294967295,
+      "STENCIL_BACK_WRITEMASK": 4294967295,
+      "SHADING_LANGUAGE_VERSION": "WebGL GLSL ES 3.00",
+      "VERSION": "WebGL 2.0",
+      "VENDOR": "Mozilla",
+      "RENDERER": "ANGLE (AMD, Radeon R9 200 Series Direct3D11 vs_5_0 ps_5_0), or similar"
+    },
+    "extensions": [
+      "EXT_color_buffer_float",
+      "EXT_depth_clamp",
+      "EXT_float_blend",
+      "EXT_polygon_offset_clamp",
+      "EXT_texture_compression_bptc",
+      "EXT_texture_compression_rgtc",
+      "EXT_texture_filter_anisotropic",
+      "OES_draw_buffers_indexed",
+      "OES_texture_float_linear",
+      "OVR_multiview2",
+      "WEBGL_compressed_texture_s3tc",
+      "WEBGL_compressed_texture_s3tc_srgb",
+      "WEBGL_debug_renderer_info",
+      "WEBGL_debug_shaders",
+      "WEBGL_lose_context",
+      "WEBGL_provoking_vertex"
+    ]
+  },
+  "audioSum": 75.83002272993326,
+  "fonts": [
+    "Arial",
+    "Calibri",
+    "Cambria",
+    "Consolas",
+    "Courier New",
+    "Georgia",
+    "Segoe UI",
+    "Segoe UI Emoji",
+    "Tahoma",
+    "Times New Roman",
+    "Verdana",
+    "Bahnschrift"
+  ],
+  "voices": [
+    "Microsoft George - English (United Kingdom)",
+    "Microsoft Hazel - English (United Kingdom)",
+    "Microsoft Susan - English (United Kingdom)",
+    "Microsoft David - English (United States)",
+    "Microsoft Mark - English (United States)",
+    "Microsoft Zira - English (United States)",
+    "Microsoft Zira Desktop - English (United States)",
+    "Microsoft David Desktop - English (United States)",
+    "Microsoft Hazel Desktop - English (Great Britain)"
+  ],
+  "mediaDevices": [
+    "audioinput"
+  ],
+  "permissions": {
+    "geolocation": "prompt",
+    "notifications": "prompt"
+  },
+  "math": [
+    "-1.4214488238747245",
+    "691.4686750787736",
+    "1.718281828459045",
+    "1.1752011936438014"
+  ],
+  "canvas": {
+    "first": "286a36e7",
+    "second": "286a36e7"
+  }
+}
