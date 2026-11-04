@@ -34,7 +34,15 @@ import {
 import type { AgentConfig } from './config.js';
 import { PROFILE_LABEL, type DockerRuntime } from './docker/runtime.js';
 import { makeTar, type TarEntry } from './docker/tar.js';
-import { detectGpu, gpuContainerSettings } from './gpu.js';
+import {
+  angleName,
+  chooseNewAdapter,
+  findMadeOn,
+  gpuContainerSettings,
+  listAdapters,
+  plainName,
+  type GpuAdapter,
+} from './gpu.js';
 import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
 import { lookupReputation, ProxyTester, type ProxyTestJob } from './proxy-tester.js';
@@ -389,9 +397,9 @@ export class ProfileService {
     const proxy = this.wizardProxy(req.proxy, useTestProxy);
 
     await this.runtime.assertReady();
-    const adapter = await this.requireGpu();
+    const gpu = await this.requireNewGpu();
     const raw = await this.checkProxy(proxy, useTestProxy);
-    const fingerprint = await this.generateFingerprint(raw, adapter);
+    const fingerprint = await this.generateFingerprint(raw, gpu.label);
 
     const now = new Date().toISOString();
     const id = this.store.newId();
@@ -516,7 +524,8 @@ export class ProfileService {
   private async relocate(profile: Profile, raw: RawProxyCheck): Promise<void> {
     const fp = profile.fingerprint;
     const before = { country: fp.locale.split('-')[1], timezone: fp.timezone, locale: fp.locale };
-    const fresh = await this.generateFingerprint(raw, await this.requireSameGpu(fp));
+    // The same name it was made with, so the claimed card stays exactly the same.
+    const fresh = await this.generateFingerprint(raw, (await this.requireSameGpu(fp)).label);
     fp.timezone = fresh.timezone;
     fp.locale = fresh.locale;
     if (fresh.languages) fp.languages = fresh.languages;
@@ -712,9 +721,15 @@ export class ProfileService {
     });
 
     const madeOn = profile.fingerprint.webgl?.hostAdapter;
-    const current = await detectGpu(this.config.gpu).catch(() => null);
-    return typeof madeOn === 'string' && madeOn !== current
-      ? { profile, otherGpu: { madeOn, current } }
+    const adapters = await listAdapters().catch((): GpuAdapter[] => []);
+    return typeof madeOn === 'string' && !findMadeOn(adapters, madeOn)
+      ? {
+          profile,
+          otherGpu: {
+            madeOn: plainName(madeOn),
+            current: adapters.map((a) => a.name).join(', ') || null,
+          },
+        }
       : { profile };
   }
 
@@ -823,7 +838,7 @@ export class ProfileService {
     const proxy = proxyInput(profile, secrets);
     const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
     assertLocationMatches(profile.fingerprint, raw);
-    const gpu = gpuContainerSettings(await this.requireSameGpu(profile.fingerprint));
+    const gpu = gpuContainerSettings((await this.requireSameGpu(profile.fingerprint)).adapter.name);
 
     const name = auditContainerName(id);
     await this.runtime.stopAndRemove(name, 1).catch(() => {});
@@ -1005,7 +1020,9 @@ export class ProfileService {
         const raw = await this.checkProxy(proxy, profile.runtime.usesTestProxy === true);
         assertLocationMatches(profile.fingerprint, raw);
         profile.proxy.lastCheck = checkResult(raw, true);
-        const gpu = gpuContainerSettings(await this.requireSameGpu(profile.fingerprint));
+        const gpu = gpuContainerSettings(
+          (await this.requireSameGpu(profile.fingerprint)).adapter.name,
+        );
 
         const [webPort, muxPort] = await this.allocatePorts();
         // Phone mode: the stream is also relayed to the tailnet. Without Tailscale the
@@ -1296,12 +1313,14 @@ export class ProfileService {
   }
 
   /**
-   * The PC's GPU, which profiles render on and claim. Refuses when there is none, or when
+   * The graphics adapter a new profile renders on and claims: the one a browser gets on
+   * this PC (gpu.ts), named as Firefox's ANGLE names it. Refuses when there is none, or when
    * Docker can't hand it to containers: a profile drawing in software would show output
    * no Windows PC produces.
    */
-  private async requireGpu(): Promise<string> {
-    const adapter = await detectGpu(this.config.gpu).catch(() => null);
+  private async requireNewGpu(): Promise<{ adapter: GpuAdapter; label: string }> {
+    const adapters = await listAdapters().catch((): GpuAdapter[] => []);
+    const adapter = chooseNewAdapter(adapters, this.config.gpu);
     if (!adapter) {
       throw new AgentError(
         'GPU_UNAVAILABLE',
@@ -1310,7 +1329,42 @@ export class ProfileService {
           : "This PC's graphics card couldn't be found. Profiles need it to draw like a real Windows PC.",
       );
     }
-    const gpu = gpuContainerSettings(adapter);
+    await this.requireDockerGpu(adapter);
+    return { adapter, label: angleName(adapter) };
+  }
+
+  /**
+   * A profile renders on and claims the adapter it was made on, wherever Windows lists it
+   * now (a driver update can reorder adapters); a PC without it can't start the profile
+   * without contradicting its fingerprint.
+   */
+  private async requireSameGpu(
+    fingerprint: Fingerprint,
+  ): Promise<{ adapter: GpuAdapter; label: string }> {
+    const madeOn = fingerprint.webgl?.hostAdapter;
+    if (typeof madeOn !== 'string') {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        'This profile was made before profiles used the graphics card. Create a new profile.',
+      );
+    }
+    const adapters = await listAdapters().catch((): GpuAdapter[] => []);
+    const adapter = findMadeOn(adapters, madeOn);
+    if (!adapter) {
+      const current = adapters.map((a) => a.name).join(', ') || 'no graphics card Enclave can use';
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        `This profile was made on a PC with ${plainName(madeOn)}, but this one has ${current}. It can't start here without changing its fingerprint.`,
+        { madeOn: plainName(madeOn), current },
+      );
+    }
+    await this.requireDockerGpu(adapter);
+    return { adapter, label: madeOn };
+  }
+
+  /** Docker can hand the GPU to containers (WSL's /dev/dxg). */
+  private async requireDockerGpu(adapter: GpuAdapter): Promise<void> {
+    const gpu = gpuContainerSettings(adapter.name);
     try {
       await this.runtime.runOneOff({
         cmd: ['test', '-c', '/dev/dxg'],
@@ -1322,30 +1376,9 @@ export class ProfileService {
     } catch {
       throw new AgentError(
         'GPU_UNAVAILABLE',
-        `Docker can't give profiles the graphics card (${adapter}). Update Windows, WSL and the graphics driver, then try again.`,
+        `Docker can't give profiles the graphics card (${adapter.name}). Update Windows, WSL and the graphics driver, then try again.`,
       );
     }
-    return adapter;
-  }
-
-  /** A profile claims the GPU it was made on; starting it on another would contradict that. */
-  private async requireSameGpu(fingerprint: Fingerprint): Promise<string> {
-    const madeOn = fingerprint.webgl?.hostAdapter;
-    if (typeof madeOn !== 'string') {
-      throw new AgentError(
-        'GPU_UNAVAILABLE',
-        'This profile was made before profiles used the graphics card. Create a new profile.',
-      );
-    }
-    const adapter = await this.requireGpu();
-    if (adapter !== madeOn) {
-      throw new AgentError(
-        'GPU_UNAVAILABLE',
-        `This profile was made on a PC with ${madeOn}, but this one has ${adapter}. It can't start here without changing its fingerprint.`,
-        { madeOn, current: adapter },
-      );
-    }
-    return adapter;
   }
 
   private async generateFingerprint(raw: RawProxyCheck, adapter: string): Promise<Fingerprint> {
