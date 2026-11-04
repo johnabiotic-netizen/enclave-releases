@@ -88,7 +88,14 @@ const check = (name: string, text: string, extra?: unknown): AuditCheckResult =>
   ...(extra === undefined ? {} : { extra }),
 });
 
+const INTEL = 'ANGLE (Intel, Intel(R) HD Graphics 400 Direct3D11 vs_5_0 ps_5_0), or similar';
+const NVIDIA = 'ANGLE (NVIDIA, NVIDIA GeForce GTX 980 Direct3D11 vs_5_0 ps_5_0), or similar';
+
 const reference = {
+  probe: {
+    navigator: { hardwareConcurrency: 4 },
+    webgl: { renderer: INTEL, params: { MAX_VERTEX_UNIFORM_VECTORS: 4096 } },
+  },
   creepjs: {
     webglParams: '94e7c936',
     webglExts: '71e0d43d',
@@ -96,6 +103,19 @@ const reference = {
     domRectElems: '0.4950627700024415',
   },
 };
+
+/** The audit's own probe page, as on a PC with this graphics card and core count. */
+const probe = (renderer: string, cores: number, uniforms: number): AuditCheckResult => ({
+  name: 'probe',
+  url: '',
+  status: 'ok',
+  seconds: 1,
+  data: {
+    canvas: { first: 'a', second: 'a' },
+    navigator: { hardwareConcurrency: cores },
+    webgl: { renderer, params: { MAX_VERTEX_UNIFORM_VECTORS: uniforms } },
+  },
+});
 
 function run(checks: AuditCheckResult[], exitIp = '72.245.68.75') {
   const report: AuditReport = { startedAt: '', finishedAt: '', checks };
@@ -118,6 +138,7 @@ describe('audit readers', () => {
   it('fails what a leaking or flagged profile shows', () => {
     const findings = run(
       [
+        probe(INTEL, 4, 4096),
         check('pixelscan', PIXELSCAN.replace('No proxy detected', 'Proxy detected')),
         check('creepjs', CREEPJS.replace('params (78): 94e7c936', 'params (78): deadbeef'), [
           'WebGL',
@@ -138,6 +159,22 @@ describe('audit readers', () => {
         'browserleaks-webrtc: no local IP',
       ]),
     );
+  });
+
+  it("compares graphics and processor values only on the reference PC's hardware", () => {
+    // Same hardware as the reference: a changed graphics value fails.
+    const same = run([probe(INTEL, 4, 4095)]);
+    expect(same.find((f) => f.item.startsWith('webgl.params.MAX_VERTEX'))?.verdict).toBe('fail');
+
+    // Another PC (a tester's NVIDIA card, 16 cores): its own values, not failures.
+    const other = run([
+      probe(NVIDIA, 16, 4095),
+      check('creepjs', CREEPJS.replace('params (78): 94e7c936', 'params (78): 39e15276'), []),
+    ]);
+    const failed = other.filter((f) => f.verdict === 'fail').map((f) => f.item);
+    expect(failed).toEqual([]);
+    expect(other.find((f) => f.item === 'graphics and processor')?.verdict).toBe('info');
+    expect(other.find((f) => f.item === 'WebGL params')?.verdict).toBe('info');
   });
 
   it('fails when WebRTC shows another IP than the exit IP', () => {

@@ -27,6 +27,8 @@ export interface AuditContext {
   /** The profile's saved probe baseline (scripts/fingerprint/baseline.mjs), if any. */
   baseline?: Record<string, unknown> | undefined;
   reference: Reference;
+  /** Set by evaluateAudit from the run's probe. */
+  hardware?: Hardware;
 }
 
 /** Probe fields that differ between machines or runs, so never compared with the reference. */
@@ -48,6 +50,7 @@ export function evaluateAudit(report: AuditReport, ctx: AuditContext): Finding[]
   if (report.error) {
     findings.push({ check: 'audit', item: 'run', verdict: 'fail', note: report.error.slice(-300) });
   }
+  const withHardware: AuditContext = { ...ctx, hardware: hardwareOf(report, ctx.reference) };
   for (const check of report.checks ?? []) {
     if (check.status !== 'ok') {
       findings.push({
@@ -59,9 +62,45 @@ export function evaluateAudit(report: AuditReport, ctx: AuditContext): Finding[]
       continue;
     }
     const reader = READERS[check.name];
-    findings.push(...(reader ? reader(check, ctx) : []));
+    findings.push(...(reader ? reader(check, withHardware) : []));
   }
   return findings;
+}
+
+/**
+ * Whether this PC has the hardware the Windows Firefox reference was measured on (the
+ * owner's PC). Graphics and processor values are a real PC's own: a profile claims the
+ * graphics card and core count it runs on, so on any other PC they differ from the
+ * reference by design, and comparing them would only report the hardware.
+ */
+function hardwareOf(report: AuditReport, reference: Reference): Hardware {
+  const probe = report.checks?.find((c) => c.name === 'probe' && c.status === 'ok');
+  if (!probe?.data || !reference.probe) return { gpu: null, cpu: null };
+  const a = flatten(probe.data as Record<string, unknown>);
+  const e = flatten(reference.probe);
+  const renderer = a.get('webgl.renderer');
+  const refRenderer = e.get('webgl.renderer');
+  return {
+    gpu: renderer !== undefined && renderer === refRenderer,
+    cpu: a.get('navigator.hardwareConcurrency') === e.get('navigator.hardwareConcurrency'),
+    renderer: renderer === undefined ? undefined : String(renderer),
+    refRenderer: refRenderer === undefined ? undefined : String(refRenderer),
+  };
+}
+
+interface Hardware {
+  /** Same graphics card as the reference; null when no probe ran to tell. */
+  gpu: boolean | null;
+  cpu: boolean | null;
+  renderer?: string | undefined;
+  refRenderer?: string | undefined;
+}
+
+/** Probe keys that belong to the PC's hardware rather than to the browser. */
+function hardwareKey(key: string, hw: Hardware): boolean {
+  if (hw.gpu !== true && (key.startsWith('webgl.') || key.startsWith('webgl2.'))) return true;
+  if (hw.cpu !== true && key === 'navigator.hardwareConcurrency') return true;
+  return false;
 }
 
 const READERS: Record<string, (c: AuditCheckResult, ctx: AuditContext) => Finding[]> = {
@@ -86,11 +125,27 @@ function readProbe(c: AuditCheckResult, ctx: AuditContext): Finding[] {
     value: `${canvas?.first} / ${canvas?.second}`,
   });
   if (ctx.reference.probe) {
+    const hw = ctx.hardware ?? { gpu: null, cpu: null };
     out.push(
-      ...compareFlat('probe', 'Windows Firefox', data, ctx.reference.probe, (k) =>
-        NOT_COMPARABLE_WITH_REFERENCE.some((p) => k === p || k.startsWith(p)),
+      ...compareFlat(
+        'probe',
+        'Windows Firefox',
+        data,
+        ctx.reference.probe,
+        (k) =>
+          NOT_COMPARABLE_WITH_REFERENCE.some((p) => k === p || k.startsWith(p)) ||
+          hardwareKey(k, hw),
       ),
     );
+    if (hw.gpu === false || hw.cpu === false) {
+      out.push({
+        check: 'probe',
+        item: 'graphics and processor',
+        verdict: 'info',
+        ...(hw.renderer ? { value: hw.renderer } : {}),
+        note: "This PC's hardware differs from the PC the Windows Firefox reference was measured on, so graphics and processor values are this PC's own and aren't compared with it. The baseline still checks they never change.",
+      });
+    }
   }
   if (ctx.baseline) {
     out.push(
@@ -279,8 +334,18 @@ function readCreepJs(c: AuditCheckResult, ctx: AuditContext): Finding[] {
       value: value ?? '(not found)',
       ...(want === undefined ? {} : { expected: want }),
     });
-  same('WebGL params', t.match(/params \(\d+\): (\w+)/)?.[1], ref.webglParams);
-  same('WebGL extensions', t.match(/exts \(\d+\): (\w+)/)?.[1], ref.webglExts);
+  // Graphics hashes only on the reference's own graphics card (hardwareOf).
+  const sameGpu = ctx.hardware?.gpu === true;
+  same(
+    'WebGL params',
+    t.match(/params \(\d+\): (\w+)/)?.[1],
+    sameGpu ? ref.webglParams : undefined,
+  );
+  same(
+    'WebGL extensions',
+    t.match(/exts \(\d+\): (\w+)/)?.[1],
+    sameGpu ? ref.webglExts : undefined,
+  );
   same('audio sum', t.match(/sum: ([\d.]+)/)?.[1], ref.audioSum);
   same('DOMRect', t.match(/elems A: ([\d.]+)/)?.[1], ref.domRectElems);
   for (const [item, re] of [
