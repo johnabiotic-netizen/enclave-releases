@@ -18,6 +18,7 @@ import { CloseIcon, MoreIcon, PlusIcon } from './icons';
 import type { ProfilesModel } from './useProfiles';
 import { PROXY_LOST } from './Viewer';
 import { ExportDialog, ImportDialog } from './Transfer';
+import { CommandBar, filterProfiles, ProxyMatch } from './CommandBar';
 
 interface Props {
   model: ProfilesModel;
@@ -33,6 +34,7 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit,
   const [deleting, setDeleting] = useState<Profile | null>(null);
   const [exporting, setExporting] = useState<Profile | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const pickImport = async () => {
     const name = await window.enclave.pickProfileFile();
     if (name) setImporting(name);
@@ -65,6 +67,22 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit,
             </div>
           )}
         </header>
+        {profiles.length > 0 && (
+          <CommandBar
+            value={query}
+            onChange={setQuery}
+            profiles={profiles}
+            isRunning={(p) => model.shownState(p) === 'running'}
+            actions={{
+              start: (id) => void model.start(id),
+              stop: (id) => void model.stop(id),
+              open: onOpen,
+              edit: onEdit,
+              audit: onAudit,
+              create: onCreate,
+            }}
+          />
+        )}
         {model.loadError && <p className="notice error">{model.loadError}</p>}
         {profiles.length === 0 ? (
           <div className="empty">
@@ -80,7 +98,10 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit,
           </div>
         ) : (
           <ul className="grid" aria-label="Profiles">
-            {profiles.map((p) => (
+            {filterProfiles(profiles, query).length === 0 && (
+              <li className="muted grid-empty">No profile matches &quot;{query.trim()}&quot;.</li>
+            )}
+            {filterProfiles(profiles, query).map((p) => (
               <Tile
                 key={p.id}
                 profile={p}
@@ -107,6 +128,7 @@ export function Dashboard({ model, selected, onSelect, onOpen, onCreate, onEdit,
           profile={current}
           state={model.shownState(current)}
           error={model.actionError[current.id]}
+          moved={Boolean(model.moved[current.id])}
           onClose={() => onSelect(null)}
           onStart={() => void model.start(current.id)}
           onOpen={() => onOpen(current.id)}
@@ -286,6 +308,7 @@ function Details(props: {
   profile: Profile;
   state: ShownState;
   error: string | undefined;
+  moved: boolean;
   onClose(): void;
   onStart(): void;
   onOpen(): void;
@@ -332,6 +355,7 @@ function Details(props: {
       {(props.error || (state === 'error' && p.status.lastError)) && (
         <p className="notice error">{props.error ?? p.status.lastError}</p>
       )}
+      <ProxyMatch profile={p} moved={props.moved} />
       <dl className="facts">
         <dt>Exit IP</dt>
         <dd>

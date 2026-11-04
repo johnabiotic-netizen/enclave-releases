@@ -1459,3 +1459,87 @@ textarea:focus-visible {
   border-color: rgba(196, 181, 253, 0.4);
   box-shadow: 0 0 30px rgba(124, 92, 255, 0.3);
 }
+
+/* the dashboard's bar: search, or a short command */
+.command {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  max-width: 720px;
+}
+.command-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--text-500);
+}
+.command-bar:focus-within {
+  border-color: rgba(139, 115, 255, 0.7);
+  box-shadow: 0 0 22px rgba(124, 92, 255, 0.25);
+}
+.command-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  outline: 0;
+}
+.command-bar kbd {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-500);
+  font-size: 11px;
+}
+.command-hint {
+  margin: 0 0 0 16px;
+  font-size: 12px;
+  color: var(--text-300);
+}
+.command-hint.warn {
+  color: var(--warn);
+}
+.grid-empty {
+  padding: 8px 0;
+}
+
+/* the proxy match card */
+.match {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--glass);
+  color: var(--text-300);
+  font-size: 13px;
+}
+.match.ok {
+  border-color: rgba(196, 181, 253, 0.28);
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.16), rgba(34, 211, 238, 0.08));
+  color: #ddd6fe;
+}
+.match.warn {
+  border-color: rgba(252, 211, 77, 0.35);
+  background: rgba(252, 211, 77, 0.07);
+  color: #fde68a;
+}
+.match strong {
+  color: var(--text-100);
+}
+.match-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.match p + p {
+  margin-top: 4px;
+}
