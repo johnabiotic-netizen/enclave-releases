@@ -7,7 +7,7 @@ import type { MediaInUse, Profile, RelayStatus, StreamInfo } from '@enclave/shar
 import { api } from './api';
 import { Flag } from './Flag';
 import { country, exitIp, SEAM, STATE_WORD, type ShownState } from './format';
-import { BackIcon, PhoneIcon } from './icons';
+import { BackIcon, ExpandIcon, MinimizeIcon, PhoneIcon, ShrinkIcon } from './icons';
 
 /** What the agent sets as a running profile's lastError while its proxy is down. */
 export const PROXY_LOST = 'Proxy unreachable';
@@ -30,9 +30,11 @@ export function Viewer({ profile, state, phoneApp, onBack, onStart, onStop }: Pr
   const [phoneOpen, setPhoneOpen] = useState(false);
   const proxyLost = running && profile.status.lastError === PROXY_LOST;
   const media = usePhoneNeeded(profile, running);
+  const full = useFullScreen(running);
 
   return (
     <section className={`viewer ${SEAM[state]}`}>
+      {full.on && <FullScreenEdge name={profile.name} onExit={() => full.set(false)} />}
       <header className="viewer-bar">
         <button className="icon-button" aria-label="Back to profiles" onClick={onBack}>
           <BackIcon />
@@ -61,6 +63,15 @@ export function Viewer({ profile, state, phoneApp, onBack, onStart, onStop }: Pr
             />
           )}
         </div>
+        {running && (
+          <button
+            className="button small"
+            onClick={() => full.set(true)}
+            title="Only the browser, on the whole screen. F11 or the top edge of the screen to come back."
+          >
+            <ExpandIcon /> Full screen
+          </button>
+        )}
         {running && (
           <button className="button small" onClick={onStop}>
             Stop
@@ -270,6 +281,75 @@ function Stream({ profile }: { profile: Profile }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Full screen: the window fills the screen and only the profile's browser shows (Enclave's
+ * rail and bars hide, body.immersive). F11 toggles it; Esc stays with the browser, where
+ * pages use it. Leaving the viewer or the profile stopping ends it.
+ */
+function useFullScreen(running: boolean) {
+  const [on, setOn] = useState(false);
+  useEffect(() => window.enclave.onFullScreen(setOn), []);
+  useEffect(() => {
+    document.body.classList.toggle('immersive', on);
+  }, [on]);
+  useEffect(() => {
+    if (!running) void window.enclave.setFullScreen(false);
+  }, [running]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'F11' || !running) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void window.enclave.setFullScreen(!document.body.classList.contains('immersive'));
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, [running]);
+  useEffect(
+    () => () => {
+      document.body.classList.remove('immersive');
+      void window.enclave.setFullScreen(false);
+    },
+    [],
+  );
+  return { on, set: (v: boolean) => void window.enclave.setFullScreen(v) };
+}
+
+/** In full screen: a bar that slides down when the mouse reaches the top edge. */
+function FullScreenEdge(props: { name: string; onExit(): void }) {
+  const [shown, setShown] = useState(false);
+  const timer = useRef(0);
+  const show = () => {
+    window.clearTimeout(timer.current);
+    setShown(true);
+  };
+  const hideSoon = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setShown(false), 1200);
+  };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  return (
+    <>
+      <div className="immersive-edge" onMouseEnter={show} aria-hidden="true" />
+      <div
+        className={`immersive-bar${shown ? ' shown' : ''}`}
+        onMouseEnter={show}
+        onMouseLeave={hideSoon}
+        onFocus={show}
+        onBlur={hideSoon}
+      >
+        <strong>{props.name}</strong>
+        <button className="button small" onClick={() => void window.enclave.minimize()}>
+          <MinimizeIcon /> Minimize
+        </button>
+        <button className="button small" onClick={props.onExit}>
+          <ShrinkIcon /> Exit full screen
+        </button>
+      </div>
+    </>
   );
 }
 

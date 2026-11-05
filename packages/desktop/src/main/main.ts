@@ -200,7 +200,7 @@ function createWindow(): void {
     height: 820,
     minWidth: 960,
     minHeight: 600,
-    backgroundColor: '#0E1420',
+    backgroundColor: '#07060F',
     title: 'Enclave',
     autoHideMenuBar: true,
     show: false,
@@ -236,6 +236,10 @@ function createWindow(): void {
     void hintTray();
   });
   win.on('closed', () => (win = null));
+  // The profile viewer's full screen (Viewer.tsx) follows the window's own state, so leaving
+  // full screen any way (F11, Windows) brings Enclave's bars back.
+  win.on('enter-full-screen', () => win?.webContents.send('window:fullscreen', true));
+  win.on('leave-full-screen', () => win?.webContents.send('window:fullscreen', false));
 }
 
 function showWindow(): void {
@@ -332,6 +336,9 @@ ipcMain.handle('setup:turn-on-wsl', async () => {
     return { ok: false, message: (err as Error).message };
   }
 });
+
+ipcMain.handle('window:set-fullscreen', (_e, on: unknown) => win?.setFullScreen(on === true));
+ipcMain.handle('window:minimize', () => win?.minimize());
 
 ipcMain.handle('app:open-data', async () => {
   if (home) await shell.openPath(home);

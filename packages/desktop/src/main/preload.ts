@@ -33,6 +33,13 @@ const bridge: EnclaveBridge = {
     ipcRenderer.on('update:state', handler);
     return () => ipcRenderer.removeListener('update:state', handler);
   },
+  setFullScreen: (on) => ipcRenderer.invoke('window:set-fullscreen', on),
+  minimize: () => ipcRenderer.invoke('window:minimize'),
+  onFullScreen: (listener) => {
+    const handler = (_e: IpcRendererEvent, on: boolean) => listener(on);
+    ipcRenderer.on('window:fullscreen', handler);
+    return () => ipcRenderer.removeListener('window:fullscreen', handler);
+  },
   onAgentState: (listener) => {
     const handler = (_e: IpcRendererEvent, state: AgentState) => listener(state);
     ipcRenderer.on('agent:state', handler);

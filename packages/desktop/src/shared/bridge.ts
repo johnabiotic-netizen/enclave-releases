@@ -104,6 +104,10 @@ export interface EnclaveBridge {
   /** Stops the profiles, installs the downloaded version, and starts Enclave again. */
   installUpdate(): Promise<void>;
   onUpdateState(listener: (state: UpdateState) => void): () => void;
+  /** The window fills the screen (the profile viewer's full screen), or not. */
+  setFullScreen(on: boolean): Promise<void>;
+  minimize(): Promise<void>;
+  onFullScreen(listener: (on: boolean) => void): () => void;
   /**
    * Exports a stopped profile to one encrypted file: asks where to save it, then writes it.
    * Not in the agent's HTTP API on purpose (specs/profile-file.md).

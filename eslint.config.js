@@ -25,6 +25,7 @@ export default tseslint.config(
       'packages/mobile/src/**',
       'packages/mobile/static/**',
       'packages/desktop/src/renderer/**',
+      'scripts/phone/pages/**',
     ],
     languageOptions: { globals: globals.browser },
   },
