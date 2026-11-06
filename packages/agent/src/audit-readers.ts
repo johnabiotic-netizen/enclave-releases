@@ -395,9 +395,16 @@ function readBrowserLeaksWebRtc(c: AuditCheckResult, ctx: AuditContext): Finding
   const remote = field('IPv4 Address');
   const pub = field('Public IP Address');
   const local = field('Local IP Address');
-  // "WebRTC Leak Test", an icon line, then "No Leak" (or the leak) before the next row.
-  const block = t.match(/WebRTC Leak Test([\s\S]*?)Local IP Address/)?.[1] ?? '';
-  const leak = /No Leak/.test(block) ? 'No Leak' : /Leak/.test(block) ? block.trim() : null;
+  // The result row: "WebRTC Leak Test", an icon line, then "No Leak" (or the leak) before
+  // "Local IP Address". The site's menu also says "WebRTC Leak Test" (2026-11), so the row is
+  // the last one before "Local IP Address", and a verdict word is all that counts.
+  const beforeLocal = t.split('Local IP Address')[0] ?? '';
+  const row = beforeLocal.slice(
+    beforeLocal.lastIndexOf('WebRTC Leak Test') + 'WebRTC Leak Test'.length,
+  );
+  const leak = /no leak/i.test(row)
+    ? 'No Leak'
+    : (row.match(/\b(Leak(?:ed| detected)?)\b[^\n]*/i)?.[0]?.trim() ?? null);
   const exit = ctx.exitIp;
   return [
     {
@@ -423,8 +430,10 @@ function readBrowserLeaksWebRtc(c: AuditCheckResult, ctx: AuditContext): Finding
     {
       check: 'browserleaks-webrtc',
       item: 'leak test',
-      verdict: leak === 'No Leak' ? 'pass' : leak ? 'fail' : 'look',
-      value: leak ?? '(not found)',
+      // No verdict word on the page: the public and local IP lines above decide.
+      verdict: leak === 'No Leak' ? 'pass' : leak ? 'fail' : 'info',
+      value: leak ?? '(no verdict shown)',
+      ...(leak ? {} : { note: 'BrowserLeaks showed no verdict; the IP lines decide.' }),
     },
   ];
 }

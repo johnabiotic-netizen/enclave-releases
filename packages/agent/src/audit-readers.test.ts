@@ -182,6 +182,31 @@ describe('audit readers', () => {
     expect(findings.find((f) => f.item === 'WebRTC IP')?.verdict).toBe('fail');
   });
 
+  it('reads the leak verdict from the result row, not from the site menu', () => {
+    // BrowserLeaks' menu (2026-11) also says "WebRTC Leak Test", before the results.
+    const menu = [
+      'Canvas Fingerprint',
+      'WebGL Report',
+      'WebRTC Leak Test',
+      'TLS Client Test',
+      '',
+    ].join('\n');
+    const ok = run([check('browserleaks-webrtc', menu + WEBRTC)]);
+    expect(ok.find((f) => f.item === 'leak test')?.verdict).toBe('pass');
+    // The result row without a verdict word (the tester's run): not a failure.
+    const bare = run([check('browserleaks-webrtc', menu + WEBRTC.replace('No Leak', ''))]);
+    expect(bare.find((f) => f.item === 'leak test')?.verdict).toBe('info');
+    // A real leak still fails.
+    const leakedText = WEBRTC.replace('No Leak', 'Leak detected').replace(
+      'Local IP Address\t-',
+      'Local IP Address\t192.168.1.5',
+    );
+    const leaked = run([check('browserleaks-webrtc', menu + leakedText)]);
+    expect(leaked.filter((f) => f.verdict === 'fail').map((f) => f.item)).toEqual(
+      expect.arrayContaining(['leak test', 'no local IP']),
+    );
+  });
+
   it('says "look", not pass, when a page changed and a field is gone', () => {
     const findings = run([check('pixelscan', 'Pixelscan has a new design')]);
     expect(findings.find((f) => f.item === 'verdict')?.verdict).toBe('look');
