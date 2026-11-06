@@ -15,6 +15,7 @@ export interface OneOffOptions {
   networkMode?: string;
   devices?: Docker.DeviceMapping[];
   mounts?: Docker.MountSettings[];
+  env?: string[];
   timeoutMs?: number;
 }
 
@@ -63,6 +64,7 @@ export class DockerRuntime {
     const container = await this.docker.createContainer({
       Image: this.image,
       Cmd: opts.cmd,
+      ...(opts.env ? { Env: opts.env } : {}),
       Labels: { [PROFILE_LABEL]: 'one-off' },
       HostConfig: {
         NetworkMode: opts.networkMode ?? 'bridge',

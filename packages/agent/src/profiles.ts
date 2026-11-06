@@ -46,6 +46,7 @@ import {
 import type { TailnetAddress, Tailscale } from './tailscale.js';
 import { evaluateAudit, summarize, type Finding, type Reference } from './audit-readers.js';
 import { lookupReputation, ProxyTester, type ProxyTestJob } from './proxy-tester.js';
+import { GPU_RENDER_TEST } from './gpu-render-test.js';
 import { AgentError, InputError } from './errors.js';
 import { stripLocation } from './strip-location.js';
 import {
@@ -1320,8 +1321,8 @@ export class ProfileService {
    */
   private async requireNewGpu(): Promise<{ adapter: GpuAdapter; label: string }> {
     const adapters = await listAdapters().catch((): GpuAdapter[] => []);
-    const adapter = chooseNewAdapter(adapters, this.config.gpu);
-    if (!adapter) {
+    const first = chooseNewAdapter(adapters, this.config.gpu);
+    if (!first) {
       throw new AgentError(
         'GPU_UNAVAILABLE',
         this.config.gpu
@@ -1329,8 +1330,61 @@ export class ProfileService {
           : "This PC's graphics card couldn't be found. Profiles need it to draw like a real Windows PC.",
       );
     }
-    await this.requireDockerGpu(adapter);
-    return { adapter, label: angleName(adapter) };
+    await this.requireDockerGpu(first);
+    // The adapter a browser gets first; when it can't draw in WSL (a driver without WSL
+    // support leaves the browser's window black), the next one that can.
+    const candidates = this.config.gpu ? [first] : [first, ...adapters.filter((a) => a !== first)];
+    const tried: string[] = [];
+    for (const adapter of candidates) {
+      const test = await this.drawsWith(adapter);
+      if (test.ok) return { adapter, label: angleName(adapter) };
+      tried.push(`${adapter.name}: ${test.reason}`);
+    }
+    throw new AgentError(
+      'GPU_UNAVAILABLE',
+      `None of this PC's graphics cards can draw in Enclave's Linux system (${tried.join('; ')}). Update the graphics driver from the card maker's site, restart the PC, then try again.`,
+    );
+  }
+
+  /** Adapters that drew in a test since the agent started; a test takes a few seconds. */
+  private readonly drawingAdapters = new Set<string>();
+
+  /**
+   * Whether WSL's D3D12 driver really draws with this adapter (gpu_render_test.py): one
+   * pixel, read back, drawn by this adapter and not another. A driver without WSL support
+   * fails here, where a profile would otherwise open to a black window.
+   */
+  private async drawsWith(adapter: GpuAdapter): Promise<{ ok: boolean; reason: string }> {
+    if (this.drawingAdapters.has(adapter.name)) return { ok: true, reason: '' };
+    const gpu = gpuContainerSettings(adapter.name);
+    let result: { ok?: boolean; renderer?: string; error?: string };
+    try {
+      const out = await this.runtime.runOneOff({
+        cmd: ['/opt/enclave/venv/bin/python', '/run/gpu/gpu_render_test.py'],
+        files: [
+          { name: 'run/gpu/', mode: 0o755 },
+          { name: 'run/gpu/gpu_render_test.py', mode: 0o644, content: GPU_RENDER_TEST },
+        ],
+        networkMode: 'none',
+        env: gpu.env,
+        devices: gpu.devices,
+        mounts: gpu.mounts,
+        timeoutMs: 60_000,
+      });
+      result = JSON.parse(out.trim().split('\n').pop() ?? '{}') as typeof result;
+    } catch (e) {
+      return { ok: false, reason: e instanceof Error ? e.message.slice(0, 200) : String(e) };
+    }
+    if (result.ok) {
+      this.drawingAdapters.add(adapter.name);
+      return { ok: true, reason: '' };
+    }
+    const reason = result.error
+      ? result.error
+      : result.renderer
+        ? `drew with ${result.renderer.replace(/^D3D12 \((.*)\)$/, '$1')} instead`
+        : 'no picture';
+    return { ok: false, reason };
   }
 
   /**
@@ -1359,6 +1413,14 @@ export class ProfileService {
       );
     }
     await this.requireDockerGpu(adapter);
+    const test = await this.drawsWith(adapter);
+    if (!test.ok) {
+      throw new AgentError(
+        'GPU_UNAVAILABLE',
+        `This profile draws with ${adapter.name}, and that card can't draw in Enclave's Linux system right now (${test.reason}). Update its driver from the card maker's site and restart the PC. The profile keeps its graphics card, so it can't move to another one.`,
+        { madeOn: adapter.name },
+      );
+    }
     return { adapter, label: madeOn };
   }
 

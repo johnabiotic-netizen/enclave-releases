@@ -4,3 +4,4 @@ coverage/
 profiles/
 pnpm-lock.yaml
 *.md
+packages/agent/src/gpu-render-test.ts
