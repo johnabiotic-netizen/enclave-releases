@@ -107,11 +107,11 @@ const READERS: Record<string, (c: AuditCheckResult, ctx: AuditContext) => Findin
   probe: readProbe,
   metrics: readMetrics,
   'svg-emoji': readSvgEmoji,
-  pixelscan: readPixelscan,
-  creepjs: readCreepJs,
-  'browserleaks-webrtc': readBrowserLeaksWebRtc,
-  'browserleaks-canvas': readBrowserLeaksCanvas,
-  amiunique: readAmiUnique,
+  scan: readPixelscan,
+  deep: readCreepJs,
+  leak: readBrowserLeaksWebRtc,
+  draw: readBrowserLeaksCanvas,
+  crowd: readAmiUnique,
 };
 
 function readProbe(c: AuditCheckResult, ctx: AuditContext): Finding[] {
@@ -273,7 +273,7 @@ function readPixelscan(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   const out: Finding[] = [];
   const verdict = t.match(/Your Browser Fingerprint is\s+(consistent|inconsistent)/)?.[1];
   out.push({
-    check: 'pixelscan',
+    check: 'scan',
     item: 'verdict',
     verdict: verdict === 'consistent' ? 'pass' : verdict ? 'fail' : 'look',
     value: verdict ?? '(not found)',
@@ -285,7 +285,7 @@ function readPixelscan(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   ];
   for (const [item, good, bad] of cards) {
     out.push({
-      check: 'pixelscan',
+      check: 'scan',
       item,
       verdict: good.test(t) ? 'pass' : bad.test(t) ? 'fail' : 'look',
       value: t.match(good)?.[0] ?? t.match(bad)?.[0] ?? '(not found)',
@@ -293,7 +293,7 @@ function readPixelscan(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   }
   const browser = t.match(/\n([^\n]+ on [^\n]+)\s*\n\s*Browser\s*\n/)?.[1]?.trim();
   out.push({
-    check: 'pixelscan',
+    check: 'scan',
     item: 'browser',
     verdict: browser ? (/Firefox [\d.]+ on Windows/.test(browser) ? 'pass' : 'fail') : 'look',
     value: browser ?? '(not found)',
@@ -302,7 +302,7 @@ function readPixelscan(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   const webrtc = after(t, /WebRTC IP Address/);
   if (ip || webrtc) {
     out.push({
-      check: 'pixelscan',
+      check: 'scan',
       item: 'WebRTC IP equals IP',
       verdict:
         ip && webrtc && ip === webrtc && (!ctx.exitIp || ip === ctx.exitIp) ? 'pass' : 'fail',
@@ -311,7 +311,7 @@ function readPixelscan(c: AuditCheckResult, ctx: AuditContext): Finding[] {
     });
   }
   const type = after(t, /User Type by IP/);
-  if (type) out.push({ check: 'pixelscan', item: 'IP type', verdict: 'info', value: type });
+  if (type) out.push({ check: 'scan', item: 'IP type', verdict: 'info', value: type });
   return out;
 }
 
@@ -321,14 +321,14 @@ function readCreepJs(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   const out: Finding[] = [];
   const lies = Array.isArray(c.extra) ? c.extra.map(String) : [];
   out.push({
-    check: 'creepjs',
+    check: 'deep',
     item: 'lies',
     verdict: lies.length ? 'fail' : 'pass',
     value: lies.length ? lies.join('; ') : 'none',
   });
   const same = (item: string, value: string | null | undefined, want: string | undefined) =>
     out.push({
-      check: 'creepjs',
+      check: 'deep',
       item,
       verdict: !value ? 'look' : want === undefined ? 'info' : value === want ? 'pass' : 'fail',
       value: value ?? '(not found)',
@@ -354,7 +354,7 @@ function readCreepJs(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   ] as const) {
     const pct = t.match(re)?.[1];
     out.push({
-      check: 'creepjs',
+      check: 'deep',
       item,
       verdict: pct === undefined ? 'look' : pct === '0' ? 'pass' : 'fail',
       value: pct === undefined ? '(not found)' : `${pct}%`,
@@ -362,25 +362,25 @@ function readCreepJs(c: AuditCheckResult, ctx: AuditContext): Finding[] {
   }
   const like = t.match(/(\d+)% like headless:/)?.[1];
   if (like !== undefined) {
-    out.push({ check: 'creepjs', item: 'like headless', verdict: 'info', value: `${like}%` });
+    out.push({ check: 'deep', item: 'like headless', verdict: 'info', value: `${like}%` });
   }
   const fonts = t.match(/load \(\d+\/\d+\): ([^\n]+)/)?.[1];
   out.push({
-    check: 'creepjs',
+    check: 'deep',
     item: 'fonts',
     verdict: !fonts ? 'look' : /Like Windows/.test(fonts) ? 'pass' : 'fail',
     value: fonts ?? '(not found)',
   });
   const device = t.match(/device:\s*\n\s*Windows \(Win32\)\s*\n\s*([^\n]+)/)?.[1];
   out.push({
-    check: 'creepjs',
+    check: 'deep',
     item: 'worker device',
     verdict: !device ? 'look' : /^Windows/.test(device) ? 'pass' : 'fail',
     value: device ?? '(not found)',
   });
   const rtc = t.match(/\nip: ([\d.]+)/)?.[1];
   out.push({
-    check: 'creepjs',
+    check: 'deep',
     item: 'WebRTC IP',
     verdict: !rtc ? 'look' : !ctx.exitIp || rtc === ctx.exitIp ? 'pass' : 'fail',
     value: rtc ?? '(not found)',
@@ -408,27 +408,27 @@ function readBrowserLeaksWebRtc(c: AuditCheckResult, ctx: AuditContext): Finding
   const exit = ctx.exitIp;
   return [
     {
-      check: 'browserleaks-webrtc',
+      check: 'leak',
       item: 'IP',
       verdict: !remote ? 'look' : !exit || remote === exit ? 'pass' : 'fail',
       value: remote ?? '(not found)',
       ...(exit ? { expected: exit } : {}),
     },
     {
-      check: 'browserleaks-webrtc',
+      check: 'leak',
       item: 'WebRTC public IP',
       verdict: !pub ? 'look' : !exit || pub === exit ? 'pass' : 'fail',
       value: pub ?? '(not found)',
       ...(exit ? { expected: exit } : {}),
     },
     {
-      check: 'browserleaks-webrtc',
+      check: 'leak',
       item: 'no local IP',
       verdict: local === null ? 'look' : local === '' || local === '-' ? 'pass' : 'fail',
       value: local || '(none)',
     },
     {
-      check: 'browserleaks-webrtc',
+      check: 'leak',
       item: 'leak test',
       // No verdict word on the page: the public and local IP lines above decide.
       verdict: leak === 'No Leak' ? 'pass' : leak ? 'fail' : 'info',
@@ -442,7 +442,7 @@ function readBrowserLeaksCanvas(c: AuditCheckResult): Finding[] {
   const sig = (c.text ?? '').match(/Signature\s+([0-9A-F]{32})/)?.[1];
   return [
     {
-      check: 'browserleaks-canvas',
+      check: 'draw',
       item: 'signature',
       verdict: sig ? 'info' : 'look',
       value: sig ?? '(not found)',
@@ -459,19 +459,19 @@ function readAmiUnique(c: AuditCheckResult): Finding[] {
   const tz = t.match(/\n([^\n]+)\nTimezone\n/)?.[1]?.trim();
   return [
     {
-      check: 'amiunique',
+      check: 'crowd',
       item: 'operating system',
       verdict: !os ? 'look' : os.toLowerCase() === 'windows' ? 'pass' : 'fail',
       value: os ?? '(not found)',
     },
     {
-      check: 'amiunique',
+      check: 'crowd',
       item: 'browser',
       verdict: !browser ? 'look' : browser.toLowerCase() === 'firefox' ? 'pass' : 'fail',
       value: browser ?? '(not found)',
     },
-    { check: 'amiunique', item: 'language', verdict: 'info', value: lang ?? '(not found)' },
-    { check: 'amiunique', item: 'timezone', verdict: 'info', value: tz ?? '(not found)' },
+    { check: 'crowd', item: 'language', verdict: 'info', value: lang ?? '(not found)' },
+    { check: 'crowd', item: 'timezone', verdict: 'info', value: tz ?? '(not found)' },
   ];
 }
 

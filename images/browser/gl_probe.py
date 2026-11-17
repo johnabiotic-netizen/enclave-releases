@@ -1,15 +1,4 @@
-#!/opt/enclave/venv/bin/python
-"""Draws one pixel through WSL's D3D12 driver and prints what drew it, as JSON.
-
-The agent runs this in a one-off container with the profile's GPU settings
-(GALLIUM_DRIVER=d3d12, MESA_D3D12_DEFAULT_ADAPTER_NAME=<adapter>, /dev/dxg) before it
-gives a profile that adapter: an adapter WSL lists but can't draw with (a driver without
-WSL support) would leave the browser's window black. Prints
-{"ok": true, "renderer": "D3D12 (<adapter>)", "pixel": [r, g, b, a]} or {"ok": false, ...}. Mesa
-quietly draws on another adapter when the one asked for isn't there, so "ok" also needs the
-renderer to name the adapter asked for.
-No display is needed: EGL's surfaceless platform and an offscreen framebuffer.
-"""
+#!/opt/session/venv/bin/python
 
 import ctypes
 import json
@@ -32,11 +21,9 @@ GL_COLOR_BUFFER_BIT = 0x4000
 GL_RGBA = 0x1908
 GL_UNSIGNED_BYTE = 0x1401
 
-
 def fail(message: str) -> None:
     print(json.dumps({"ok": False, "error": message}))
     sys.exit(0)
-
 
 def main() -> None:
     try:
@@ -84,7 +71,6 @@ def main() -> None:
     u, i, f, p = ctypes.c_uint, ctypes.c_int, ctypes.c_float, ctypes.c_void_p
     renderer = (gl("glGetString", ctypes.c_char_p, u)(GL_RENDERER) or b"").decode(errors="replace")
 
-    # An offscreen 1x1 picture, cleared to a known colour, read back.
     fbo, rbo = u(), u()
     gl("glGenFramebuffers", None, i, p)(1, ctypes.byref(fbo))
     gl("glBindFramebuffer", None, u, u)(GL_FRAMEBUFFER, fbo)
@@ -100,10 +86,8 @@ def main() -> None:
     gl("glReadPixels", None, i, i, i, i, u, u, p)(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel)
     got = list(pixel)
     drew = abs(got[0] - 51) <= 2 and abs(got[1] - 153) <= 2 and abs(got[2] - 204) <= 2
-    # Mesa falls back to another adapter when the requested one isn't there: it must be this one.
     wanted = os.environ.get("MESA_D3D12_DEFAULT_ADAPTER_NAME", "")
     right_card = renderer == f"D3D12 ({wanted})" if wanted else renderer.startswith("D3D12")
     print(json.dumps({"ok": drew and right_card, "renderer": renderer, "pixel": got, "wanted": wanted}))
-
 
 main()

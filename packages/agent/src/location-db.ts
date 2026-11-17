@@ -23,7 +23,7 @@ const RELEASE =
   'https://github.com/johnabiotic-netizen/enclave-releases/releases/download/location-database/';
 export const LOCATION_DB_MANIFEST = `${RELEASE}location-database.json`;
 /** Where the camoufox package looks for its database in the image (Dockerfile). */
-const TARGET = '/opt/camoufox-cache/camoufox/geoip/mmdb';
+const TARGET = '/opt/session-cache/camoufox/geoip/mmdb';
 const FILE_NAME = 'geoip aio by daijro-combined.mmdb';
 const VOLUME_LABEL = 'enclave.location-db';
 /** How often to ask for a newer database; the workflow publishes monthly. */

@@ -1,19 +1,4 @@
-#!/opt/enclave/venv/bin/python
-"""Print a new, complete fingerprint for one profile as JSON on stdout.
-
-Run once, at profile creation (docs/05-fingerprints.md). The agent saves the output
-as `fingerprint` in profile.json; launch_browser.py replays `raw` on every launch.
-
-Run with no network (docker run --network none): nothing here needs it, and the
-real IP of the PC must never be looked up. --ip is resolved with the GeoIP
-database bundled in the image.
-
-  gen_fingerprint.py --gpu "Intel(R) HD Graphics 620" --country US \
-      --timezone America/New_York --locale en-US --ip 198.51.100.10
-
---gpu is the PC's real graphics card as Windows names it. Profiles render on it, so
-they claim it, as Windows Firefox reports it (windows_gpu.py).
-"""
+#!/opt/session/venv/bin/python
 
 import argparse
 import json
@@ -22,24 +7,18 @@ import random
 import sys
 from importlib.metadata import version
 
-os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("ENCLAVE_CAMOUFOX_CACHE", "/opt/camoufox-cache"))
+os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("SESSION_CACHE", "/opt/session-cache"))
 
 from camoufox.fingerprints import Screen, _load_media_devices  # noqa: E402
 import camoufox.geolocation  # noqa: E402
 from camoufox.geolocation import get_geolocation  # noqa: E402
 
-# The GeoIP database is pinned in the image (Dockerfile geoip-dist). Camoufox would
-# re-download it once its data is 8 days old; in these containers that download hangs
-# (read-only install), which stopped every proxy check 8 days after the build. The
-# database is refreshed by rebuilding the image with a newer pin, never at run time.
 camoufox.geolocation.needs_update = lambda config=None: False
 from camoufox.pkgman import camoufox_path  # noqa: E402
 from camoufox.utils import launch_options  # noqa: E402
 from camoufox.webgl import recorded_devices  # noqa: E402
-from windows_gpu import windows_webgl_pair  # noqa: E402
+from gl_info import windows_webgl_pair  # noqa: E402
 
-# Common Windows desktop sizes at 100% scaling, weighted by how often they occur, up to
-# 1920x1080 so streaming stays light. Each needs a mode in the image's Xorg config.
 SCREENS = [
     ((1920, 1080), 50),
     ((1366, 768), 20),
@@ -48,10 +27,7 @@ SCREENS = [
     ((1680, 1050), 8),
 ]
 
-
-# The taskbar height Firefox's Strict fingerprinting protection assumes on Windows.
 WINDOWS_STRICT_TASKBAR = 48
-
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -67,7 +43,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--screen", help="WxH from the supported list; default: a weighted random pick")
     return p.parse_args()
 
-
 def pick_screen(arg: str | None) -> tuple[int, int]:
     sizes = [size for size, _ in SCREENS]
     if arg:
@@ -77,11 +52,9 @@ def pick_screen(arg: str | None) -> tuple[int, int]:
         return size  # type: ignore[return-value]
     return random.SystemRandom().choices(sizes, weights=[w for _, w in SCREENS])[0]
 
-
 def decode_chunks(env: dict, prefix: str) -> dict:
     chunks = sorted((int(k.rsplit("_", 1)[1]), v) for k, v in env.items() if k.startswith(prefix))
     return json.loads("".join(v for _, v in chunks)) if chunks else {}
-
 
 def common_webgl(config: dict, gpu: tuple[str, str]) -> None:
     """The WebGL values of the most common device recorded for this GPU, for every profile.
@@ -98,18 +71,15 @@ def common_webgl(config: dict, gpu: tuple[str, str]) -> None:
     best = devices[max(range(len(keyed)), key=lambda i: (keyed.count(keyed[i]), -i))]
     config.update(best)
 
-
 def maximize_window(config: dict) -> None:
     """The browser window is maximized above the taskbar (openbox does this with the
-    margins prepare_profile.py derives from the window size), so report that geometry."""
+    margins profile_apply.py derives from the window size), so report that geometry."""
     config["window.screenX"] = 0
     config["window.screenY"] = 0
     config["window.outerWidth"] = config["screen.availWidth"]
     config["window.outerHeight"] = config["screen.availHeight"]
-    # Inner size follows from the real window and toolbars; never claim a fixed one.
     config.pop("window.innerWidth", None)
     config.pop("window.innerHeight", None)
-
 
 def strict_screen(config: dict) -> None:
     """The available area as Firefox with Strict tracking protection reports it on Windows:
@@ -121,7 +91,6 @@ def strict_screen(config: dict) -> None:
     config["screen.availHeight"] = config["screen.height"] - WINDOWS_STRICT_TASKBAR
     config["screen.availLeft"] = 0
     config["screen.availTop"] = 0
-
 
 def ensure_webcam(config: dict) -> None:
     """Give the machine a built-in camera when Camoufox drew none.
@@ -139,7 +108,6 @@ def ensure_webcam(config: dict) -> None:
     config["mediaDevices:webcams"] = 1
     config["mediaDevices:webcamLabels"] = [cam]
     config["mediaDevices:webcamGroups"] = [f"hw-{max((int(g[3:]) for g in groups), default=0) + 1}"]
-
 
 def summarize(args: argparse.Namespace, config: dict, prefs: dict) -> dict:
     """The readable fields of the profile schema, all taken from the generated config."""
@@ -160,7 +128,6 @@ def summarize(args: argparse.Namespace, config: dict, prefs: dict) -> dict:
         "webgl": {
             "vendor": config["webGl:vendor"],
             "renderer": config["webGl:renderer"],
-            # The card the profile really renders on; it must stay the same.
             "hostAdapter": args.gpu,
         },
         "audioSeed": format(config["audio:seed"], "08x"),
@@ -183,7 +150,6 @@ def summarize(args: argparse.Namespace, config: dict, prefs: dict) -> dict:
         }
     return fingerprint
 
-
 def validate(args: argparse.Namespace, fp: dict, screen: tuple[int, int], gpu: tuple[str, str]) -> None:
     problems = []
     if "Windows" not in fp["userAgent"]:
@@ -199,14 +165,12 @@ def validate(args: argparse.Namespace, fp: dict, screen: tuple[int, int], gpu: t
     if problems:
         raise ValueError("; ".join(problems))
 
-
 def main() -> None:
     args = parse_args()
     screen = pick_screen(args.screen)
     gpu = windows_webgl_pair(args.gpu)
 
     if args.ip:
-        # Location must match the proxy (hard rule 3): refuse rather than mix countries.
         country = get_geolocation(args.ip).locale.region
         if not country or country.upper() != args.country.upper():
             raise ValueError(f"--ip {args.ip} is in {country}, not {args.country}")
@@ -218,9 +182,6 @@ def main() -> None:
         block_webrtc=not args.ip,
         config={"timezone": args.timezone},
         screen=Screen(min_width=screen[0], max_width=screen[0], min_height=screen[1], max_height=screen[1]),
-        # The PC's own GPU, which the profile renders on. Camoufox would otherwise cover
-        # the canvas with random data; the profile uses Firefox's Strict canvas
-        # randomization instead (launch_browser.py).
         webgl_config=gpu,
         canvas_noise=False,
         headless=False,
@@ -231,15 +192,8 @@ def main() -> None:
     prefs = {**decode_chunks(env, "CAMOU_PREFS_"), **(opts.get("firefox_user_prefs") or {})}
     strict_screen(config)
     maximize_window(config)
-    # A desktop without a touchscreen, stated explicitly: otherwise the page sees neko's
-    # touch input device (Firefox reports it as 10 points, Strict collapses that to 5).
-    # 0 also turns off window.TouchEvent, as on such a PC. Always 0: a touch count
-    # Camoufox drew is a touchscreen the PC does not have (Profile 1 got 5).
     config["navigator.maxTouchPoints"] = 0
     common_webgl(config, gpu)
-    # Stock Web Audio. Every x86 PC renders the standard OfflineAudioContext probe the same
-    # way, and Firefox (Strict included) adds no audio noise, so a per-profile audio hash
-    # would be something no real Firefox has. Seed 0 is Camoufox's "no noise".
     config["audio:seed"] = 0
     ensure_webcam(config)
 
@@ -248,9 +202,8 @@ def main() -> None:
     json.dump(fingerprint, sys.stdout, indent=2)
     sys.stdout.write("\n")
 
-
 if __name__ == "__main__":
     try:
         main()
     except (ValueError, KeyError) as e:
-        sys.exit(f"enclave: cannot generate fingerprint: {e}")
+        sys.exit(f"session: cannot generate fingerprint: {e}")

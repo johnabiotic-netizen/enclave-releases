@@ -34,7 +34,7 @@ Runs in an audit container of the profile. Each check gives pass, fail or "look"
 `%LOCALAPPDATA%\Enclave\reports\<date>-<kind>-<name>\`: `report.json`, `summary.txt`, screenshots. CLI: `enclave proxy-test ...`, `enclave audit <id>`. Windows app (Stage 7): the Proxies screen runs the proxy tester (one proxy per line, a port may be a range; options for the sticky check and Pixelscan; Create profile from a row), and the create wizard's Check proxy shows the same rating (`rateProxy` in packages/shared/src/proxy-test.ts) with a Deep check button (Pixelscan, one proxy). The profile audit runs from each profile's menu (Check fingerprint): choose checks, optionally save a baseline, results grouped by check with failures first.
 
 ## Build order
-- [x] A. Audit container: start a profile copy in audit mode, run `audit.py` (Playwright, Camoufox's own launcher path), return JSON, remove it.
+- [x] A. Audit container: start a profile copy in audit mode, run `diag.py` (Playwright, Camoufox's own launcher path), return JSON, remove it.
 - [x] B. Self-check: probe values in audit mode equal a normal launch.
 - [x] C. Page readers: probe, text metrics, Pixelscan, CreepJS, BrowserLeaks, amiunique.
 - [x] D. Reference: save real Firefox 158 measurements; comparison rules.

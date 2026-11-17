@@ -465,7 +465,7 @@ function PhonePanel(props: {
       ) : (
         <p>
           {relay?.enabled
-            ? 'Sign in to your relay in Settings, then pair your phone.'
+            ? 'Sign in to Link in Settings, then pair your phone.'
             : 'Phone access is off on this PC. Turn it on in Settings.'}
         </p>
       )}

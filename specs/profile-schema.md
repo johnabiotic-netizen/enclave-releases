@@ -72,6 +72,6 @@ Each profile is a folder on the host: `profiles/<id>/`, containing `profile.json
 
 ## Rules
 - `fingerprint` is written once at creation. Only `timezone`, `locale`, `languages`, `geolocation` may change later, and only via the explicit "Update location" action when the proxy's country changes. In `raw` that action changes the matching Camoufox keys only (`timezone`, `locale:*`, `geolocation:*`, `webrtc:ipv4`, and `voices`, since a Windows PC's speech voices come with its language) and the pref `intl.locale.requested`, taken from a fingerprint made for the new place on the same GPU. All other fields are immutable for the life of the profile.
-- Changing the proxy (same country and timezone, enforced) moves `geolocation` to the new exit IP's location. At every start the browser reports the IP and location from that start's proxy check (`ENCLAVE_EXIT_IP`, `ENCLAVE_EXIT_LAT`, `ENCLAVE_EXIT_LON`), not the values saved at creation, so WebRTC and geolocation always agree with the IP websites see (hard rule 3).
+- Changing the proxy (same country and timezone, enforced) moves `geolocation` to the new exit IP's location. At every start the browser reports the IP and location from that start's proxy check (`SESSION_GEO_IP`, `SESSION_GEO_LAT`, `SESSION_GEO_LON`), not the values saved at creation, so WebRTC and geolocation always agree with the IP websites see (hard rule 3).
 - The proxy password is never stored in `profile.json`. Only `secretRef` is.
 - `status` is runtime only and may be rewritten freely.

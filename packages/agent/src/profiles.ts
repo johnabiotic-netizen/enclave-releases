@@ -37,6 +37,7 @@ import { makeTar, type TarEntry } from './docker/tar.js';
 import {
   angleName,
   chooseNewAdapter,
+  driverVersions,
   findMadeOn,
   gpuContainerSettings,
   listAdapters,
@@ -72,13 +73,13 @@ const MONITOR_INTERVAL_MS = 60_000;
 const STREAM_TTL_MS = 24 * 60 * 60 * 1000;
 const CONTAINER_MEMORY_BYTES = 3 * 1024 ** 3;
 const SHM_BYTES = 2 * 1024 ** 3;
-/** Where the profile's browser saves downloads (launch_browser.py RUNTIME_PREFS). */
+/** Where the profile's browser saves downloads (launch.py RUNTIME_PREFS). */
 const DOWNLOADS_DIR = '/data/downloads';
 const PROXY_UNREACHABLE = 'Proxy unreachable';
 
 /**
  * Stage 4: is a page using the camera or microphone? Run in the container as neko. The
- * camera is in use while a browser process maps the phone camera's shared memory (camfeed,
+ * camera is in use while a browser process maps the phone camera's shared memory (media_bridge,
  * which writes it, always does); the microphone while something records from the
  * "microphone" source (its own loopback module aside); a file picker while Firefox's "File
  * Upload" dialog is on screen. Prints "<camera 0|1> <recordings> <pickers>".
@@ -86,7 +87,7 @@ const PROXY_UNREACHABLE = 'Proxy unreachable';
 const MEDIA_IN_USE_SCRIPT = `cam=0
 for d in /proc/[0-9]*; do
   grep -qs enclave-camera "$d/maps" || continue
-  grep -qs camfeed "$d/cmdline" || cam=1
+  grep -qs media_bridge "$d/cmdline" || cam=1
 done
 src=$(pactl list short sources | awk '$2 == "microphone" { print $1 }')
 mic=$(pactl list short source-outputs | awk -v s="$src" '$2 == s && $4 == "protocol-native.c"' | wc -l)
@@ -786,28 +787,27 @@ export class ProfileService {
     this.proxyTester ??= new ProxyTester(
       (p) => this.runProxyCheck(p),
       path.join(this.config.home, 'reports'),
-      (p) => this.pixelscanProxy(p),
+      (p) => this.scanProxy(p),
     );
     return this.proxyTester.start(proxies, {
       stickyMinutes: minutes,
-      pixelscan: req.pixelscan === true,
+      scan: req.scan === true,
     });
   }
 
   /**
-   * Pixelscan's view of a proxy: a temporary profile on it (a fingerprint for its
-   * location), an audit of Pixelscan alone, then the profile is deleted.
+   * Enclave Scan's view of a proxy: a temporary profile on it (a fingerprint for its
+   * location), an audit of Enclave Scan alone, then the profile is deleted.
    */
-  private async pixelscanProxy(proxy: ProxyInput): Promise<{ verdict: string; proxy: string }> {
+  private async scanProxy(proxy: ProxyInput): Promise<{ verdict: string; proxy: string }> {
     const temp = await this.create(
       { name: `proxy test ${proxy.host}:${proxy.port}`, proxy },
       { temporary: true },
     );
     try {
-      const run = await this.audit(temp.id, ['pixelscan']);
+      const run = await this.audit(temp.id, ['scan']);
       const value = (item: string) =>
-        run.findings.find((f) => f.check === 'pixelscan' && f.item === item)?.value ??
-        '(not found)';
+        run.findings.find((f) => f.check === 'scan' && f.item === item)?.value ?? '(not found)';
       return { verdict: value('verdict'), proxy: value('proxy') };
     } finally {
       await this.delete(temp.id, true).catch(() => {});
@@ -852,7 +852,7 @@ export class ProfileService {
         Image: this.runtime.image,
         Labels: { [AUDIT_LABEL]: id },
         Env: [
-          'ENCLAVE_AUDIT=1',
+          'SESSION_DIAG=1',
           'NEKO_MEMBER_PROVIDER=multiuser',
           `NEKO_MEMBER_MULTIUSER_USER_PASSWORD=${randomPassword()}`,
           `NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD=${randomPassword()}`,
@@ -875,7 +875,7 @@ export class ProfileService {
       await container.putArchive(
         makeTar([
           ...configFiles(profile, proxy),
-          { name: 'config/audit.json', mode: 0o644, content: JSON.stringify({ checks }) },
+          { name: 'config/diag.json', mode: 0o644, content: JSON.stringify({ checks }) },
         ]),
         { path: '/' },
       );
@@ -893,7 +893,7 @@ export class ProfileService {
         if (!check.screenshot || !/^[\w.-]+\.png$/.test(check.screenshot)) continue;
         const shot = await this.runtime.execOutput(
           name,
-          ['base64', '-w0', `/data/audit/${check.screenshot}`],
+          ['base64', '-w0', `/data/diag/${check.screenshot}`],
           'root',
         );
         if (shot.code === 0) {
@@ -991,7 +991,7 @@ export class ProfileService {
         );
       }
       const out = await this.runtime
-        .execOutput(name, ['cat', '/data/audit/result.json'], 'root')
+        .execOutput(name, ['cat', '/data/diag/result.json'], 'root')
         .catch(() => null);
       if (out?.code === 0 && out.stdout.trim()) return JSON.parse(out.stdout) as AuditReport;
       await new Promise((r) => setTimeout(r, AUDIT_POLL_MS));
@@ -1302,7 +1302,7 @@ export class ProfileService {
 
   private async runProxyCheck(proxy: ProxyInput): Promise<RawProxyCheck> {
     const out = await this.runtime.runOneOff({
-      cmd: ['bash', '-c', '/opt/enclave/check_proxy.py < /run/check/proxy.json'],
+      cmd: ['bash', '-c', '/opt/session/net_check.py < /run/check/proxy.json'],
       mounts: this.locationMounts(),
       files: [
         { name: 'run/check/', mode: 0o700 },
@@ -1346,37 +1346,84 @@ export class ProfileService {
     );
   }
 
-  /** Adapters that drew in a test since the agent started; a test takes a few seconds. */
-  private readonly drawingAdapters = new Set<string>();
+  /**
+   * Adapter signatures (name, device id, driver version) that passed the draw test, held in
+   * memory and mirrored to disk, so the slow first draw runs once per machine and driver
+   * rather than on the first start after every launch. Loaded lazily on first use.
+   */
+  private drawnAdapters: Set<string> | undefined;
+  /** The PC's driver versions, read once per session (a driver change needs a restart anyway). */
+  private driverVersionsOnce: Promise<Map<string, string>> | undefined;
+
+  /** Where the draw-test results are remembered between launches (beside the profiles folder). */
+  private gpuCacheFile(): string {
+    return path.join(path.dirname(this.store.dir), 'gpu-draw-cache.json');
+  }
+
+  /** The signatures that have drawn, read from disk the first time and then kept in memory. */
+  private async drawnAdapterSet(): Promise<Set<string>> {
+    if (this.drawnAdapters) return this.drawnAdapters;
+    let drawn: string[] = [];
+    try {
+      const parsed = JSON.parse(await readFile(this.gpuCacheFile(), 'utf8')) as { drawn?: unknown };
+      if (Array.isArray(parsed.drawn))
+        drawn = parsed.drawn.filter((x): x is string => typeof x === 'string');
+    } catch {
+      // No cache yet, or unreadable: start from nothing.
+    }
+    this.drawnAdapters = new Set(drawn);
+    return this.drawnAdapters;
+  }
+
+  /** Remembers a signature that drew, in memory and on disk (disk is a convenience, not required). */
+  private async rememberDrawn(signature: string): Promise<void> {
+    const set = await this.drawnAdapterSet();
+    set.add(signature);
+    try {
+      await mkdir(path.dirname(this.gpuCacheFile()), { recursive: true });
+      await writeFile(this.gpuCacheFile(), JSON.stringify({ drawn: [...set] }, null, 2));
+    } catch {
+      // Disk write failed; the in-memory set still spares repeat tests this session.
+    }
+  }
+
+  /** This adapter's cache signature: name, device id and current driver version together. */
+  private async adapterSignature(adapter: GpuAdapter): Promise<string> {
+    const versions = await (this.driverVersionsOnce ??= driverVersions());
+    return `${adapter.name}|${adapter.deviceId ?? ''}|${versions.get(adapter.name) ?? ''}`;
+  }
 
   /**
-   * Whether WSL's D3D12 driver really draws with this adapter (gpu_render_test.py): one
+   * Whether WSL's D3D12 driver really draws with this adapter (gl_probe.py): one
    * pixel, read back, drawn by this adapter and not another. A driver without WSL support
-   * fails here, where a profile would otherwise open to a black window.
+   * fails here, where a profile would otherwise open to a black window. An older card can be
+   * slow to start D3D12 the first time (tens of seconds), so the test gets a generous window
+   * and a pass is remembered per driver, so later starts don't wait on it again.
    */
   private async drawsWith(adapter: GpuAdapter): Promise<{ ok: boolean; reason: string }> {
-    if (this.drawingAdapters.has(adapter.name)) return { ok: true, reason: '' };
+    const signature = await this.adapterSignature(adapter);
+    if ((await this.drawnAdapterSet()).has(signature)) return { ok: true, reason: '' };
     const gpu = gpuContainerSettings(adapter.name);
     let result: { ok?: boolean; renderer?: string; error?: string };
     try {
       const out = await this.runtime.runOneOff({
-        cmd: ['/opt/enclave/venv/bin/python', '/run/gpu/gpu_render_test.py'],
+        cmd: ['/opt/session/venv/bin/python', '/run/probe/gl_probe.py'],
         files: [
-          { name: 'run/gpu/', mode: 0o755 },
-          { name: 'run/gpu/gpu_render_test.py', mode: 0o644, content: GPU_RENDER_TEST },
+          { name: 'run/probe/', mode: 0o755 },
+          { name: 'run/probe/gl_probe.py', mode: 0o644, content: GPU_RENDER_TEST },
         ],
         networkMode: 'none',
         env: gpu.env,
         devices: gpu.devices,
         mounts: gpu.mounts,
-        timeoutMs: 60_000,
+        timeoutMs: 180_000,
       });
       result = JSON.parse(out.trim().split('\n').pop() ?? '{}') as typeof result;
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message.slice(0, 200) : String(e) };
     }
     if (result.ok) {
-      this.drawingAdapters.add(adapter.name);
+      await this.rememberDrawn(signature);
       return { ok: true, reason: '' };
     }
     const reason = result.error
@@ -1446,7 +1493,7 @@ export class ProfileService {
   private async generateFingerprint(raw: RawProxyCheck, adapter: string): Promise<Fingerprint> {
     const out = await this.runtime.runOneOff({
       cmd: [
-        '/opt/enclave/gen_fingerprint.py',
+        '/opt/session/profile_build.py',
         '--gpu',
         adapter,
         '--country',
@@ -1669,9 +1716,9 @@ function assertLocationMatches(fingerprint: Fingerprint, raw: RawProxyCheck): vo
  */
 function exitEnv(raw: RawProxyCheck): string[] {
   return [
-    ...(raw.exitIp ? [`ENCLAVE_EXIT_IP=${raw.exitIp}`] : []),
+    ...(raw.exitIp ? [`SESSION_GEO_IP=${raw.exitIp}`] : []),
     ...(raw.lat !== undefined && raw.lon !== undefined
-      ? [`ENCLAVE_EXIT_LAT=${raw.lat}`, `ENCLAVE_EXIT_LON=${raw.lon}`]
+      ? [`SESSION_GEO_LAT=${raw.lat}`, `SESSION_GEO_LON=${raw.lon}`]
       : []),
   ];
 }
@@ -1703,7 +1750,7 @@ function streamInfo(port: number, stream: NonNullable<ProfileSecrets['stream']>)
 /**
  * Relay mode (Stage 6): neko gathers candidates for the phone too (no ICE lite), with the
  * relay's STUN and TURN server by IP (the container has no DNS). The egress lock opens UDP
- * and that TURN server to neko's own group only (apply_egress_lock.sh): the browser still
+ * and that TURN server to neko's own group only (net_apply.sh): the browser still
  * reaches nothing but its proxy. Viewers get no ICE servers from neko: the phone app brings
  * its own from the relay, and the PC's viewer needs none.
  */
@@ -1721,7 +1768,7 @@ export function relayStreamEnv(turn: PcTurn): string[] {
     'NEKO_WEBRTC_ICELITE=false',
     `NEKO_WEBRTC_ICESERVERS_BACKEND=${JSON.stringify(servers)}`,
     'NEKO_WEBRTC_ICESERVERS_FRONTEND=[]',
-    `ENCLAVE_STREAM_TURN=${at}`,
+    `SESSION_TURN=${at}`,
   ];
 }
 
@@ -1761,7 +1808,7 @@ function configArchive(profile: Profile, proxy: ProxyInput): Buffer {
   return makeTar(configFiles(profile, proxy));
 }
 
-/** One check page's outcome, as audit.py records it. */
+/** One check page's outcome, as diag.py records it. */
 export interface AuditCheckResult {
   name: string;
   url: string;

@@ -1,16 +1,4 @@
-#!/opt/enclave/venv/bin/python
-"""Proxy safety check (docs/06-proxies.md). Run by the agent in a one-off container.
-
-Reads the proxy as JSON on stdin ({type, host, port, username?, password?}) so the
-password never appears in arguments or the environment, and prints one JSON object:
-
-  {"tcpOk", "latencyMs", "exitIps", "exitIp", "realIp", "country", "timezone",
-   "locale", "lat", "lon", "error"}
-
-The agent decides what passes: this only measures. Exit IPs come from two independent
-echo services through the proxy; the real IP from one of them without it. Location comes
-from the GeoIP database bundled in the image.
-"""
+#!/opt/session/venv/bin/python
 
 import json
 import os
@@ -19,7 +7,7 @@ import subprocess
 import sys
 import time
 
-os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("ENCLAVE_CAMOUFOX_CACHE", "/opt/camoufox-cache"))
+os.environ.setdefault("XDG_CACHE_HOME", os.environ.get("SESSION_CACHE", "/opt/session-cache"))
 
 import xml.etree.ElementTree as ET  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -28,22 +16,14 @@ import camoufox  # noqa: E402
 import camoufox.geolocation  # noqa: E402
 from camoufox.geolocation import get_geolocation  # noqa: E402
 
-# The GeoIP database is pinned in the image (Dockerfile geoip-dist). Camoufox would
-# re-download it once its data is 8 days old; in these containers that download hangs
-# (read-only install), which stopped every proxy check 8 days after the build. The
-# database is refreshed by rebuilding the image with a newer pin, never at run time.
 camoufox.geolocation.needs_update = lambda config=None: False
 
-# Languages Firefox ships in (its l10n locales, by language). Camoufox picks a country's
-# language at random by population, which can give one no Firefox build exists for
-# (Nigerian Pidgin for Nigeria): a browser language no real PC reports.
 FIREFOX_LANGUAGES = set(
     "af ar az be bg bn bs ca cs cy da de el en eo es et eu fa fi fr fy ga gd gl gu he hi hr hu "
     "hy id is it ja ka kk km kn ko lo lt lv mk ml mr ms my nb ne nl nn pa pl pt ro ru si sk sl "
     "sq sr sv ta te th tl tr uk ur uz vi zh".split()
 )
 OFFICIAL = ("official", "de_facto_official")
-
 
 def browser_language(region: str) -> str:
     """The language a browser in `region` most likely runs in: English where it is an
@@ -70,10 +50,8 @@ def browser_language(region: str) -> str:
 ECHO_SERVICES = ["https://api.ipify.org", "https://icanhazip.com"]
 SCHEMES = {"socks5": "socks5h", "http": "http", "https": "https"}
 
-
 def curl_config_value(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
 
 def fetch_ip(url: str, proxy: dict | None) -> str:
     config = [f"url = {curl_config_value(url)}", "silent", "show-error", "fail", "max-time = 20"]
@@ -89,7 +67,6 @@ def fetch_ip(url: str, proxy: dict | None) -> str:
     if out.returncode != 0:
         raise RuntimeError(f"{url}: {out.stderr.strip() or f'curl exit {out.returncode}'}")
     return out.stdout.strip()
-
 
 def main() -> dict:
     proxy = json.load(sys.stdin)
@@ -133,7 +110,6 @@ def main() -> dict:
     except Exception as e:  # the GeoIP library raises its own types
         result["geoError"] = f"no location for {result['exitIp']}: {e}"
     return result
-
 
 if __name__ == "__main__":
     try:

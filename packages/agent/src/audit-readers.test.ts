@@ -123,12 +123,12 @@ function run(checks: AuditCheckResult[], exitIp = '72.245.68.75') {
 }
 
 describe('audit readers', () => {
-  it('passes a clean Pixelscan, CreepJS, BrowserLeaks and amiunique run', () => {
+  it('passes a clean Pixelscan, CreepJS, BrowserLeaks and crowd run', () => {
     const findings = run([
-      check('pixelscan', PIXELSCAN),
-      check('creepjs', CREEPJS, []),
-      check('browserleaks-webrtc', WEBRTC),
-      check('amiunique', AMIUNIQUE),
+      check('scan', PIXELSCAN),
+      check('deep', CREEPJS, []),
+      check('leak', WEBRTC),
+      check('crowd', AMIUNIQUE),
     ]);
     const notPassing = findings.filter((f) => f.verdict === 'fail' || f.verdict === 'look');
     expect(notPassing).toEqual([]);
@@ -139,24 +139,19 @@ describe('audit readers', () => {
     const findings = run(
       [
         probe(INTEL, 4, 4096),
-        check('pixelscan', PIXELSCAN.replace('No proxy detected', 'Proxy detected')),
-        check('creepjs', CREEPJS.replace('params (78): 94e7c936', 'params (78): deadbeef'), [
-          'WebGL',
-        ]),
-        check(
-          'browserleaks-webrtc',
-          WEBRTC.replace('Local IP Address\t-', 'Local IP Address\t192.168.1.5'),
-        ),
+        check('scan', PIXELSCAN.replace('No proxy detected', 'Proxy detected')),
+        check('deep', CREEPJS.replace('params (78): 94e7c936', 'params (78): deadbeef'), ['WebGL']),
+        check('leak', WEBRTC.replace('Local IP Address\t-', 'Local IP Address\t192.168.1.5')),
       ],
       '72.245.68.75',
     );
     const failed = findings.filter((f) => f.verdict === 'fail').map((f) => `${f.check}: ${f.item}`);
     expect(failed).toEqual(
       expect.arrayContaining([
-        'pixelscan: proxy',
-        'creepjs: lies',
-        'creepjs: WebGL params',
-        'browserleaks-webrtc: no local IP',
+        'scan: proxy',
+        'deep: lies',
+        'deep: WebGL params',
+        'leak: no local IP',
       ]),
     );
   });
@@ -169,7 +164,7 @@ describe('audit readers', () => {
     // Another PC (a tester's NVIDIA card, 16 cores): its own values, not failures.
     const other = run([
       probe(NVIDIA, 16, 4095),
-      check('creepjs', CREEPJS.replace('params (78): 94e7c936', 'params (78): 39e15276'), []),
+      check('deep', CREEPJS.replace('params (78): 94e7c936', 'params (78): 39e15276'), []),
     ]);
     const failed = other.filter((f) => f.verdict === 'fail').map((f) => f.item);
     expect(failed).toEqual([]);
@@ -178,7 +173,7 @@ describe('audit readers', () => {
   });
 
   it('fails when WebRTC shows another IP than the exit IP', () => {
-    const findings = run([check('creepjs', CREEPJS, [])], '198.145.172.41');
+    const findings = run([check('deep', CREEPJS, [])], '198.145.172.41');
     expect(findings.find((f) => f.item === 'WebRTC IP')?.verdict).toBe('fail');
   });
 
@@ -191,34 +186,34 @@ describe('audit readers', () => {
       'TLS Client Test',
       '',
     ].join('\n');
-    const ok = run([check('browserleaks-webrtc', menu + WEBRTC)]);
+    const ok = run([check('leak', menu + WEBRTC)]);
     expect(ok.find((f) => f.item === 'leak test')?.verdict).toBe('pass');
     // The result row without a verdict word (the tester's run): not a failure.
-    const bare = run([check('browserleaks-webrtc', menu + WEBRTC.replace('No Leak', ''))]);
+    const bare = run([check('leak', menu + WEBRTC.replace('No Leak', ''))]);
     expect(bare.find((f) => f.item === 'leak test')?.verdict).toBe('info');
     // A real leak still fails.
     const leakedText = WEBRTC.replace('No Leak', 'Leak detected').replace(
       'Local IP Address\t-',
       'Local IP Address\t192.168.1.5',
     );
-    const leaked = run([check('browserleaks-webrtc', menu + leakedText)]);
+    const leaked = run([check('leak', menu + leakedText)]);
     expect(leaked.filter((f) => f.verdict === 'fail').map((f) => f.item)).toEqual(
       expect.arrayContaining(['leak test', 'no local IP']),
     );
   });
 
   it('says "look", not pass, when a page changed and a field is gone', () => {
-    const findings = run([check('pixelscan', 'Pixelscan has a new design')]);
+    const findings = run([check('scan', 'Pixelscan has a new design')]);
     expect(findings.find((f) => f.item === 'verdict')?.verdict).toBe('look');
     expect(findings.some((f) => f.verdict === 'pass')).toBe(false);
   });
 
   it('summarizes counts and lists what did not pass', () => {
     const text = summarize('Profile 3', '72.245.68.75', [
-      { check: 'pixelscan', item: 'proxy', verdict: 'fail', value: 'Proxy detected' },
+      { check: 'scan', item: 'proxy', verdict: 'fail', value: 'Proxy detected' },
       { check: 'creepjs', item: 'lies', verdict: 'pass', value: 'none' },
     ]);
     expect(text).toContain('1 passed, 1 failed');
-    expect(text).toContain('FAIL  pixelscan: proxy = Proxy detected');
+    expect(text).toContain('FAIL  scan: proxy = Proxy detected');
   });
 });

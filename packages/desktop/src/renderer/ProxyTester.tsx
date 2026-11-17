@@ -1,5 +1,5 @@
 // The proxy tester (testing/test-suite.md): many proxies at once, or a range of ports, with the
-// same rating the create wizard's Check proxy shows. Also the wizard's Pixelscan deep check.
+// same rating the create wizard's Check proxy shows. Also the wizard's Enclave Scan deep check.
 
 import { useEffect, useState } from 'react';
 import {
@@ -59,13 +59,13 @@ function usePolledJob(initial: ProxyTestJob | null) {
 
 // ---------------------------------------------------------------- the wizard's deep check
 
-/** Pixelscan through one proxy, on request: about 1 to 2 minutes. */
+/** Enclave Scan through one proxy, on request: about 1 to 2 minutes. */
 export function DeepCheck({ proxy }: { proxy: string }) {
   const [job, setJob] = usePolledJob(null);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     setError(null);
-    const body: ProxyTestRequest = { proxies: [proxy], stickyMinutes: 0, pixelscan: true };
+    const body: ProxyTestRequest = { proxies: [proxy], stickyMinutes: 0, scan: true };
     try {
       setJob(await api<ProxyTestJob>('POST', '/proxy-tests', body));
     } catch (e) {
@@ -83,27 +83,27 @@ export function DeepCheck({ proxy }: { proxy: string }) {
             Deep check
           </button>
           <span className="muted">
-            Opens Pixelscan through this proxy in a temporary profile and reads its verdict. About 1
-            to 2 minutes.
+            Opens Enclave Scan through this proxy in a temporary profile and reads its verdict.
+            About 1 to 2 minutes.
           </span>
         </div>
       )}
       {job?.state === 'running' && (
         <p className="muted" role="status">
-          Checking with Pixelscan. This takes 1 to 2 minutes.
+          Checking with Enclave Scan. This takes 1 to 2 minutes.
         </p>
       )}
       {row && rating && (
         <div className={`rated ${rating.level}`}>
           <strong>Deep check</strong>{' '}
-          {row.pixelscan === undefined ? (
-            <span className="muted">Pixelscan didn&apos;t run: the proxy failed its check.</span>
+          {row.scan === undefined ? (
+            <span className="muted">Enclave Scan didn&apos;t run: the proxy failed its check.</span>
           ) : (
             <>
               <RatingBadge level={rating.level} />
               <p>
-                {row.pixelscan === 'consistent'
-                  ? 'Pixelscan says consistent: it sees nothing that gives the proxy away.'
+                {row.scan === 'consistent'
+                  ? 'Enclave Scan says consistent: it sees nothing that gives the proxy away.'
                   : rating.notes[0]}
               </p>
             </>
@@ -139,8 +139,8 @@ function phaseText(job: ProxyTestJob): string {
     }
     case 'sticky check':
       return 'Checking each IP again.';
-    case 'pixelscan':
-      return `Pixelscan, ${job.checked} of ${job.total}. About 1.5 minutes each.`;
+    case 'scan':
+      return `Enclave Scan, ${job.checked} of ${job.total}. About 1.5 minutes each.`;
   }
 }
 
@@ -152,7 +152,7 @@ function hostPort(proxy: string): string {
 export function ProxyTesterPage(props: { onCreate(proxy: string): void }) {
   const [text, setText] = useState(kept.text);
   const [sticky, setSticky] = useState(false);
-  const [pixelscan, setPixelscan] = useState(false);
+  const [scan, setScan] = useState(false);
   const [inputs, setInputs] = useState<string[]>(kept.inputs);
   const [job, setJob] = usePolledJob(kept.job);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +172,7 @@ export function ProxyTesterPage(props: { onCreate(proxy: string): void }) {
     const body: ProxyTestRequest = {
       proxies: parsed.proxies,
       stickyMinutes: sticky ? STICKY_MINUTES : 0,
-      pixelscan,
+      scan,
     };
     try {
       const started = await api<ProxyTestJob>('POST', '/proxy-tests', body);
@@ -229,14 +229,14 @@ export function ProxyTesterPage(props: { onCreate(proxy: string): void }) {
         <label className="toggle">
           <input
             type="checkbox"
-            checked={pixelscan}
+            checked={scan}
             disabled={running}
-            onChange={(e) => setPixelscan(e.target.checked)}
+            onChange={(e) => setScan(e.target.checked)}
           />
           <span>
-            Pixelscan check
+            Enclave Scan check
             <small>
-              Opens Pixelscan through each working proxy in a temporary profile. The surest test,
+              Opens Enclave Scan through each working proxy in a temporary profile. The surest test,
               and slow: about 1.5 minutes per proxy.
             </small>
           </span>
@@ -260,8 +260,8 @@ export function ProxyTesterPage(props: { onCreate(proxy: string): void }) {
         )}
       </div>
       <p className="muted small tester-privacy">
-        Each exit IP is looked up at ip-api.com over an unencrypted connection. Only the IP address
-        is sent, never the proxy&apos;s login.
+        Each exit IP is checked against an external IP reputation database over an unencrypted
+        connection. Only the IP address is sent, never the proxy&apos;s login.
       </p>
       {error && <p className="notice error">{error}</p>}
 

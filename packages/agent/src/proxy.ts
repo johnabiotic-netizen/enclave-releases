@@ -18,7 +18,7 @@ export function describeProxy(p: Pick<ProxyInput, 'type' | 'host' | 'port' | 'us
   return `${p.type}://${p.username ? `${p.username}@` : ''}${p.host}:${p.port}`;
 }
 
-/** What check_proxy.py prints (images/browser/check_proxy.py). */
+/** What net_check.py prints (images/browser/net_check.py). */
 export interface RawProxyCheck {
   tcpOk?: boolean;
   latencyMs?: number;

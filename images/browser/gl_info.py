@@ -1,15 +1,3 @@
-"""What Windows Firefox reports for a graphics card (WEBGL_debug_renderer_info).
-
-Profiles render on the PC's real GPU (through WSL's D3D12 driver), so they must claim
-exactly that GPU, the way Firefox on Windows names it. Firefox does not report the
-model: dom/canvas/SanitizeRenderer.cpp (ChooseDeviceReplacement) maps it to one of a
-few representative cards, and ANGLE wraps that in "ANGLE (<vendor>, <card> Direct3D11
-vs_5_0 ps_5_0), or similar". This is a port of that mapping for the GPUs Windows PCs
-have (Intel, NVIDIA, AMD).
-
-  windows_webgl_pair("Intel(R) HD Graphics 620")
-  -> ("Google Inc. (Intel)", "ANGLE (Intel, Intel(R) HD Graphics 400 Direct3D11 vs_5_0 ps_5_0), or similar")
-"""
 
 import re
 from typing import Optional, Tuple
@@ -24,7 +12,6 @@ INTEL_HD = "Intel(R) HD Graphics"
 INTEL_HD_400 = "Intel(R) HD Graphics 400"
 INTEL_945GM = "Intel 945GM"
 INTEL_ARC = "Intel(R) Arc(TM) A750 Graphics"
-
 
 def _amd(name: str) -> Optional[str]:
     if any(s in name for s in ("REMBRANDT", "RENOIR", "Vega", "VII", "Fury")):
@@ -43,7 +30,6 @@ def _amd(name: str) -> Optional[str]:
     if "AMD " in name or "FirePro" in name or "Radeon" in name:
         return RADEON_HD_3000
     return None
-
 
 def _nvidia(name: str) -> Optional[str]:
     if not any(s in name for s in ("NVIDIA", "GeForce", "Quadro")):
@@ -69,9 +55,7 @@ def _nvidia(name: str) -> Optional[str]:
             card = GEFORCE_480
     elif t:
         card = GEFORCE_480 if (t.group(1) or " ")[-1] in (" ", "B", "Z") else GEFORCE_980
-    # ANGLE reports "NVIDIA GeForce ..." (the adapter name starts with NVIDIA).
     return f"NVIDIA {card}" if name.startswith("NVIDIA") else card
-
 
 def _intel(name: str) -> Optional[str]:
     if "Intel" not in name:
@@ -89,7 +73,6 @@ def _intel(name: str) -> Optional[str]:
             return INTEL_HD
         return INTEL_HD_400
     return INTEL_945GM
-
 
 def windows_webgl_pair(adapter: str) -> Tuple[str, str]:
     """(UNMASKED_VENDOR_WEBGL, UNMASKED_RENDERER_WEBGL) of Windows Firefox on `adapter`,

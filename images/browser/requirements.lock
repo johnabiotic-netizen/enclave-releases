@@ -1,4 +1,4 @@
-# Exact Python packages for /opt/enclave/venv. Installed with --no-deps, so this list must be complete.
+# Exact Python packages for /opt/session/venv. Installed with --no-deps, so this list must be complete.
 # Regenerate by installing camoufox[geoip]==<new> in a clean venv on the base image and running pip freeze.
 anyio==4.15.1
 blessed==1.52.0

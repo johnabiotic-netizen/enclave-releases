@@ -1,5 +1,5 @@
 // The PC's graphics adapters, which profiles render on (through WSL's D3D12 driver) and
-// therefore claim. See images/browser/windows_gpu.py and DECISIONS.md.
+// therefore claim. See images/browser/gl_info.py and DECISIONS.md.
 //
 // A new profile takes the adapter a browser gets on this PC: DXGI's first adapter, the
 // one Windows hands a program by default (on a laptop with two chips, the power-saving
@@ -146,11 +146,34 @@ export function findMadeOn(adapters: GpuAdapter[], hostAdapter: string): GpuAdap
   );
 }
 
+/**
+ * Each adapter's driver version, keyed by Windows adapter name. A saved "this card draws"
+ * is kept per driver version, so a driver update (or rollback) makes Enclave draw-test the
+ * card once more instead of trusting an old result. Empty off Windows or when the query fails.
+ */
+export async function driverVersions(): Promise<Map<string, string>> {
+  if (process.platform !== 'win32') return new Map();
+  const map = new Map<string, string>();
+  try {
+    const out = await powershell([
+      '-Command',
+      'Get-CimInstance Win32_VideoController | ForEach-Object { "$($_.Name)`t$($_.DriverVersion)" }',
+    ]);
+    for (const line of out.split(/\r?\n/)) {
+      const [name, version] = line.split('\t');
+      if (name?.trim() && version?.trim()) map.set(name.trim(), version.trim());
+    }
+  } catch {
+    // Driver versions couldn't be read; the draw test just runs without this hint.
+  }
+  return map;
+}
+
 /** Container settings that give a profile the GPU (WSL's /dev/dxg and its D3D12 libraries). */
 export function gpuContainerSettings(adapter: string) {
   return {
     env: [
-      'ENCLAVE_GPU=1',
+      'SESSION_ACCEL=1',
       'LD_LIBRARY_PATH=/usr/lib/wsl/lib',
       'GALLIUM_DRIVER=d3d12',
       `MESA_D3D12_DEFAULT_ADAPTER_NAME=${plainName(adapter)}`,

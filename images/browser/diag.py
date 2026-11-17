@@ -1,17 +1,4 @@
-#!/opt/enclave/venv/bin/python
-"""Audit run (testing/test-suite.md): open the check pages in this profile's browser
-and record what they report.
-
-Runs instead of the normal browser start when the agent starts an audit container
-(ENCLAVE_AUDIT=1): same image, same saved fingerprint and proxy, a throwaway data
-volume. The browser is started through Playwright, the way Camoufox's own launcher
-does, with the environment launch_browser.prepare_launch() gives a normal start.
-
-Which checks to run comes from /config/audit.json: {"checks": ["probe", ...]}.
-Results go to /data/audit/result.json, screenshots next to it. The page text is
-returned as well, so a reader that no longer finds its fields can say "look" instead
-of guessing.
-"""
+#!/opt/session/venv/bin/python
 
 import json
 import os
@@ -19,52 +6,46 @@ import sys
 import time
 import traceback
 
-import launch_browser  # sets XDG_CACHE_HOME for the camoufox package first
+import launch  # sets XDG_CACHE_HOME for the camoufox package first
 from camoufox.utils import attach_context_defaults
 from playwright.sync_api import sync_playwright
 
-AUDIT_JSON = "/config/audit.json"
-OUT_DIR = "/data/audit"
-PAGES_DIR = "/opt/enclave/audit"
+AUDIT_JSON = "/config/diag.json"
+OUT_DIR = "/data/diag"
+PAGES_DIR = "/opt/session/diag"
 
-# name -> (url, JS that is true once the page has its results, timeout in seconds)
 CHECKS = {
     "probe": (f"file://{PAGES_DIR}/probe.html", "document.getElementById('out').textContent.startsWith('{')", 30),
     "metrics": (f"file://{PAGES_DIR}/metrics.html", "document.getElementById('out').textContent.startsWith('{')", 30),
     "svg-emoji": (f"file://{PAGES_DIR}/svg-emoji.html", "document.getElementById('out').textContent.startsWith('{')", 30),
-    "pixelscan": (
+    "scan": (
         "https://pixelscan.net/fingerprint-check",
         "/Your Browser Fingerprint is\\s+(consistent|inconsistent)/.test(document.body.innerText)"
         " && !/Collecting Data/.test(document.body.innerText)",
         90,
     ),
-    "creepjs": (
+    "deep": (
         "https://abrahamjuliot.github.io/creepjs/",
         "/FP ID:/.test(document.body.innerText) && /\\nAudio/.test(document.body.innerText)"
         " && !/loading/i.test((document.querySelector('.fingerprint-header') || {}).innerText || '')",
         90,
     ),
-    "browserleaks-webrtc": (
+    "leak": (
         "https://browserleaks.com/webrtc",
         r"/Public IP Address\s+\d+\.\d+\.\d+\.\d+/.test(document.body.innerText)",
         60,
     ),
-    "browserleaks-canvas": ("https://browserleaks.com/canvas", "/Signature\\s+[0-9A-F]{32}/.test(document.body.innerText)", 60),
-    "amiunique": ("https://amiunique.org/fingerprint", "/You are (not )?unique|unique among/i.test(document.body.innerText)", 90),
+    "draw": ("https://browserleaks.com/canvas", "/Signature\\s+[0-9A-F]{32}/.test(document.body.innerText)", 60),
+    "crowd": ("https://amiunique.org/fingerprint", "/You are (not )?unique|unique among/i.test(document.body.innerText)", 90),
 }
-# Our own pages put their result as JSON in #out.
 OWN_PAGES = {"probe", "metrics", "svg-emoji"}
-# Pages that keep measuring for a while after they first show results.
-SETTLE_SECONDS = {"creepjs": 10, "pixelscan": 5, "amiunique": 5}
-# Facts a page shows only through markup, read with extra JS: CreepJS marks a value it
-# caught lying with the classes "lies"/"rejected" rather than with words.
+SETTLE_SECONDS = {"deep": 10, "scan": 5, "crowd": 5}
 EXTRA_JS = {
-    "creepjs": (
+    "deep": (
         "Array.from(document.querySelectorAll('.lies, .rejected'))"
         r".map(e => (e.closest('div') || e).innerText.trim().split('\n')[0].slice(0, 120))"
     ),
 }
-
 
 def scroll_through(page) -> None:
     """Some pages fill in sections only once they are scrolled into view."""
@@ -73,7 +54,6 @@ def scroll_through(page) -> None:
         page.evaluate(f"window.scrollTo(0, {y})")
         time.sleep(0.3)
     page.evaluate("window.scrollTo(0, 0)")
-
 
 def run_check(context, name: str) -> dict:
     url, ready, timeout = CHECKS[name]
@@ -109,12 +89,10 @@ def run_check(context, name: str) -> dict:
     page.close()
     return result
 
-
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     done = os.path.join(OUT_DIR, "result.json")
     if os.path.exists(done):
-        # supervisord restarts a program that exits; the agent removes the container.
         while True:
             time.sleep(3600)
 
@@ -125,15 +103,13 @@ def main() -> None:
     try:
         if unknown:
             raise ValueError(f"unknown checks: {', '.join(unknown)}")
-        binary, env = launch_browser.prepare_launch()
+        binary, env = launch.prepare_launch()
         with sync_playwright() as p:
-            # Playwright's own (temporary) profile, as Camoufox's launcher uses it; the
-            # user.js preferences a normal start writes go in as launch preferences.
             browser = p.firefox.launch(
                 executable_path=binary,
                 env=env,
                 headless=False,
-                firefox_user_prefs=launch_browser.USER_PREFS,
+                firefox_user_prefs=launch.USER_PREFS,
             )
             attach_context_defaults(browser, True)
             context = browser.new_context()
@@ -150,7 +126,6 @@ def main() -> None:
     os.replace(tmp, done)
     while True:
         time.sleep(3600)
-
 
 if __name__ == "__main__":
     sys.exit(main())

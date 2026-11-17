@@ -89,7 +89,7 @@ export async function pair(link: PairingLink, deviceName: string): Promise<Ident
     error?: { message?: string };
   };
   if (!res.ok || !body.pc || !body.deviceId || !body.deviceKey) {
-    throw new PairingError(body.error?.message ?? `The relay answered HTTP ${res.status}.`);
+    throw new PairingError(body.error?.message ?? `The Link service answered HTTP ${res.status}.`);
   }
   // The key the relay hands over must be the one the PC put in the QR code.
   if ((await pcKeyHash(body.pc.publicKey)) !== link.pcKeyHash) {

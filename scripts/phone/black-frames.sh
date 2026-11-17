@@ -15,7 +15,7 @@ docker exec "$c" sh -c 'chmod 644 /data/black-frames.html; rm -f /data/downloads
 docker exec "$c" supervisorctl stop camoufox >/dev/null
 docker exec -u neko "$c" sh -c 'grep -q media.navigator.permission.disabled /data/profile/prefs.js || echo "user_pref(\"media.navigator.permission.disabled\", true);" >> /data/profile/prefs.js'
 docker exec "$c" supervisorctl start camoufox >/dev/null
-docker exec "$c" supervisorctl stop camfeed >/dev/null
+docker exec "$c" supervisorctl stop media >/dev/null
 if [ "$mode" != "--stopped" ]; then
   docker cp "$here/container/slow-writer.py" "$c:/tmp/slow-writer.py"
   docker exec -d -u neko "$c" python3 /tmp/slow-writer.py
@@ -28,4 +28,4 @@ for _ in $(seq 1 40); do
 done
 docker exec "$c" sh -c 'cat /data/downloads/black-frames-result*.json'
 sleep 5
-docker exec "$c" supervisorctl start camfeed >/dev/null
+docker exec "$c" supervisorctl start media >/dev/null

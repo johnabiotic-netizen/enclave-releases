@@ -16,7 +16,7 @@
 | Screen size, available size, color depth, device pixel ratio | Generator; container display resized to match |
 | Window outer and inner size | Generator; neko screen size matches |
 | Hardware concurrency, device memory where exposed | Generator |
-| WebGL vendor, renderer, parameters, extensions | The PC's real GPU as Windows Firefox reports it (`images/browser/windows_gpu.py`), with Camoufox's recorded parameters for it; rendered on that GPU through WSL's D3D12 driver |
+| WebGL vendor, renderer, parameters, extensions | The PC's real GPU as Windows Firefox reports it (`images/browser/gl_info.py`), with Camoufox's recorded parameters for it; rendered on that GPU through WSL's D3D12 driver |
 | Canvas | Drawn on the PC's GPU; randomized by Firefox's Strict fingerprinting protection (per profile, per site, per browser start) |
 | Audio | Stock: no noise (seed 0), as Firefox renders it on every x86 PC |
 | Fonts | Windows font set installed in image; Camoufox font list restricted to Windows fonts |
@@ -35,7 +35,7 @@ When Camoufox is upgraded, existing profiles must keep presenting the same finge
 
 ## Generation flow
 
-1. Agent runs: `docker run --rm --network none <browser-image> /opt/enclave/gen_fingerprint.py --os windows --country XX --timezone Area/City --locale xx-XX --ip <proxy exit IP>`. No network: the generator must never look up the PC's real IP. `--ip` is looked up in the GeoIP database bundled in the image.
+1. Agent runs: `docker run --rm --network none <browser-image> /opt/session/profile_build.py --os windows --country XX --timezone Area/City --locale xx-XX --ip <proxy exit IP>`. No network: the generator must never look up the PC's real IP. `--ip` is looked up in the GeoIP database bundled in the image.
 2. Script prints JSON to stdout.
 3. Agent validates against `specs/schemas/profile.schema.json` and saves.
 

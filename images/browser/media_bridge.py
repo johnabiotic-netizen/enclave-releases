@@ -1,23 +1,4 @@
-#!/opt/enclave/venv/bin/python
-"""Keep the phone camera's latest frame for the browser (Stage 4).
-
-neko writes the phone's camera, decoded to I420 at NEKO_CAPTURE_WEBCAM_WIDTH x
-NEKO_CAPTURE_WEBCAM_HEIGHT, into the named pipe FIFO (Enclave's neko patch:
-webcam device "fifo:<path>"). This copies each whole frame into SHM, which the
-browser's camera reads (enclave-camoufox zz-enclave-phone-media.patch):
-
-    32-byte header: b"ENCLCAM1", u32 width, u32 height, u32 sequence,
-                    u32 reserved, u64 write time (microseconds since 1970)
-    then the frame, tightly packed I420.
-
-The sequence is odd while a frame is being written, so the reader never uses a
-half-written frame. When the phone stops sharing, nothing new is written and the
-browser shows black once the last frame is 2 seconds old.
-
-While the phone is still sharing, a short gap in its frames (a network hiccup)
-keeps the last frame on screen, as a real webcam would, instead of going black:
-the last frame is published again every half second, for up to HOLD seconds.
-"""
+#!/opt/session/venv/bin/python
 
 import mmap
 import os
@@ -26,11 +7,10 @@ import stat
 import struct
 import time
 
-FIFO = "/tmp/enclave-camera.fifo"
+FIFO = "/tmp/session-media.fifo"
 SHM = "/dev/shm/enclave-camera"
 HEADER = 32
 HOLD = 10.0  # seconds a sharing phone's last frame stays on screen without new ones
-
 
 def main() -> None:
     width = int(os.environ.get("NEKO_CAPTURE_WEBCAM_WIDTH", "1280"))
@@ -64,7 +44,6 @@ def main() -> None:
     frame = bytearray(frame_size)
     view = memoryview(frame)
     while True:
-        # Blocks until neko opens the pipe, which it does when the phone starts sharing.
         with open(FIFO, "rb", buffering=0) as pipe:
             poller = select.poll()
             poller.register(pipe, select.POLLIN)
@@ -73,7 +52,6 @@ def main() -> None:
                 got = 0
                 while got < frame_size:
                     if not poller.poll(500):
-                        # No data for half a second: hold the last frame, if recent.
                         if last and time.monotonic() - last < HOLD:
                             publish(None)
                         continue
@@ -85,7 +63,6 @@ def main() -> None:
                     break  # neko closed the pipe: the phone stopped sharing
                 publish(frame)
                 last = time.monotonic()
-
 
 if __name__ == "__main__":
     main()

@@ -39,14 +39,14 @@ ADD --checksum=sha256:e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0b
 # $ENCLAVE_DIST_CACHE/neko/; without it this stage is empty and the checksum below fails.
 FROM scratch AS neko-dist
 
-# --- GL shim (gl_shim.c), built apart so the image carries no compiler ----------
+# --- GL shim (gl_compat.c), built apart so the image carries no compiler ----------
 
 FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647c57cf5b9695a90234a0edaa446 AS gl-shim
-COPY gl_shim.c /src/gl_shim.c
+COPY gl_compat.c /src/gl_compat.c
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends gcc-14=14.2.0-19 libc6-dev=2.41-12+deb13u4; \
-    gcc-14 -O2 -Wall -Werror -shared -fPIC -o /libenclave_gl.so /src/gl_shim.c -ldl
+    gcc-14 -O2 -Wall -Werror -shared -fPIC -o /libglcompat.so /src/gl_compat.c -ldl
 
 # --- Image -------------------------------------------------------------------
 
@@ -62,7 +62,7 @@ ARG GOST_SHA256=e0e3a2c9116e2f025e962bba340749f80696bda318613d45e5ae96dd0bcae37c
 
 # Where the camoufox package keeps its browser, GeoIP database and add-ons
 # (it uses $XDG_CACHE_HOME/camoufox). Our scripts set XDG_CACHE_HOME to this.
-ENV ENCLAVE_CAMOUFOX_CACHE=/opt/camoufox-cache
+ENV SESSION_CACHE=/opt/session-cache
 
 RUN set -eux; \
     apt-get update; \
@@ -86,12 +86,12 @@ RUN set -eux; \
 # User for the proxy forwarder. Task C's firewall lets only this user reach the proxy.
 RUN useradd --system --uid 1100 --no-create-home --shell /usr/sbin/nologin egress
 
-COPY requirements.lock /opt/enclave/requirements.lock
+COPY requirements.lock /opt/session/requirements.lock
 RUN set -eux; \
-    python3 -m venv /opt/enclave/venv; \
-    /opt/enclave/venv/bin/pip install --no-cache-dir --no-deps --require-virtualenv \
-      --retries 10 --timeout 60 --resume-retries 10 -r /opt/enclave/requirements.lock; \
-    /opt/enclave/venv/bin/pip check
+    python3 -m venv /opt/session/venv; \
+    /opt/session/venv/bin/pip install --no-cache-dir --no-deps --require-virtualenv \
+      --retries 10 --timeout 60 --resume-retries 10 -r /opt/session/requirements.lock; \
+    /opt/session/venv/bin/pip check
 
 RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
     --mount=type=bind,from=geoip-dist,target=/dist/geoip \
@@ -100,7 +100,7 @@ RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
     echo "${CAMOUFOX_SHA256}  /dist/camoufox/camoufox.zip" | sha256sum -c -; \
     echo "${GEOIP_SHA256}  /dist/geoip/geoip-aio-all.mmdb.zip" | sha256sum -c -; \
     echo "${UBLOCK_SHA256}  /dist/ublock/ublock-origin.xpi" | sha256sum -c -; \
-    c="${ENCLAVE_CAMOUFOX_CACHE}/camoufox"; \
+    c="${SESSION_CACHE}/camoufox"; \
     mkdir -p "$c/${CAMOUFOX_INSTALL}" "$c/geoip/mmdb" "$c/addons/UBO"; \
     # unzip exits 1 on warnings: the zip's Japanese font names trigger "mismatching local filename".
     unzip -q /dist/camoufox/camoufox.zip -d "$c/${CAMOUFOX_INSTALL}" || [ "$?" -eq 1 ]; \
@@ -112,15 +112,15 @@ RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
       "${CAMOUFOX_SHA256}" > "$c/${CAMOUFOX_INSTALL}/version.json"; \
     printf '{"active_version": "%s"}\n' "${CAMOUFOX_INSTALL}" > "$c/config.json"; \
     touch "$c/.0.5_FLAG"; \
-    XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -c \
+    XDG_CACHE_HOME="${SESSION_CACHE}" /opt/session/venv/bin/python -c \
       'from camoufox.fpgen_model import ensure_fpgen_model; ensure_fpgen_model()'; \
-    XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -m camoufox version; \
-    XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -m camoufox version | grep -q 'Installed *Yes'; \
+    XDG_CACHE_HOME="${SESSION_CACHE}" /opt/session/venv/bin/python -m camoufox version; \
+    XDG_CACHE_HOME="${SESSION_CACHE}" /opt/session/venv/bin/python -m camoufox version | grep -q 'Installed *Yes'; \
     # Camoufox loads its bundled libraries (NSS and others) from its own folder.
     missing="$(LD_LIBRARY_PATH="$c/${CAMOUFOX_INSTALL}" ldd "$c/${CAMOUFOX_INSTALL}/camoufox-bin" "$c/${CAMOUFOX_INSTALL}/libxul.so" | grep 'not found' || true)"; \
     test -z "$missing" || { echo "Missing libraries: $missing"; exit 1; }; \
     chmod -R 755 "$c/${CAMOUFOX_INSTALL}"; \
-    chmod -R a+rX "${ENCLAVE_CAMOUFOX_CACHE}"
+    chmod -R a+rX "${SESSION_CACHE}"
 
 # Text as Windows lays it out: Windows Firefox (DirectWrite) uses exact glyph advances;
 # Camoufox's fontconfig asks FreeType for full hinting, which rounds every advance to a
@@ -128,7 +128,7 @@ RUN --mount=type=bind,from=camoufox-dist,target=/dist/camoufox \
 # 71 million px of bounds in getBBox(). Measured against Windows Firefox 158 on the
 # owner's PC, 2026-10-27: unhinted widths match exactly.
 RUN set -eux; \
-    f="$(echo "${ENCLAVE_CAMOUFOX_CACHE}"/camoufox/browsers/official/*/fontconfig/windows/fonts.conf)"; \
+    f="$(echo "${SESSION_CACHE}"/camoufox/browsers/official/*/fontconfig/windows/fonts.conf)"; \
     sed -i \
       -e 's#<edit name="hinting" mode="assign"><bool>true</bool></edit>#<edit name="hinting" mode="assign"><bool>false</bool></edit>#' \
       -e 's#<edit name="hintstyle" mode="assign"><const>hintfull</const></edit>#<edit name="hintstyle" mode="assign"><const>hintnone</const></edit>#' \
@@ -138,14 +138,14 @@ RUN set -eux; \
 
 # Camoufox writes its fontconfig file on first use. It depends only on the bundled
 # fonts, so create it now and keep the install read-only for the browser user.
-RUN XDG_CACHE_HOME="${ENCLAVE_CAMOUFOX_CACHE}" /opt/enclave/venv/bin/python -c \
+RUN XDG_CACHE_HOME="${SESSION_CACHE}" /opt/session/venv/bin/python -c \
       'from camoufox.utils import get_env_vars; print(get_env_vars({}, "win")["FONTCONFIG_FILE"])' \
-    && chmod -R a+rX "${ENCLAVE_CAMOUFOX_CACHE}/camoufox/fontconfig"
+    && chmod -R a+rX "${SESSION_CACHE}/camoufox/fontconfig"
 
 # Camoufox ships with no search engine ("None"); make Google the default.
 COPY set_search_engine.py /tmp/set_search_engine.py
 RUN set -eux; \
-    p="$(echo "${ENCLAVE_CAMOUFOX_CACHE}"/camoufox/browsers/official/*/distribution/policies.json)"; \
+    p="$(echo "${SESSION_CACHE}"/camoufox/browsers/official/*/distribution/policies.json)"; \
     test -f "$p"; \
     python3 /tmp/set_search_engine.py "$p"; \
     chmod 0644 "$p"; \
@@ -169,14 +169,14 @@ RUN set -eux; \
     sed -i 's/("ontouchstart"in window||navigator.maxTouchPoints>0)&&!matchMedia/false\&\&!matchMedia/' "$f"; \
     grep -qF 'inputMode==="touch":false&&' "$f"; \
     b="$(basename "$f")"; \
-    sed -i "s#${b}\"#${b}?v=enclave1\"#" /var/www/index.html; \
-    grep -qF "${b}?v=enclave1" /var/www/index.html
+    sed -i "s#${b}\"#${b}?v=s1\"#" /var/www/index.html; \
+    grep -qF "${b}?v=s1" /var/www/index.html
 
-# Screen sizes profiles may claim (gen_fingerprint.py SCREENS) need a display mode at the
+# Screen sizes profiles may claim (profile_build.py SCREENS) need a display mode at the
 # 30 Hz neko streams at. neko's list lacks 1440x900, 1680x1050, and 1600x900 at 30 Hz
 # (timings from gtf). 1366x768 runs on neko's 1368x768 mode: the dummy driver only takes
 # widths that are multiples of 8, the page sees the claimed 1366 (Camoufox reports the
-# screen size) and the 1366-wide window, and prepare_profile.py picks the mode.
+# screen size) and the 1366-wide window, and profile_apply.py picks the mode.
 RUN set -eux; \
     f=/etc/neko/xorg.conf; \
     sed -i '/^Section "Monitor"/,/^EndSection/ s|^EndSection|  Modeline "1440x900_30.00"  48.80  1440 1464 1608 1776  900 901 904 916  -HSync +Vsync\n  Modeline "1680x1050_30.00"  67.73  1680 1728 1896 2112  1050 1051 1054 1069  -HSync +Vsync\n  Modeline "1600x900_30.00"  54.52  1600 1632 1792 1984  900 901 904 916  -HSync +Vsync\nEndSection|' "$f"; \
@@ -186,10 +186,10 @@ RUN set -eux; \
     grep -q '"1368x768_30.00"' "$f"
 
 COPY openbox.xml /etc/neko/openbox.xml
-COPY supervisord.conf /etc/neko/supervisord/enclave.conf
+COPY supervisord.conf /etc/neko/supervisord/session.conf
 # Screen encoder settings that keep the stream at full frame rate on a 2-core PC (see the file).
 COPY neko.yaml /etc/neko/neko.yaml
-# Firewall for the egress lock (apply_egress_lock.sh). capsh (libcap2-bin) is in the base.
+# Firewall for the egress lock (net_apply.sh). capsh (libcap2-bin) is in the base.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends iptables=1.8.11-2; \
@@ -202,18 +202,18 @@ RUN set -eux; \
 RUN set -eux; \
     groupadd --system stream; \
     f=/etc/neko/supervisord.conf; \
-    sed -i '/^\[program:neko\]/,/^$/ { s|^command=/usr/bin/neko |command=/opt/enclave/run-neko.sh |; s|^user=.*|user=root| }' "$f"; \
-    sed -n '/^\[program:neko\]/,/^$/p' "$f" | grep -qx 'command=/opt/enclave/run-neko.sh serve --server.static "/var/www"'; \
+    sed -i '/^\[program:neko\]/,/^$/ { s|^command=/usr/bin/neko |command=/opt/session/run-neko.sh |; s|^user=.*|user=root| }' "$f"; \
+    sed -n '/^\[program:neko\]/,/^$/p' "$f" | grep -qx 'command=/opt/session/run-neko.sh serve --server.static "/var/www"'; \
     sed -n '/^\[program:neko\]/,/^$/p' "$f" | grep -qx 'user=root'
 
-COPY entrypoint.sh start-browser.sh launch_browser.py prepare_profile.py gen_fingerprint.py windows_gpu.py apply_egress_lock.sh check_proxy.py audit.py camfeed.py run-neko.sh /opt/enclave/
-# Check pages for audit runs (audit.py, testing/test-suite.md).
-COPY audit/ /opt/enclave/audit/
+COPY entrypoint.sh session.sh launch.py profile_apply.py profile_build.py gl_info.py net_apply.sh net_check.py diag.py media_bridge.py run-neko.sh /opt/session/
+# Check pages for audit runs (diag.py, testing/test-suite.md).
+COPY diag/ /opt/session/diag/
 # Windows line endings break the shebang ("required file not found"): refuse them.
-RUN chmod 0755 /opt/enclave/*.sh /opt/enclave/*.py \
-    && ! grep -l "$(printf '\r')" /opt/enclave/*.sh /opt/enclave/*.py /etc/neko/supervisord/enclave.conf /etc/neko/neko.yaml
+RUN chmod 0755 /opt/session/*.sh /opt/session/*.py \
+    && ! grep -l "$(printf '\r')" /opt/session/*.sh /opt/session/*.py /etc/neko/supervisord/session.conf /etc/neko/neko.yaml
 
-COPY --from=gl-shim /libenclave_gl.so /opt/enclave/libenclave_gl.so
+COPY --from=gl-shim /libglcompat.so /opt/session/libglcompat.so
 
 ARG NEKO_SHA256=e88f09ebf4a922dc1f66b84a36010fbc46b928a6efec236e0358cb2676e9e907
 RUN --mount=type=bind,from=neko-dist,target=/dist/neko \
@@ -222,10 +222,10 @@ RUN --mount=type=bind,from=neko-dist,target=/dist/neko \
     install -m 0755 /dist/neko/neko /usr/bin/neko
 
 # Stage 4: the phone camera. neko receives it and (Enclave's neko build) writes the
-# decoded frames into camfeed.py's pipe; the browser's camera reads them from there.
+# decoded frames into media_bridge.py's pipe; the browser's camera reads them from there.
 ENV NEKO_CAPTURE_WEBCAM_ENABLED=true \
-    NEKO_CAPTURE_WEBCAM_DEVICE=fifo:/tmp/enclave-camera.fifo \
+    NEKO_CAPTURE_WEBCAM_DEVICE=fifo:/tmp/session-media.fifo \
     NEKO_CAPTURE_WEBCAM_WIDTH=1280 \
     NEKO_CAPTURE_WEBCAM_HEIGHT=720
 
-ENTRYPOINT ["/opt/enclave/entrypoint.sh"]
+ENTRYPOINT ["/opt/session/entrypoint.sh"]

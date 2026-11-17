@@ -40,7 +40,7 @@ Close codes: 4401 unknown credentials, 4403 revoked, 4409 the same PC connected 
 
 ## Media
 - neko (the profile's streaming program) runs without ICE lite in relay mode, with the relay's STUN and TURN servers by IP (the container has no DNS). Its credentials (coturn `use-auth-secret`, 30 days) come with `REGISTERED`; a running profile keeps the ones it started with.
-- The egress lock lets neko's own group (`stream`) send UDP anywhere and reach the TURN server over TCP; the browser still reaches only its proxy (`images/browser/apply_egress_lock.sh`). So media goes direct where the networks allow it, and through TURN (UDP, or TCP 3478 where UDP is blocked) otherwise.
+- The egress lock lets neko's own group (`stream`) send UDP anywhere and reach the TURN server over TCP; the browser still reaches only its proxy (`images/browser/net_apply.sh`). So media goes direct where the networks allow it, and through TURN (UDP, or TCP 3478 where UDP is blocked) otherwise.
 - The phone app replaces whatever ICE servers neko offers with its own from `SESSION_GRANTED`.
 
 ## Security

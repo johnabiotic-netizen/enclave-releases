@@ -36,7 +36,7 @@ export interface MediaDeviceInfo {
 export const WEBRTC_POLICIES = ['proxy-only', 'disabled'] as const;
 export type WebRtcPolicy = (typeof WEBRTC_POLICIES)[number];
 
-/** Output of Camoufox's generator, saved once (images/browser/gen_fingerprint.py). */
+/** Output of the generator, saved once (images/browser/profile_build.py). */
 export interface FingerprintRaw {
   /** Camoufox config, passed to the browser as CAMOU_CONFIG. */
   config: Record<string, unknown>;

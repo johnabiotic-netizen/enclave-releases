@@ -1,5 +1,5 @@
-# Test-only, runs inside a profile container as neko, with camfeed stopped: stands in for
-# camfeed with slow writes. A mid-grey frame 50 times a second, each write holding the sequence
+# Test-only, runs inside a profile container as neko, with media_bridge stopped: stands in for
+# media_bridge with slow writes. A mid-grey frame 50 times a second, each write holding the sequence
 # odd for 4 ms (as a busy PC can), for 50 s. The browser must never show a black frame.
 import mmap, os, struct, time
 

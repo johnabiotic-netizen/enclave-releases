@@ -16,43 +16,43 @@ export interface Finding {
 export const AUDIT_CHECKS = [
   {
     id: 'probe',
-    label: 'Browser values',
+    label: 'Enclave Core',
     about:
       "Screen, time zone, graphics, audio, fonts and more, against this profile's baseline and real Windows Firefox.",
   },
   {
     id: 'metrics',
-    label: 'Text measurements',
+    label: 'Enclave Metrics',
     about: 'How wide common Windows fonts draw, against real Windows Firefox.',
   },
   {
     id: 'svg-emoji',
-    label: 'Emoji drawing',
+    label: 'Enclave Glyphs',
     about: 'The size of drawn emoji, a value some sites compare.',
   },
   {
-    id: 'pixelscan',
-    label: 'Pixelscan',
-    about: 'Its overall verdict, and whether it spots the proxy or masking.',
+    id: 'scan',
+    label: 'Enclave Scan',
+    about: 'The overall verdict, and whether it spots the proxy or masking.',
   },
   {
-    id: 'creepjs',
-    label: 'CreepJS',
-    about: 'Lies it detects, its headless score, graphics and fonts.',
+    id: 'deep',
+    label: 'Enclave Deep Scan',
+    about: 'Lies it detects, the headless score, graphics and fonts.',
   },
   {
-    id: 'browserleaks-webrtc',
-    label: 'WebRTC leak',
-    about: 'BrowserLeaks: that WebRTC shows only the proxy IP, no local address.',
+    id: 'leak',
+    label: 'Enclave Leak',
+    about: 'That WebRTC shows only the proxy IP, no local address.',
   },
   {
-    id: 'browserleaks-canvas',
-    label: 'Canvas',
-    about: 'BrowserLeaks: the canvas signature, which differs per profile.',
+    id: 'draw',
+    label: 'Enclave Canvas',
+    about: 'The canvas signature, which differs per profile.',
   },
   {
-    id: 'amiunique',
-    label: 'AmIUnique',
+    id: 'crowd',
+    label: 'Enclave Crowd',
     about: 'The system, browser, language and time zone it detects.',
   },
 ] as const;

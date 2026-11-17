@@ -113,7 +113,7 @@ export function RelayPanel({ profiles }: { profiles: Profile[] | null }) {
     <div className="relay">
       {error && <p className="notice error">{error}</p>}
       <dl className="facts">
-        <dt>Relay</dt>
+        <dt>Link</dt>
         <dd className="mono">{status.url}</dd>
         <dt>Account</dt>
         <dd>{status.email}</dd>
@@ -277,7 +277,7 @@ export function RelayPanel({ profiles }: { profiles: Profile[] | null }) {
           </>
         ) : (
           <button className="button small quiet" onClick={() => setConfirm('sign-out')}>
-            Sign out of the relay
+            Sign out of Link
           </button>
         )}
       </div>
@@ -314,12 +314,12 @@ function SignIn(props: {
     >
       {props.error && <p className="notice error">{props.error}</p>}
       <label className="field">
-        <span>Relay address</span>
+        <span>Link address</span>
         <input
           className="mono"
           value={url}
           spellCheck={false}
-          placeholder="relay.example.com"
+          placeholder="link.example.com"
           onChange={(e) => setUrl(e.target.value)}
         />
       </label>
@@ -338,7 +338,7 @@ function SignIn(props: {
         {create && password.length > 0 && password.length < 10 && (
           <small className="error-text">At least 10 characters.</small>
         )}
-        <small>Sent to the relay once to sign this PC in. Not kept on this PC.</small>
+        <small>Sent to Link once to sign this PC in. Not kept on this PC.</small>
       </label>
       <label className="field">
         <span>This PC&apos;s name</span>
@@ -361,7 +361,7 @@ function SignIn(props: {
         <label className="field narrow">
           <span>Invite code</span>
           <input className="mono" value={invite} onChange={(e) => setInvite(e.target.value)} />
-          <small>If your relay asks for one.</small>
+          <small>If your Link service asks for one.</small>
         </label>
       )}
       <div className="row">

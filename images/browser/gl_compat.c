@@ -1,15 +1,3 @@
-// Preloaded into Camoufox (start-browser.sh). Makes four WebGL values read like Windows.
-//
-// Firefox reads the initial stencil masks from the GL driver once per context
-// (WebGLContextValidate.cpp) and reports them to pages unchanged. On Windows the driver
-// is ANGLE, which returns all ones: Windows Firefox 158 on an Intel HD 620 reports
-// 4294967295 (measured 2026-10-27; Firefox 147 and Camoufox's recordings show the older
-// 2147483647). Mesa returns all ones cut to the stencil buffer's 8 bits: 255. Camoufox's
-// WebGL override never sees these, so pages saw a Linux value next to a Windows GPU.
-//
-// Firefox finds GL functions at runtime with dlsym and eglGetProcAddress, so those are
-// wrapped and hand out a glGetIntegerv that rewrites only the all-ones answer. A mask a
-// page sets itself is cached by Firefox and never comes from here.
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <string.h>
@@ -42,9 +30,6 @@ static void shim_getintegerv(GLenum pname, GLint *data) {
   if (pname != GL_STENCIL_VALUE_MASK && pname != GL_STENCIL_WRITEMASK &&
       pname != GL_STENCIL_BACK_VALUE_MASK && pname != GL_STENCIL_BACK_WRITEMASK)
     return;
-  // All ones cut to WebGL's 8-bit stencil buffer becomes ANGLE's full all ones. No
-  // further GL query here: Firefox rejects a context whose setup raised a GL error, and
-  // GL_STENCIL_BITS is an error in core profiles.
   if (*data == 0xFF) *data = ANGLE_ALL_ONES;
 }
 

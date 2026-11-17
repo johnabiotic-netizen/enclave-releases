@@ -47,9 +47,9 @@ export interface ProxyTestResult {
   hosting?: boolean;
   proxyFlag?: boolean;
   mobile?: boolean;
-  /** Pixelscan in a temporary profile on this proxy: its verdict and proxy card. */
-  pixelscan?: string;
-  pixelscanProxy?: string;
+  /** Enclave Scan in a temporary profile on this proxy: its verdict and proxy card. */
+  scan?: string;
+  scanProxy?: string;
   /** Lower is better: failing, flagged or unsticky proxies sort last. */
   score: number;
 }
@@ -62,8 +62,8 @@ export interface ProxyTestRequest {
   like?: { profileId: string; ports: [number, number] };
   /** Minutes before the sticky re-check (default 5, 0 skips it). */
   stickyMinutes?: number;
-  /** Also run Pixelscan per working proxy (about 1.5 minutes each). */
-  pixelscan?: boolean;
+  /** Also run Enclave Scan per working proxy (about 1.5 minutes each). */
+  scan?: boolean;
 }
 
 export interface ProxyTestJob {
@@ -73,8 +73,7 @@ export interface ProxyTestJob {
   finishedAt?: string;
   total: number;
   checked: number;
-  phase:
-    'first check' | 'waiting for the sticky check' | 'sticky check' | 'reputation' | 'pixelscan';
+  phase: 'first check' | 'waiting for the sticky check' | 'sticky check' | 'reputation' | 'scan';
   /** While the sticky check waits: when it starts. */
   stickyAt?: string;
   /** Every proxy, in request order while running; best first once done. */
@@ -109,8 +108,8 @@ export type RatedProxy = Pick<
   | 'mobile'
   | 'sticky'
   | 'exitIpLater'
-  | 'pixelscan'
-  | 'pixelscanProxy'
+  | 'scan'
+  | 'scanProxy'
 >;
 
 export function reportToRated(r: ProxyReport): RatedProxy {
@@ -125,7 +124,7 @@ export function reportToRated(r: ProxyReport): RatedProxy {
 
 /**
  * Good, a warning, or not usable. IP databases don't predict detection sites well (a listed
- * IP can pass Pixelscan, a clean one can fail it), so a database listing is a warning, and
+ * IP can pass Enclave Scan, a clean one can fail it), so a database listing is a warning, and
  * only a failed safety check makes a proxy unusable.
  */
 export function rateProxy(r: RatedProxy): ProxyRating {
@@ -134,11 +133,11 @@ export function rateProxy(r: RatedProxy): ProxyRating {
   }
   const warnings: string[] = [];
   const facts: string[] = [];
-  if (r.pixelscan !== undefined && r.pixelscan !== 'consistent') {
+  if (r.scan !== undefined && r.scan !== 'consistent') {
     warnings.push(
-      r.pixelscan.startsWith('error')
-        ? "Pixelscan couldn't finish its check."
-        : `Pixelscan says ${r.pixelscan}${r.pixelscanProxy ? ` (${r.pixelscanProxy})` : ''}.`,
+      r.scan.startsWith('error')
+        ? "Enclave Scan couldn't finish its check."
+        : `Enclave Scan says ${r.scan}${r.scanProxy ? ` (${r.scanProxy})` : ''}.`,
     );
   }
   if (r.sticky === false) {
@@ -155,7 +154,7 @@ export function rateProxy(r: RatedProxy): ProxyRating {
   if (r.latencyMs !== undefined && r.latencyMs > SLOW_PROXY_MS) {
     warnings.push(`Slow to answer (${r.latencyMs} ms). Pages will load slowly.`);
   }
-  if (r.pixelscan === 'consistent') facts.push('Pixelscan says consistent.');
+  if (r.scan === 'consistent') facts.push('Enclave Scan says consistent.');
   if (r.sticky === true) facts.push('The IP stayed the same between checks.');
   if (r.mobile) facts.push('A mobile network address.');
   else if (r.hosting === false && r.proxyFlag === false) {
