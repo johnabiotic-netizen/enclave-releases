@@ -34,11 +34,15 @@ services:
     restart: unless-stopped
     environment:
       RELAY_DOMAIN: ${RELAY_DOMAIN}
+      # The landing page host. Set in the server's .env; unset falls back to a harmless
+      # internal name, so the relay keeps working on a server that serves no landing page.
+      LANDING_DOMAIN: ${LANDING_DOMAIN:-localhost}
     ports:
       - '80:80'
       - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./landing:/srv/landing:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on: [relay]

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enclave</title>
+    <meta name="description" content="A private browser for Windows where every profile is its own sealed world, with its own device fingerprint and its own proxy, and continues on your phone." />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="googlebot" content="noindex, nofollow, noarchive" />
+    <meta name="color-scheme" content="dark" />
+    <style>
+      :root {
+        --bg: #07090f;
+        --panel: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.09);
+        --text: #e9edf5;
+        --muted: #9aa4b6;
+        --accent: #6ea8ff;
+        --accent-2: #8f7bff;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      .glow {
+        position: fixed;
+        inset: -30% -10% auto -10%;
+        height: 70vh;
+        background:
+          radial-gradient(45% 55% at 25% 20%, rgba(110, 168, 255, 0.22), transparent 70%),
+          radial-gradient(40% 50% at 78% 10%, rgba(143, 123, 255, 0.20), transparent 70%);
+        filter: blur(20px);
+        pointer-events: none;
+        z-index: 0;
+      }
+      main { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 16px; }
+      header { display: flex; align-items: center; gap: 10px; padding: 28px 0 10px; }
+      .mark {
+        width: 26px; height: 26px; border-radius: 7px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 0 22px rgba(110, 168, 255, 0.5);
+      }
+      .brand { font-weight: 650; letter-spacing: 0.2px; }
+      .hero { padding: 64px 0 40px; }
+      h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); line-height: 1.08; margin: 0 0 18px; letter-spacing: -0.02em; }
+      h1 .accent { background: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .lede { font-size: clamp(1.05rem, 2.4vw, 1.3rem); color: var(--muted); max-width: 42ch; margin: 0 0 32px; }
+      .cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 10px;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #0a0c12; font-weight: 650; text-decoration: none;
+        padding: 14px 22px; border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(110, 168, 255, 0.28);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .btn:hover { transform: translateY(-1px); box-shadow: 0 12px 38px rgba(110, 168, 255, 0.38); }
+      .btn-sub { color: var(--muted); font-size: 0.92rem; text-decoration: none; border-bottom: 1px solid transparent; }
+      .btn-sub:hover { border-bottom-color: var(--muted); }
+      .meta { color: var(--muted); font-size: 0.86rem; margin-top: 14px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; padding: 28px 0 10px; }
+      .card {
+        background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+        padding: 22px; backdrop-filter: blur(8px);
+      }
+      .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+      .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); margin-right: 8px; vertical-align: middle; }
+      footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: 48px; padding: 24px 0 40px; }
+      footer a { color: var(--muted); }
+      .note { background: rgba(110, 168, 255, 0.06); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; color: var(--muted); font-size: 0.9rem; margin-top: 28px; }
+    </style>
+  </head>
+  <body>
+    <div class="glow" aria-hidden="true"></div>
+    <main>
+      <header>
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand">Enclave</span>
+      </header>
+
+      <section class="hero">
+        <h1>Every profile is its<br /><span class="accent">own sealed world.</span></h1>
+        <p class="lede">
+          A private browser for Windows. Each profile runs in its own sealed container, with its
+          own fixed device fingerprint and its own proxy, and carries on to your phone in the
+          exact same session.
+        </p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/johnabiotic-netizen/enclave-releases/releases/download/v0.3.14/Enclave-Setup-0.3.14.exe">
+            Download for Windows
+          </a>
+          <a class="btn-sub" href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest">All versions</a>
+        </div>
+        <p class="meta">Windows 10 and 11, 64-bit. Free beta. The installer isn't signed yet, so Windows may show a SmartScreen warning the first time.</p>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <h3><span class="dot"></span>Sealed profiles</h3>
+          <p>Each profile is one container with a fixed device fingerprint, generated once and never changed. Nothing bleeds between profiles.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Its own proxy, never leaks</h3>
+          <p>A profile's traffic only ever leaves through its own proxy. If the proxy fails, the profile fails closed, never your real connection.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Continue on your phone</h3>
+          <p>Start on your PC and pick it up on your phone: same tabs, same logins, same IP, same fingerprint. The browser keeps running on the PC; the phone is just a screen.</p>
+        </div>
+        <div class="card">
+          <h3><span class="dot"></span>Consistent by design</h3>
+          <p>Time zone, language and location follow the proxy, and the device details match a real machine, so a profile looks like one ordinary computer.</p>
+        </div>
+      </section>
+
+      <div class="note">
+        Private beta. No accounts, no tracking, no analytics. You bring your own proxies.
+      </div>
+
+      <footer>
+        Enclave is a work in progress and is offered as is during the beta. &middot;
+        <a href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest">Releases</a>
+      </footer>
+    </main>
+  </body>
+</html>

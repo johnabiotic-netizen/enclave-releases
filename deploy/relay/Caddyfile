@@ -4,3 +4,15 @@
 	header Strict-Transport-Security "max-age=31536000"
 	reverse_proxy relay:8790
 }
+
+# The product landing page, served as static files with search indexing turned off
+# (X-Robots-Tag header plus robots.txt in the folder). The host comes from LANDING_DOMAIN
+# in .env, so it is never written in the repo; left unset it falls back to a harmless internal
+# name (an internal self-signed cert, never reached from outside) so the relay above is untouched.
+{$LANDING_DOMAIN:localhost} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+	root * /srv/landing
+	file_server
+}
