@@ -7,3 +7,4 @@ export * from './tunnel.js';
 export * from './proxy-test.js';
 export * from './proxy-parse.js';
 export * from './audit.js';
+export * from './license.js';
