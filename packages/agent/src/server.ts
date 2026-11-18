@@ -24,7 +24,11 @@ import type { DockerRuntime } from './docker/runtime.js';
 import type { RelayLink } from './relay/link.js';
 import type { ImageDownloader } from './image-download.js';
 
-export const AGENT_VERSION = '0.1.0';
+/**
+ * What the agent tells the relay it is. 0.1.0 was every release up to 0.3.14; 0.2.0 is the first with
+ * license keys, so the relay can turn the phone link off for older apps (RELAY_MIN_AGENT_VERSION).
+ */
+export const AGENT_VERSION = '0.2.0';
 const LOOPBACK = '127.0.0.1';
 
 const CONTENT_TYPES: Record<string, string> = {

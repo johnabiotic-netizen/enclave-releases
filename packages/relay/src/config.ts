@@ -11,6 +11,8 @@ export interface RelayConfig {
   dataDir: string;
   /** The built phone app (packages/mobile/dist), served from `/`. */
   staticDir: string;
+  /** The oldest agent version that may keep a PC connection (0.1.0 was every release before licenses). Unset: any. */
+  minAgentVersion?: string | undefined;
   /** Who may make an account. */
   signup: 'open' | 'invite' | 'closed';
   inviteCode: string | undefined;
@@ -50,6 +52,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
   if (env.TURN_IP && !/^\d{1,3}(\.\d{1,3}){3}$/.test(env.TURN_IP)) {
     throw new Error(`TURN_IP must be an IPv4 address, got "${env.TURN_IP}".`);
   }
+  const minAgentVersion = env.RELAY_MIN_AGENT_VERSION || undefined;
+  if (minAgentVersion && !/^\d+\.\d+\.\d+$/.test(minAgentVersion)) {
+    throw new Error(`RELAY_MIN_AGENT_VERSION must look like 0.2.0, got "${minAgentVersion}".`);
+  }
   const here = path.dirname(fileURLToPath(import.meta.url));
   return {
     host: env.RELAY_HOST || '127.0.0.1',
@@ -58,6 +64,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): RelayConfig {
     staticDir: env.RELAY_STATIC_DIR || path.resolve(here, '../../mobile/dist'),
     signup,
     inviteCode,
+    minAgentVersion,
     trustProxy: env.RELAY_TRUST_PROXY === '1',
     turn: secret
       ? {

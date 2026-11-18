@@ -311,6 +311,10 @@ export class RelayLink {
         this.problem = 'The relay no longer knows this PC. Sign in again.';
         return;
       }
+      if (e.code === RELAY_CLOSE.UPDATE) {
+        this.problem = 'This version of Enclave is too old for the phone link. Update Enclave.';
+        return;
+      }
       if (e.code === RELAY_CLOSE.REPLACED) {
         this.problem = 'This PC is signed in to the relay from another Enclave.';
         return;

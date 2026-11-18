@@ -14,6 +14,7 @@ import {
   type RelayToPhone,
 } from '@enclave/shared';
 import type { RelayConfig } from './config.js';
+import { versionBelow } from './version.js';
 import { secretMatches, type Device, type Pc, type RelayStore } from './store.js';
 import { pcTurn, phoneIceServers } from './turn.js';
 
@@ -86,6 +87,9 @@ export class Hub {
         const found = this.store.pc(msg.pcId);
         if (!found || !secretMatches(msg.pcSecret, found.secretHash)) {
           return ws.close(RELAY_CLOSE.UNAUTHORIZED, 'Unknown PC');
+        }
+        if (this.config.minAgentVersion && versionBelow(msg.version, this.config.minAgentVersion)) {
+          return ws.close(RELAY_CLOSE.UPDATE, 'Update Enclave');
         }
         clearTimeout(timer);
         pc = found;

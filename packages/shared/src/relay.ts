@@ -141,4 +141,6 @@ export const RELAY_CLOSE = {
   REVOKED: 4403,
   /** The same PC connected again elsewhere. */
   REPLACED: 4409,
+  /** This version of Enclave is older than the relay accepts (RELAY_MIN_AGENT_VERSION). */
+  UPDATE: 4426,
 } as const;

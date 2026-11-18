@@ -15,6 +15,8 @@ services:
       RELAY_SIGNUP: ${RELAY_SIGNUP:-invite}
       RELAY_INVITE_CODE: ${RELAY_INVITE_CODE:-}
       RELAY_TRUST_PROXY: '1'
+      # Turns the phone link off for Enclave apps older than this (0.2.0 = the first with licenses).
+      RELAY_MIN_AGENT_VERSION: ${RELAY_MIN_AGENT_VERSION:-}
       TURN_SECRET: ${TURN_SECRET}
       TURN_HOST: ${RELAY_DOMAIN}
       TURN_IP: ${TURN_IP}
