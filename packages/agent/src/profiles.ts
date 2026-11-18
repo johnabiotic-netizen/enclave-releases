@@ -170,6 +170,8 @@ export class ProfileService {
     private readonly relayTurn?: () => PcTurn | null,
     /** A newer location database than the image's (location-db.ts), mounted into containers. */
     private readonly locationDb?: { mounts(): Docker.MountSettings[] },
+    /** Null when a profile may start; otherwise why not (no valid license). */
+    private readonly licenseGate?: () => string | null,
   ) {}
 
   /** The location database mount, for every container that looks up an IP's location. */
@@ -1002,6 +1004,8 @@ export class ProfileService {
   // ---------------------------------------------------------------- start / stop
 
   async start(id: string): Promise<{ stream: StreamInfo }> {
+    const unlicensed = this.licenseGate?.();
+    if (unlicensed) throw new AgentError('LICENSE_REQUIRED', unlicensed);
     return this.exclusive(id, async () => {
       const profile = await this.store.get(id);
       await this.runtime.assertReady();

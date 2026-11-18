@@ -6,6 +6,7 @@ import type { AppSettingsView, PhoneMode } from '../shared/bridge';
 import { api } from './api';
 import { RelayPanel } from './Phone';
 import { UpdateSettings } from './Update';
+import { LicenseSettings } from './License';
 
 const PHONE_CHOICES: [PhoneMode, string, string][] = [
   [
@@ -208,6 +209,11 @@ export function Settings({ profiles }: { profiles: Profile[] | null }) {
               Open folder
             </button>
           </div>
+        </section>
+
+        <section className="settings-group" aria-labelledby="s-license">
+          <h2 id="s-license">License</h2>
+          <LicenseSettings />
         </section>
 
         <section className="settings-group" aria-labelledby="s-updates">

@@ -1,5 +1,7 @@
 // What the preload bridge gives the window (window.enclave). Shared by main, preload and renderer.
 
+import type { LicenseStatus } from '@enclave/shared';
+
 export type AgentState =
   | { status: 'starting' }
   | { status: 'running'; dockerMode: string; phoneApp: string | null }
@@ -104,6 +106,11 @@ export interface EnclaveBridge {
   /** Stops the profiles, installs the downloaded version, and starts Enclave again. */
   installUpdate(): Promise<void>;
   onUpdateState(listener: (state: UpdateState) => void): () => void;
+  /** The license: whether profiles may start, who it is for, and why not when it isn't valid. */
+  licenseState(): Promise<LicenseStatus>;
+  /** Checks a pasted key, locks it to this PC through the relay, and keeps it when it is good. */
+  activateLicense(key: string): Promise<LicenseStatus>;
+  onLicenseState(listener: (state: LicenseStatus) => void): () => void;
   /** The window fills the screen (the profile viewer's full screen), or not. */
   setFullScreen(on: boolean): Promise<void>;
   minimize(): Promise<void>;

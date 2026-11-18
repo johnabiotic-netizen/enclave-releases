@@ -27,6 +27,11 @@ export interface RunningAgent {
 export interface AgentOptions {
   /** Encrypts profile secrets on disk (the Windows app: safeStorage). Without it they are plain. */
   sealer?: SecretSealer;
+  /**
+   * Asked before a profile starts: null when it may, or the reason it may not (no valid license).
+   * Running profiles are never stopped by it.
+   */
+  licenseGate?: () => string | null;
 }
 
 export async function startAgent(
@@ -86,6 +91,7 @@ export async function startAgent(
     phone,
     () => relay.turn(),
     locationDb,
+    options.licenseGate,
   );
   await service.startMonitor();
   locationDb.start();

@@ -7,6 +7,7 @@ import {
   type LicensePayload,
 } from '@enclave/shared';
 import { verifyLicenseKey } from './license.js';
+import { ProfileService } from './profiles.js';
 
 const pair = generateKeyPairSync('ed25519');
 const pubB64 = b64urlEncode(pair.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32));
@@ -60,5 +61,25 @@ describe('license keys', () => {
   });
   it('refuses everything while no public key is set', () => {
     expect(verifyLicenseKey(make(base), '', on)).toEqual({ ok: false, problem: 'bad-signature' });
+  });
+});
+
+describe('license gate on starting a profile', () => {
+  const fake = {} as never;
+  const make = (gate: () => string | null) =>
+    new ProfileService(fake, fake, fake, undefined, undefined, undefined, gate);
+
+  it('refuses to start a profile while unlicensed, with the reason', async () => {
+    const service = make(() => 'Enclave needs a license to start a profile.');
+    await expect(service.start('anything')).rejects.toMatchObject({
+      code: 'LICENSE_REQUIRED',
+      message: 'Enclave needs a license to start a profile.',
+    });
+  });
+
+  it('goes on to the normal start when licensed', async () => {
+    const service = make(() => null);
+    // The fakes know nothing, so it fails later and elsewhere: not with LICENSE_REQUIRED.
+    await expect(service.start('anything')).rejects.not.toMatchObject({ code: 'LICENSE_REQUIRED' });
   });
 });

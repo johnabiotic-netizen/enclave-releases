@@ -1,6 +1,7 @@
 // The window's only way to the app: a few calls, no Node, no token.
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { LicenseStatus } from '@enclave/shared';
 import type { AgentState, EnclaveBridge, TransferProgress, UpdateState } from '../shared/bridge.js';
 
 const bridge: EnclaveBridge = {
@@ -32,6 +33,13 @@ const bridge: EnclaveBridge = {
     const handler = (_e: IpcRendererEvent, s: UpdateState) => listener(s);
     ipcRenderer.on('update:state', handler);
     return () => ipcRenderer.removeListener('update:state', handler);
+  },
+  licenseState: () => ipcRenderer.invoke('license:state'),
+  activateLicense: (key) => ipcRenderer.invoke('license:activate', key),
+  onLicenseState: (listener) => {
+    const handler = (_e: IpcRendererEvent, s: LicenseStatus) => listener(s);
+    ipcRenderer.on('license:state', handler);
+    return () => ipcRenderer.removeListener('license:state', handler);
   },
   setFullScreen: (on) => ipcRenderer.invoke('window:set-fullscreen', on),
   minimize: () => ipcRenderer.invoke('window:minimize'),

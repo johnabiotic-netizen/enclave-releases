@@ -21,6 +21,7 @@ import {
   Tray,
 } from 'electron';
 import { loadConfig, startAgent, type RunningAgent, type SecretSealer } from '@enclave/agent';
+import { LicenseManager } from './license.js';
 import { API_BASE_PATH, DESKTOP_APP_ORIGIN } from '@enclave/shared';
 import { SettingsFile, type AppSettings, type PhoneMode } from './settings.js';
 import { BROWSER_IMAGE } from './image.js';
@@ -72,6 +73,7 @@ let lastConfig: { image: string; wslDistro: string | undefined } = {
 let state: AgentState = { status: 'starting' };
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let license: LicenseManager | null = null;
 /** Set once Quit Enclave runs: the window may close for real then. */
 let quitting = false;
 
@@ -138,6 +140,14 @@ async function bootAgent(): Promise<void> {
       }
     }
     await checkEncryption();
+    if (!license) {
+      license = new LicenseManager(
+        home,
+        app.isPackaged || process.env.ENCLAVE_REQUIRE_LICENSE === '1',
+        (s) => win?.webContents.send('license:state', s),
+      );
+      await license.init();
+    }
     token = await settings.agentToken(process.env.AGENT_TOKEN);
     const config = loadConfig({
       ...process.env,
@@ -149,7 +159,10 @@ async function bootAgent(): Promise<void> {
         : process.env.ENCLAVE_IDLE_MINUTES,
     });
     lastConfig = { image: config.image, wslDistro: config.wslDistro };
-    agent = await startAgent(config, { sealer: safeStorageSealer });
+    agent = await startAgent(config, {
+      sealer: safeStorageSealer,
+      licenseGate: () => license?.blockedReason() ?? null,
+    });
     setState({ status: 'running', dockerMode: agent.dockerMode, phoneApp: agent.phoneApp ?? null });
   } catch (err) {
     setState({ status: 'failed', message: describeStartError(err) });
@@ -255,6 +268,11 @@ function showWindow(): void {
 
 ipcMain.handle('agent:state', () => state);
 ipcMain.handle('update:state', () => updateState());
+ipcMain.handle('license:state', () => license?.current() ?? { licensed: false });
+ipcMain.handle('license:activate', (_e, key: unknown) => {
+  if (!license || typeof key !== 'string' || key.length > 2000) return { licensed: false };
+  return license.activate(key);
+});
 ipcMain.handle('update:check', () => checkForUpdates());
 ipcMain.handle('update:install', () => quitAll(true));
 

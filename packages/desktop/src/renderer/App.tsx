@@ -11,6 +11,7 @@ import { UpdateBanner } from './Update';
 import { useProfiles } from './useProfiles';
 import { Settings } from './Settings';
 import { Setup } from './Setup';
+import { LicenseGate, useLicense } from './License';
 import { api } from './api';
 import type { SystemResponse } from '@enclave/shared';
 import { Viewer } from './Viewer';
@@ -34,6 +35,7 @@ export function App() {
   // service (a "starting" in between must not unmount Setup, whose mount runs a check: that
   // looped, restarting the service without end).
   const [failedOnce, setFailedOnce] = useState(false);
+  const license = useLicense();
   useEffect(() => {
     const take = (s: AgentState) => {
       setAgent(s);
@@ -43,6 +45,9 @@ export function App() {
     void window.enclave.agentState().then(take);
     return window.enclave.onAgentState(take);
   }, []);
+
+  // No valid license: nothing else is shown until there is one (running profiles are untouched).
+  if (license && !license.licensed) return <LicenseGate status={license} />;
 
   if (phoneApp === undefined) {
     // Enclave's service could not start (Docker not running, for one): the setup checker says
