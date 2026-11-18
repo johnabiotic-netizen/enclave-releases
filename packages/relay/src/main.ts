@@ -8,6 +8,8 @@ const config = loadConfig();
 // The owner's commands, run inside the relay's container next to the running relay:
 //   node /app/relay.mjs invite "<who it is for>"   a single-use invite code for one account
 //   node /app/relay.mjs invites                    the invites and whether they were used
+//   node /app/relay.mjs licenses                   the license keys seen, their PC and whether revoked
+//   node /app/relay.mjs license-revoke <id>        stop a key working (also unrevoke, reset-pc)
 const command = process.argv[2];
 if (command === 'invite' || command === 'invites') {
   const url = `http://127.0.0.1:${config.port}/r/v1/admin/invites`;
@@ -26,6 +28,24 @@ if (command === 'invite' || command === 'invites') {
   }
   if (command === 'invite') console.log((body as { code: string }).code);
   else console.log(JSON.stringify(body, null, 2));
+  process.exit(0);
+}
+
+const licenseActions = ['license-revoke', 'license-unrevoke', 'license-reset-pc'];
+if (command === 'licenses' || (command && licenseActions.includes(command))) {
+  const base = `http://127.0.0.1:${config.port}/r/v1/admin/licenses`;
+  const res =
+    command === 'licenses'
+      ? await fetch(base)
+      : await fetch(`${base}/${encodeURIComponent(process.argv[3] ?? '')}/${command.slice(8)}`, {
+          method: 'POST',
+        });
+  const body = (await res.json()) as unknown;
+  if (!res.ok) {
+    console.error(JSON.stringify(body));
+    process.exit(1);
+  }
+  console.log(JSON.stringify(body, null, 2));
   process.exit(0);
 }
 

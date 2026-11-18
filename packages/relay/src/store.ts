@@ -48,12 +48,25 @@ export interface Invite {
   usedBy: string | null;
 }
 
+/** One license key the relay has seen: which PC it is bound to and whether the owner revoked it. */
+export interface LicenseRecord {
+  id: string;
+  name: string;
+  expires: string;
+  /** SHA-256 hex of the PC it is locked to; null until the first check or after a reset. */
+  pcHash: string | null;
+  revoked: boolean;
+  firstSeenAt: string;
+  lastCheckAt: string | null;
+}
+
 interface Data {
   version: 1;
   accounts: Account[];
   pcs: Pc[];
   devices: Device[];
   invites?: Invite[];
+  licenses?: LicenseRecord[];
 }
 
 // OWASP's argon2id minimum: 19 MiB, 2 passes, 1 lane.
@@ -170,6 +183,60 @@ export class RelayStore {
 
   invites(): Invite[] {
     return this.data.invites ?? [];
+  }
+
+  licenses(): LicenseRecord[] {
+    return this.data.licenses ?? [];
+  }
+
+  license(id: string): LicenseRecord | undefined {
+    return this.licenses().find((l) => l.id === id);
+  }
+
+  /** A good check: makes the record on first sight, binds the PC if none is bound, notes the time. */
+  async recordLicenseCheck(
+    payload: { id: string; name: string; expires: string },
+    pc: string,
+    now: Date,
+  ): Promise<void> {
+    let rec = this.license(payload.id);
+    if (!rec) {
+      rec = {
+        id: payload.id,
+        name: payload.name,
+        expires: payload.expires,
+        pcHash: null,
+        revoked: false,
+        firstSeenAt: now.toISOString(),
+        lastCheckAt: null,
+      };
+      (this.data.licenses ??= []).push(rec);
+    }
+    rec.pcHash ??= pc;
+    rec.lastCheckAt = now.toISOString();
+    await this.save();
+  }
+
+  /** Owner actions. Revoking a key that was never used creates its record, so it can't be used later. */
+  async setLicense(id: string, change: 'revoke' | 'unrevoke' | 'reset-pc'): Promise<boolean> {
+    let rec = this.license(id);
+    if (!rec) {
+      if (change !== 'revoke') return false;
+      rec = {
+        id,
+        name: '(not used yet)',
+        expires: '',
+        pcHash: null,
+        revoked: false,
+        firstSeenAt: new Date().toISOString(),
+        lastCheckAt: null,
+      };
+      (this.data.licenses ??= []).push(rec);
+    }
+    if (change === 'reset-pc') rec.pcHash = null;
+    else rec.revoked = change === 'revoke';
+    await this.save();
+    return true;
   }
 
   /** Uses up an unused invite with this code for `email`; false if there is none. */

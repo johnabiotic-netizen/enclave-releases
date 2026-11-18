@@ -17,10 +17,13 @@ import {
   type RegisterPcRequest,
   type RegisterPcResponse,
   type RelayDevice,
+  type LicenseCheckRequest,
+  type LicenseCheckResponse,
   type RelayInfo,
 } from '@enclave/shared';
 import type { RelayConfig } from './config.js';
 import { Hub } from './hub.js';
+import { checkLicense } from './license.js';
 import { RateLimit } from './rate-limit.js';
 import { RelayStore, secretMatches, verifyNothing, verifyPassword, type Pc } from './store.js';
 
@@ -65,6 +68,8 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
     password: new RateLimit(10, 10 * 60_000),
     // Pairing claims: 20 per 10 minutes.
     claim: new RateLimit(20, 10 * 60_000),
+    // License checks: 60 per 10 minutes from one address (the app checks once a day).
+    license: new RateLimit(60, 10 * 60_000),
   };
 
   app.addHook('onSend', async (req, reply) => {
@@ -256,6 +261,45 @@ export async function buildRelay(config: RelayConfig): Promise<Relay> {
           usedBy: i.usedBy,
         }));
       });
+
+      r.post<{ Body: LicenseCheckRequest }>(
+        '/license/check',
+        {
+          schema: {
+            body: {
+              type: 'object',
+              required: ['key', 'pc'],
+              additionalProperties: false,
+              properties: {
+                key: { type: 'string', minLength: 10, maxLength: 1000 },
+                pc: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+              },
+            },
+          },
+        },
+        async (req): Promise<LicenseCheckResponse> => {
+          limits.license.take(req.ip);
+          return checkLicense(store, req.body.key, req.body.pc);
+        },
+      );
+      r.get('/admin/licenses', async (req) => {
+        ownerOnly(req);
+        return store.licenses();
+      });
+      r.post<{ Params: { id: string; action: string } }>(
+        '/admin/licenses/:id/:action',
+        async (req) => {
+          ownerOnly(req);
+          const { id, action } = req.params;
+          if (action !== 'revoke' && action !== 'unrevoke' && action !== 'reset-pc') {
+            throw new HttpError(404, 'NOT_FOUND', 'Not found.');
+          }
+          if (!(await store.setLicense(id, action))) {
+            throw new HttpError(404, 'NOT_FOUND', 'No license with that id has been used yet.');
+          }
+          return { ok: true };
+        },
+      );
 
       r.get('/devices', async (req): Promise<RelayDevice[]> => {
         const pc = pcAuth(req);

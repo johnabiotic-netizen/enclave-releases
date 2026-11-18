@@ -1,17 +1,12 @@
 // License verification (specs/license.md): is this key signed by the owner, for this PC, and not expired?
 import { createPublicKey, verify } from 'node:crypto';
 import {
+  LICENSE_PUBLIC_KEY,
   licenseExpired,
   parseLicenseKey,
   type LicensePayload,
   type LicenseProblem,
 } from '@enclave/shared';
-
-/**
- * The owner's public key (Ed25519, raw 32 bytes as base64url). It can only check keys, never make
- * them. Paste the value `license keygen` prints. Empty until the owner has made a key pair.
- */
-export const LICENSE_PUBLIC_KEY = 'p_k1gxrDrclIQQD0IOr8Opx7XFaETrKz4ef1imRPeAM';
 
 // The fixed prefix of a DER SubjectPublicKeyInfo for an Ed25519 key; the 32 raw bytes follow.
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');

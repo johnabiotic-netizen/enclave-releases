@@ -94,6 +94,23 @@ export function formatLicenseKey(payloadBytes: Uint8Array, signature: Uint8Array
   return `${LICENSE_PREFIX}${b64urlEncode(payloadBytes)}.${b64urlEncode(signature)}`;
 }
 
+/**
+ * The owner's public key (Ed25519, raw 32 bytes, base64url). It can only check keys, never make them.
+ * The agent and the relay both use it.
+ */
+export const LICENSE_PUBLIC_KEY = 'p_k1gxrDrclIQQD0IOr8Opx7XFaETrKz4ef1imRPeAM';
+
+/** POST /license/check: the first check from a PC binds the key to it. `pc` is a SHA-256 hex of the PC's id. */
+export interface LicenseCheckRequest {
+  key: string;
+  pc: string;
+}
+export interface LicenseCheckResponse {
+  status: 'ok' | 'invalid' | 'expired' | 'revoked' | 'other-pc';
+  name?: string;
+  expires?: string;
+}
+
 /** A key is valid through the end of its expiry day (UTC). */
 export function licenseExpired(payload: LicensePayload, now: Date = new Date()): boolean {
   return now.getTime() >= Date.parse(`${payload.expires}T00:00:00Z`) + 24 * 3600 * 1000;
