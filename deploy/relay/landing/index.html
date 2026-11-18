@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Enclave</title>
-    <meta name="description" content="A private browser for Windows. Every profile runs in its own sealed container, with its own fixed device fingerprint and its own proxy, and continues on your phone in the same live session." />
+    <meta
+      name="description"
+      content="A private browser for Windows. Every profile runs in its own sealed container, with its own fixed device fingerprint and its own proxy, and continues on your phone in the same live session."
+    />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="googlebot" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
@@ -16,177 +19,840 @@
         --ink: #eef1fa;
         --muted: #9aa4bb;
         --faint: #626c84;
-        --line: rgba(255,255,255,0.08);
-        --line-2: rgba(255,255,255,0.14);
-        --glass: rgba(255,255,255,0.04);
-        --glass-2: rgba(255,255,255,0.06);
+        --line: rgba(255, 255, 255, 0.08);
+        --line-2: rgba(255, 255, 255, 0.14);
+        --glass: rgba(255, 255, 255, 0.04);
+        --glass-2: rgba(255, 255, 255, 0.06);
         --a1: #6ea8ff;
         --a2: #a07bff;
         --a3: #57e0c6;
         --grad: linear-gradient(110deg, #6ea8ff 0%, #a07bff 55%, #57e0c6 120%);
         --maxw: 1140px;
       }
-      * { box-sizing: border-box; }
-      html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-      body {
-        margin: 0; background: var(--bg); color: var(--ink);
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+      * {
+        box-sizing: border-box;
       }
-      a { color: inherit; text-decoration: none; }
-      .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+      html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .wrap {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 0 22px;
+      }
 
       /* ---------- ambient ---------- */
-      .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-      .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; will-change: transform; }
-      .blob.b1 { width: 56vw; height: 56vw; top: -20vw; left: -10vw; background: radial-gradient(circle at 40% 40%, rgba(110,168,255,.55), transparent 62%); animation: drift1 26s ease-in-out infinite; }
-      .blob.b2 { width: 48vw; height: 48vw; top: -14vw; right: -12vw; background: radial-gradient(circle at 60% 40%, rgba(160,123,255,.5), transparent 62%); animation: drift2 30s ease-in-out infinite; }
-      .blob.b3 { width: 44vw; height: 44vw; top: 36vw; left: 32vw; background: radial-gradient(circle at 50% 50%, rgba(87,224,198,.26), transparent 62%); animation: drift3 34s ease-in-out infinite; }
-      @keyframes drift1 { 50% { transform: translate(6vw, 5vw) scale(1.08); } }
-      @keyframes drift2 { 50% { transform: translate(-5vw, 6vw) scale(1.1); } }
-      @keyframes drift3 { 50% { transform: translate(-6vw, -4vw) scale(1.06); } }
-      .grid-lines { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .4;
-        background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
-        background-size: 64px 64px; mask-image: radial-gradient(circle at 50% 20%, #000 0%, transparent 70%); }
+      .bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(70px);
+        opacity: 0.55;
+        will-change: transform;
+      }
+      .blob.b1 {
+        width: 56vw;
+        height: 56vw;
+        top: -20vw;
+        left: -10vw;
+        background: radial-gradient(circle at 40% 40%, rgba(110, 168, 255, 0.55), transparent 62%);
+        animation: drift1 26s ease-in-out infinite;
+      }
+      .blob.b2 {
+        width: 48vw;
+        height: 48vw;
+        top: -14vw;
+        right: -12vw;
+        background: radial-gradient(circle at 60% 40%, rgba(160, 123, 255, 0.5), transparent 62%);
+        animation: drift2 30s ease-in-out infinite;
+      }
+      .blob.b3 {
+        width: 44vw;
+        height: 44vw;
+        top: 36vw;
+        left: 32vw;
+        background: radial-gradient(circle at 50% 50%, rgba(87, 224, 198, 0.26), transparent 62%);
+        animation: drift3 34s ease-in-out infinite;
+      }
+      @keyframes drift1 {
+        50% {
+          transform: translate(6vw, 5vw) scale(1.08);
+        }
+      }
+      @keyframes drift2 {
+        50% {
+          transform: translate(-5vw, 6vw) scale(1.1);
+        }
+      }
+      @keyframes drift3 {
+        50% {
+          transform: translate(-6vw, -4vw) scale(1.06);
+        }
+      }
+      .grid-lines {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.4;
+        background-image:
+          linear-gradient(var(--line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(circle at 50% 20%, #000 0%, transparent 70%);
+      }
 
-      .page { position: relative; z-index: 1; }
+      .page {
+        position: relative;
+        z-index: 1;
+      }
 
       /* ---------- nav ---------- */
-      nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
-      .brand { display: flex; align-items: center; gap: 12px; font-weight: 680; letter-spacing: .2px; }
-      .logo { width: 30px; height: 30px; border-radius: 9px; background: var(--grad); position: relative; box-shadow: 0 0 26px rgba(110,168,255,.5); }
-      .logo::before { content:""; position:absolute; inset: 6px; border-radius: 4px; border: 2px solid rgba(5,6,11,.85); }
-      .nav-links { display: flex; align-items: center; gap: 26px; }
-      .nav-links a.minor { color: var(--muted); font-size: .92rem; }
-      .nav-links a.minor:hover { color: var(--ink); }
-      .pill { font-size: .9rem; padding: 9px 16px; border: 1px solid var(--line-2); border-radius: 11px; color: var(--ink); transition: background .15s; }
-      .pill:hover { background: var(--glass-2); }
-      @media (max-width: 680px){ .nav-links a.minor { display:none; } }
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 680;
+        letter-spacing: 0.2px;
+      }
+      .logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--grad);
+        position: relative;
+        box-shadow: 0 0 26px rgba(110, 168, 255, 0.5);
+      }
+      .logo::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border-radius: 4px;
+        border: 2px solid rgba(5, 6, 11, 0.85);
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 26px;
+      }
+      .nav-links a.minor {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .nav-links a.minor:hover {
+        color: var(--ink);
+      }
+      .pill {
+        font-size: 0.9rem;
+        padding: 9px 16px;
+        border: 1px solid var(--line-2);
+        border-radius: 11px;
+        color: var(--ink);
+        transition: background 0.15s;
+      }
+      .pill:hover {
+        background: var(--glass-2);
+      }
+      @media (max-width: 680px) {
+        .nav-links a.minor {
+          display: none;
+        }
+      }
 
       /* ---------- hero ---------- */
-      .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; padding: 54px 0 70px; }
-      @media (max-width: 920px){ .hero { grid-template-columns: 1fr; gap: 44px; padding: 36px 0 50px; } }
-      .eyebrow { display: inline-flex; align-items: center; gap: 9px; font-size: .8rem; color: var(--muted); border: 1px solid var(--line); background: var(--glass); padding: 7px 13px; border-radius: 999px; margin-bottom: 26px; }
-      .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--a3); box-shadow: 0 0 10px var(--a3); animation: blink 2.4s ease-in-out infinite; }
-      @keyframes blink { 50% { opacity: .35; } }
-      h1 { font-size: clamp(2.5rem, 6vw, 4.3rem); line-height: 1.02; letter-spacing: -.03em; margin: 0 0 22px; font-weight: 700; }
-      h1 .shine { background: var(--grad); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 7s linear infinite; }
-      @keyframes shine { to { background-position: 200% center; } }
-      .lede { font-size: clamp(1.08rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 44ch; margin: 0 0 32px; }
-      .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-      .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--grad); color: #060810; font-weight: 680; padding: 15px 24px; border-radius: 13px; box-shadow: 0 12px 38px rgba(110,168,255,.3); transition: transform .16s, box-shadow .16s; }
-      .btn:hover { transform: translateY(-2px); box-shadow: 0 18px 50px rgba(120,140,255,.44); }
-      .btn svg { width: 18px; height: 18px; }
-      .ghost { color: var(--muted); font-size: .95rem; display: inline-flex; align-items: center; gap: 7px; }
-      .ghost:hover { color: var(--ink); }
-      .platform { color: var(--faint); font-size: .85rem; margin-top: 18px; }
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: 40px;
+        align-items: center;
+        padding: 54px 0 70px;
+      }
+      @media (max-width: 920px) {
+        .hero {
+          grid-template-columns: 1fr;
+          gap: 44px;
+          padding: 36px 0 50px;
+        }
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        background: var(--glass);
+        padding: 7px 13px;
+        border-radius: 999px;
+        margin-bottom: 26px;
+      }
+      .eyebrow .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--a3);
+        box-shadow: 0 0 10px var(--a3);
+        animation: blink 2.4s ease-in-out infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      h1 {
+        font-size: clamp(2.5rem, 6vw, 4.3rem);
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        margin: 0 0 22px;
+        font-weight: 700;
+      }
+      h1 .shine {
+        background: var(--grad);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shine 7s linear infinite;
+      }
+      @keyframes shine {
+        to {
+          background-position: 200% center;
+        }
+      }
+      .lede {
+        font-size: clamp(1.08rem, 2.2vw, 1.3rem);
+        color: var(--muted);
+        max-width: 44ch;
+        margin: 0 0 32px;
+      }
+      .cta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--grad);
+        color: #060810;
+        font-weight: 680;
+        padding: 15px 24px;
+        border-radius: 13px;
+        box-shadow: 0 12px 38px rgba(110, 168, 255, 0.3);
+        transition:
+          transform 0.16s,
+          box-shadow 0.16s;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 50px rgba(120, 140, 255, 0.44);
+      }
+      .btn svg {
+        width: 18px;
+        height: 18px;
+      }
+      .ghost {
+        color: var(--muted);
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .ghost:hover {
+        color: var(--ink);
+      }
+      .platform {
+        color: var(--faint);
+        font-size: 0.85rem;
+        margin-top: 18px;
+      }
 
       /* ---------- hero mock ---------- */
-      .stage { position: relative; perspective: 1400px; min-height: 360px; }
-      .app { position: relative; border: 1px solid var(--line-2); border-radius: 18px; background: linear-gradient(180deg, rgba(20,24,38,.9), rgba(10,12,22,.92)); box-shadow: 0 40px 100px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05); backdrop-filter: blur(14px); overflow: hidden; transform: rotateY(-11deg) rotateX(5deg); transform-style: preserve-3d; animation: floatApp 9s ease-in-out infinite; }
-      @keyframes floatApp { 50% { transform: rotateY(-9deg) rotateX(4deg) translateY(-8px); } }
-      .app-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-      .tl { width: 11px; height: 11px; border-radius: 50%; background: #3a4154; }
-      .app-title { margin-left: 10px; font-size: .82rem; color: var(--muted); font-weight: 600; }
-      .app-body { display: grid; grid-template-columns: 54px 1fr; }
-      .rail { border-right: 1px solid var(--line); padding: 14px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-      .rail i { width: 22px; height: 22px; border-radius: 7px; background: var(--glass-2); display: block; }
-      .rail i.on { background: var(--grad); box-shadow: 0 0 16px rgba(110,168,255,.5); }
-      .tiles { padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--glass); position: relative; overflow: hidden; }
-      .tile::after { content:""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent, rgba(255,255,255,.05), transparent); transform: translateX(-120%); }
-      .tile.live::after { animation: sweep 3.6s ease-in-out infinite; }
-      @keyframes sweep { 60%,100% { transform: translateX(120%); } }
-      .tile .row1 { display: flex; align-items: center; gap: 8px; }
-      .flag { font-size: 1.05rem; line-height: 1; }
-      .tname { font-size: .82rem; font-weight: 650; }
-      .status { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--a3); box-shadow: 0 0 8px var(--a3); }
-      .status.amber { background: #f2b64c; box-shadow: 0 0 8px #f2b64c; }
-      .tmeta { margin-top: 9px; font-size: .68rem; color: var(--faint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
-      .tchip { margin-top: 8px; display: inline-block; font-size: .62rem; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+      .stage {
+        position: relative;
+        perspective: 1400px;
+        min-height: 360px;
+      }
+      .app {
+        position: relative;
+        border: 1px solid var(--line-2);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(20, 24, 38, 0.9), rgba(10, 12, 22, 0.92));
+        box-shadow:
+          0 40px 100px rgba(0, 0, 0, 0.55),
+          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(14px);
+        overflow: hidden;
+        transform: rotateY(-11deg) rotateX(5deg);
+        transform-style: preserve-3d;
+        animation: floatApp 9s ease-in-out infinite;
+      }
+      @keyframes floatApp {
+        50% {
+          transform: rotateY(-9deg) rotateX(4deg) translateY(-8px);
+        }
+      }
+      .app-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tl {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #3a4154;
+      }
+      .app-title {
+        margin-left: 10px;
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .app-body {
+        display: grid;
+        grid-template-columns: 54px 1fr;
+      }
+      .rail {
+        border-right: 1px solid var(--line);
+        padding: 14px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      .rail i {
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        background: var(--glass-2);
+        display: block;
+      }
+      .rail i.on {
+        background: var(--grad);
+        box-shadow: 0 0 16px rgba(110, 168, 255, 0.5);
+      }
+      .tiles {
+        padding: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .tile {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--glass);
+        position: relative;
+        overflow: hidden;
+      }
+      .tile::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+        transform: translateX(-120%);
+      }
+      .tile.live::after {
+        animation: sweep 3.6s ease-in-out infinite;
+      }
+      @keyframes sweep {
+        60%,
+        100% {
+          transform: translateX(120%);
+        }
+      }
+      .tile .row1 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .flag {
+        font-size: 1.05rem;
+        line-height: 1;
+      }
+      .tname {
+        font-size: 0.82rem;
+        font-weight: 650;
+      }
+      .status {
+        margin-left: auto;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--a3);
+        box-shadow: 0 0 8px var(--a3);
+      }
+      .status.amber {
+        background: #f2b64c;
+        box-shadow: 0 0 8px #f2b64c;
+      }
+      .tmeta {
+        margin-top: 9px;
+        font-size: 0.68rem;
+        color: var(--faint);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.02em;
+      }
+      .tchip {
+        margin-top: 8px;
+        display: inline-block;
+        font-size: 0.62rem;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
       /* phone */
-      .phone { position: absolute; right: -6px; bottom: -26px; width: 104px; height: 212px; border-radius: 22px; border: 1px solid var(--line-2); background: linear-gradient(180deg, #11141f, #0a0c15); box-shadow: 0 30px 60px rgba(0,0,0,.6); padding: 9px; transform: rotate(6deg); animation: floatPhone 7s ease-in-out infinite; }
-      @keyframes floatPhone { 50% { transform: rotate(5deg) translateY(-10px); } }
-      .phone .scr { height: 100%; border-radius: 15px; background: radial-gradient(120% 80% at 50% 0%, rgba(110,168,255,.22), transparent), #0c0f1a; border: 1px solid var(--line); display: flex; flex-direction: column; }
-      .phone .scr .pbar { display:flex; align-items:center; gap:5px; padding: 8px; border-bottom: 1px solid var(--line); }
-      .phone .scr .pflag { font-size: .8rem; }
-      .phone .scr .plabel { font-size: .52rem; color: var(--muted); font-weight: 600; }
-      .phone .scr .pdot { margin-left:auto; width:5px;height:5px;border-radius:50%;background:var(--a3); box-shadow:0 0 6px var(--a3); }
-      .phone .scr .pbody { flex:1; padding: 9px; display:flex; flex-direction:column; gap:6px; }
-      .phone .scr .pline { height: 6px; border-radius: 3px; background: var(--glass-2); }
-      .phone .scr .pline.s { width: 60%; }
-      .link-wire { position: absolute; right: 70px; bottom: 30px; width: 60px; height: 2px; background: linear-gradient(90deg, transparent, var(--a1)); opacity: .7; }
-      .ping { position:absolute; right: 96px; bottom: 25px; width: 10px; height: 10px; border-radius:50%; border:1px solid var(--a1); animation: ping 2.2s ease-out infinite; }
-      @keyframes ping { 0%{ transform: scale(.4); opacity:.9 } 100%{ transform: scale(2.4); opacity:0 } }
-      @media (max-width: 920px){ .app { transform: none; animation: none; } .phone { position: relative; right:auto; bottom:auto; margin: 18px auto 0; transform: none; animation: none; } .link-wire,.ping{ display:none; } .stage{ perspective:none; } }
+      .phone {
+        position: absolute;
+        right: -6px;
+        bottom: -26px;
+        width: 104px;
+        height: 212px;
+        border-radius: 22px;
+        border: 1px solid var(--line-2);
+        background: linear-gradient(180deg, #11141f, #0a0c15);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+        padding: 9px;
+        transform: rotate(6deg);
+        animation: floatPhone 7s ease-in-out infinite;
+      }
+      @keyframes floatPhone {
+        50% {
+          transform: rotate(5deg) translateY(-10px);
+        }
+      }
+      .phone .scr {
+        height: 100%;
+        border-radius: 15px;
+        background:
+          radial-gradient(120% 80% at 50% 0%, rgba(110, 168, 255, 0.22), transparent), #0c0f1a;
+        border: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+      }
+      .phone .scr .pbar {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .phone .scr .pflag {
+        font-size: 0.8rem;
+      }
+      .phone .scr .plabel {
+        font-size: 0.52rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .phone .scr .pdot {
+        margin-left: auto;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--a3);
+        box-shadow: 0 0 6px var(--a3);
+      }
+      .phone .scr .pbody {
+        flex: 1;
+        padding: 9px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .phone .scr .pline {
+        height: 6px;
+        border-radius: 3px;
+        background: var(--glass-2);
+      }
+      .phone .scr .pline.s {
+        width: 60%;
+      }
+      .link-wire {
+        position: absolute;
+        right: 70px;
+        bottom: 30px;
+        width: 60px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--a1));
+        opacity: 0.7;
+      }
+      .ping {
+        position: absolute;
+        right: 96px;
+        bottom: 25px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1px solid var(--a1);
+        animation: ping 2.2s ease-out infinite;
+      }
+      @keyframes ping {
+        0% {
+          transform: scale(0.4);
+          opacity: 0.9;
+        }
+        100% {
+          transform: scale(2.4);
+          opacity: 0;
+        }
+      }
+      @media (max-width: 920px) {
+        .app {
+          transform: none;
+          animation: none;
+        }
+        .phone {
+          position: relative;
+          right: auto;
+          bottom: auto;
+          margin: 18px auto 0;
+          transform: none;
+          animation: none;
+        }
+        .link-wire,
+        .ping {
+          display: none;
+        }
+        .stage {
+          perspective: none;
+        }
+      }
 
-      .video { border:1px solid var(--line-2); border-radius:22px; overflow:hidden; background:#000; box-shadow:0 30px 80px rgba(0,0,0,.5); }
-      .video video { display:block; width:100%; height:auto; }
+      .video {
+        border: 1px solid var(--line-2);
+        border-radius: 22px;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+      }
+      .video video {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
       /* ---------- trust strip ---------- */
-      .strip { display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 20px 0 10px; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-      .strip span { display: inline-flex; align-items: center; gap: 9px; }
-      .strip svg { width: 16px; height: 16px; stroke: var(--a3); }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 28px;
+        padding: 20px 0 10px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+      .strip span {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .strip svg {
+        width: 16px;
+        height: 16px;
+        stroke: var(--a3);
+      }
 
       /* ---------- sections ---------- */
-      section { padding: 78px 0; }
-      .kick { color: var(--a1); font-size: .8rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 14px; }
-      h2 { font-size: clamp(1.7rem, 3.6vw, 2.5rem); letter-spacing: -.02em; margin: 0 0 14px; font-weight: 680; }
-      .sub { color: var(--muted); max-width: 56ch; margin: 0 0 40px; font-size: 1.05rem; }
+      section {
+        padding: 78px 0;
+      }
+      .kick {
+        color: var(--a1);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin: 0 0 14px;
+      }
+      h2 {
+        font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+        letter-spacing: -0.02em;
+        margin: 0 0 14px;
+        font-weight: 680;
+      }
+      .sub {
+        color: var(--muted);
+        max-width: 56ch;
+        margin: 0 0 40px;
+        font-size: 1.05rem;
+      }
 
       /* bento */
-      .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
-      .b { border: 1px solid var(--line); border-radius: 20px; padding: 26px; background: var(--glass); position: relative; overflow: hidden; transition: border-color .2s, transform .2s, background .2s; }
-      .b:hover { border-color: var(--line-2); background: var(--glass-2); transform: translateY(-3px); }
-      .b.wide { grid-column: span 4; } .b.half { grid-column: span 3; } .b.third { grid-column: span 2; }
-      @media (max-width: 860px){ .bento { grid-template-columns: 1fr 1fr; } .b.wide,.b.half,.b.third { grid-column: span 1; } }
-      @media (max-width: 560px){ .bento { grid-template-columns: 1fr; } }
-      .ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: rgba(110,168,255,.12); border: 1px solid var(--line); margin-bottom: 18px; }
-      .ic svg { width: 21px; height: 21px; stroke: var(--a1); }
-      .b h3 { margin: 0 0 9px; font-size: 1.12rem; font-weight: 640; }
-      .b p { margin: 0; color: var(--muted); font-size: .96rem; }
+      .bento {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 16px;
+      }
+      .b {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 26px;
+        background: var(--glass);
+        position: relative;
+        overflow: hidden;
+        transition:
+          border-color 0.2s,
+          transform 0.2s,
+          background 0.2s;
+      }
+      .b:hover {
+        border-color: var(--line-2);
+        background: var(--glass-2);
+        transform: translateY(-3px);
+      }
+      .b.wide {
+        grid-column: span 4;
+      }
+      .b.half {
+        grid-column: span 3;
+      }
+      .b.third {
+        grid-column: span 2;
+      }
+      @media (max-width: 860px) {
+        .bento {
+          grid-template-columns: 1fr 1fr;
+        }
+        .b.wide,
+        .b.half,
+        .b.third {
+          grid-column: span 1;
+        }
+      }
+      @media (max-width: 560px) {
+        .bento {
+          grid-template-columns: 1fr;
+        }
+      }
+      .ic {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        display: grid;
+        place-items: center;
+        background: rgba(110, 168, 255, 0.12);
+        border: 1px solid var(--line);
+        margin-bottom: 18px;
+      }
+      .ic svg {
+        width: 21px;
+        height: 21px;
+        stroke: var(--a1);
+      }
+      .b h3 {
+        margin: 0 0 9px;
+        font-size: 1.12rem;
+        font-weight: 640;
+      }
+      .b p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
       /* mini visual in wide card: stacked sealed layers */
-      .layers { margin-top: 22px; display: grid; gap: 8px; }
-      .layer { height: 30px; border-radius: 9px; border: 1px solid var(--line); background: linear-gradient(90deg, var(--glass-2), transparent); display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: .72rem; color: var(--muted); }
-      .layer .lk { width: 12px; height: 12px; border-radius: 3px; background: var(--grad); }
-      .layer .fl { margin-left: auto; opacity: .85; }
+      .layers {
+        margin-top: 22px;
+        display: grid;
+        gap: 8px;
+      }
+      .layer {
+        height: 30px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        background: linear-gradient(90deg, var(--glass-2), transparent);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .layer .lk {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        background: var(--grad);
+      }
+      .layer .fl {
+        margin-left: auto;
+        opacity: 0.85;
+      }
       /* leak flow */
-      .flow { margin-top: 20px; display: flex; align-items: center; gap: 10px; font-size: .72rem; color: var(--muted); flex-wrap: wrap; }
-      .node { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--glass); }
-      .node.block { border-color: rgba(242,120,120,.4); color: #f2a0a0; text-decoration: line-through; opacity: .8; }
-      .arrow { color: var(--faint); }
+      .flow {
+        margin-top: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.72rem;
+        color: var(--muted);
+        flex-wrap: wrap;
+      }
+      .node {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: var(--glass);
+      }
+      .node.block {
+        border-color: rgba(242, 120, 120, 0.4);
+        color: #f2a0a0;
+        text-decoration: line-through;
+        opacity: 0.8;
+      }
+      .arrow {
+        color: var(--faint);
+      }
 
       /* steps flow */
-      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; position: relative; }
-      @media (max-width: 760px){ .steps { grid-template-columns: 1fr; } }
-      .step { border: 1px solid var(--line); border-radius: 18px; padding: 26px; background: linear-gradient(180deg, var(--glass), transparent); }
-      .step .num { font-family: ui-monospace, monospace; font-size: .78rem; color: var(--a1); font-weight: 700; letter-spacing: .14em; }
-      .step h3 { margin: 12px 0 8px; font-size: 1.14rem; }
-      .step p { margin: 0; color: var(--muted); font-size: .96rem; }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        position: relative;
+      }
+      @media (max-width: 760px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+      }
+      .step {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 26px;
+        background: linear-gradient(180deg, var(--glass), transparent);
+      }
+      .step .num {
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        color: var(--a1);
+        font-weight: 700;
+        letter-spacing: 0.14em;
+      }
+      .step h3 {
+        margin: 12px 0 8px;
+        font-size: 1.14rem;
+      }
+      .step p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.96rem;
+      }
 
       /* final */
-      .final { text-align: center; }
-      .final .wrapn { border: 1px solid var(--line-2); border-radius: 26px; padding: 56px 28px; background:
-        radial-gradient(130% 150% at 0% 0%, rgba(110,168,255,.1), transparent 55%),
-        radial-gradient(130% 150% at 100% 0%, rgba(160,123,255,.1), transparent 55%),
-        radial-gradient(130% 160% at 50% 120%, rgba(87,224,198,.08), transparent 55%), rgba(10,12,22,.6); }
-      .final h2 { margin-bottom: 12px; }
+      .final {
+        text-align: center;
+      }
+      .final .wrapn {
+        border: 1px solid var(--line-2);
+        border-radius: 26px;
+        padding: 56px 28px;
+        background:
+          radial-gradient(130% 150% at 0% 0%, rgba(110, 168, 255, 0.1), transparent 55%),
+          radial-gradient(130% 150% at 100% 0%, rgba(160, 123, 255, 0.1), transparent 55%),
+          radial-gradient(130% 160% at 50% 120%, rgba(87, 224, 198, 0.08), transparent 55%),
+          rgba(10, 12, 22, 0.6);
+      }
+      .final h2 {
+        margin-bottom: 12px;
+      }
 
-      footer { border-top: 1px solid var(--line); padding: 30px 0 52px; display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: space-between; align-items: center; color: var(--faint); font-size: .86rem; }
-      footer a { color: var(--muted); } footer a:hover { color: var(--ink); }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 30px 0 52px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 22px;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--faint);
+        font-size: 0.86rem;
+      }
+      footer a {
+        color: var(--muted);
+      }
+      footer a:hover {
+        color: var(--ink);
+      }
 
       /* reveal */
-      .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
-      .reveal.in { opacity: 1; transform: none; }
+      .reveal {
+        opacity: 0;
+        transform: translateY(22px);
+        transition:
+          opacity 0.7s ease,
+          transform 0.7s ease;
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
       @media (prefers-reduced-motion: reduce) {
-        html { scroll-behavior: auto; }
-        .blob, .tile.live::after, .ping, .app, .phone, .eyebrow .dot, h1 .shine { animation: none !important; }
-        .reveal { opacity: 1; transform: none; transition: none; }
+        html {
+          scroll-behavior: auto;
+        }
+        .blob,
+        .tile.live::after,
+        .ping,
+        .app,
+        .phone,
+        .eyebrow .dot,
+        h1 .shine {
+          animation: none !important;
+        }
+        .reveal {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
       }
     </style>
   </head>
   <body>
     <div class="bg" aria-hidden="true">
-      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
     </div>
     <div class="grid-lines" aria-hidden="true"></div>
 
@@ -204,41 +870,85 @@
         <!-- HERO -->
         <div class="hero">
           <div>
-            <span class="eyebrow"><span class="dot" aria-hidden="true"></span>Free beta · Windows</span>
+            <span class="eyebrow"
+              ><span class="dot" aria-hidden="true"></span>Free beta · Windows</span
+            >
             <h1>Every profile is a<br /><span class="shine">different computer.</span></h1>
-            <p class="lede">Enclave runs each browser profile in its own sealed container, with a fixed device fingerprint and its own proxy, and hands it to your phone in the same live session.</p>
+            <p class="lede">
+              Enclave runs each browser profile in its own sealed container, with a fixed device
+              fingerprint and its own proxy, and hands it to your phone in the same live session.
+            </p>
             <div class="cta">
-              <a class="btn" id="get" href="https://github.com/johnabiotic-netizen/enclave-releases/releases/download/v0.3.14/Enclave-Setup-0.3.14.exe">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+              <a
+                class="btn"
+                id="get"
+                href="https://github.com/johnabiotic-netizen/enclave-releases/releases/download/v0.3.14/Enclave-Setup-0.3.14.exe"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                </svg>
                 Download for Windows
               </a>
-              <a class="ghost" href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest">All versions &rsaquo;</a>
+              <a
+                class="ghost"
+                href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest"
+                >All versions &rsaquo;</a
+              >
             </div>
-            <p class="platform">Windows 10 and 11, 64-bit. The installer isn't signed yet, so Windows may warn the first time.</p>
+            <p class="platform">
+              Windows 10 and 11, 64-bit. The installer isn't signed yet, so Windows may warn the
+              first time.
+            </p>
           </div>
 
           <!-- product mock -->
           <div class="stage">
             <div class="app">
-              <div class="app-bar"><span class="tl"></span><span class="tl"></span><span class="tl"></span><span class="app-title">Enclave</span></div>
+              <div class="app-bar">
+                <span class="tl"></span><span class="tl"></span><span class="tl"></span
+                ><span class="app-title">Enclave</span>
+              </div>
               <div class="app-body">
                 <div class="rail"><i class="on"></i><i></i><i></i><i></i></div>
                 <div class="tiles">
                   <div class="tile live">
-                    <div class="row1"><span class="flag">🇩🇪</span><span class="tname">Berlin</span><span class="status"></span></div>
-                    <div class="tmeta">88.214.xx.xx · de-DE</div><span class="tchip">fingerprint locked</span>
+                    <div class="row1">
+                      <span class="flag">🇩🇪</span><span class="tname">Berlin</span
+                      ><span class="status"></span>
+                    </div>
+                    <div class="tmeta">88.214.xx.xx · de-DE</div>
+                    <span class="tchip">fingerprint locked</span>
                   </div>
                   <div class="tile live">
-                    <div class="row1"><span class="flag">🇺🇸</span><span class="tname">Chicago</span><span class="status"></span></div>
-                    <div class="tmeta">104.28.xx.xx · en-US</div><span class="tchip">own proxy</span>
+                    <div class="row1">
+                      <span class="flag">🇺🇸</span><span class="tname">Chicago</span
+                      ><span class="status"></span>
+                    </div>
+                    <div class="tmeta">104.28.xx.xx · en-US</div>
+                    <span class="tchip">own proxy</span>
                   </div>
                   <div class="tile">
-                    <div class="row1"><span class="flag">🇬🇧</span><span class="tname">London</span><span class="status amber"></span></div>
-                    <div class="tmeta">starting…</div><span class="tchip">sealed</span>
+                    <div class="row1">
+                      <span class="flag">🇬🇧</span><span class="tname">London</span
+                      ><span class="status amber"></span>
+                    </div>
+                    <div class="tmeta">starting…</div>
+                    <span class="tchip">sealed</span>
                   </div>
                   <div class="tile live">
-                    <div class="row1"><span class="flag">🇳🇬</span><span class="tname">Lagos</span><span class="status"></span></div>
-                    <div class="tmeta">102.89.xx.xx · en-NG</div><span class="tchip">on phone</span>
+                    <div class="row1">
+                      <span class="flag">🇳🇬</span><span class="tname">Lagos</span
+                      ><span class="status"></span>
+                    </div>
+                    <div class="tmeta">102.89.xx.xx · en-NG</div>
+                    <span class="tchip">on phone</span>
                   </div>
                 </div>
               </div>
@@ -247,63 +957,186 @@
             <div class="ping" aria-hidden="true"></div>
             <div class="phone" aria-hidden="true">
               <div class="scr">
-                <div class="pbar"><span class="pflag">🇳🇬</span><span class="plabel">Lagos</span><span class="pdot"></span></div>
-                <div class="pbody"><span class="pline"></span><span class="pline s"></span><span class="pline"></span><span class="pline s"></span></div>
+                <div class="pbar">
+                  <span class="pflag">🇳🇬</span><span class="plabel">Lagos</span
+                  ><span class="pdot"></span>
+                </div>
+                <div class="pbody">
+                  <span class="pline"></span><span class="pline s"></span><span class="pline"></span
+                  ><span class="pline s"></span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <div class="strip reveal">
-          <span><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Fails closed, never your real IP</span>
-          <span><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>No accounts, no tracking</span>
-          <span><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>Runs on your own PC</span>
+          <span
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 13l4 4L19 7" /></svg
+            >Fails closed, never your real IP</span
+          >
+          <span
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 13l4 4L19 7" /></svg
+            >No accounts, no tracking</span
+          >
+          <span
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 13l4 4L19 7" /></svg
+            >Runs on your own PC</span
+          >
         </div>
       </div>
 
       <div class="wrap">
-                <section id="film" style="padding-top:20px">
+        <section id="film" style="padding-top: 20px">
           <p class="kick reveal">Watch</p>
           <h2 class="reveal">Sixty-five seconds, start to finish.</h2>
-          <div class="video reveal"><video controls preload="metadata" playsinline poster="sealed-poster.jpg"><source src="sealed.mp4" type="video/mp4" /></video></div>
+          <div class="video reveal">
+            <video controls preload="metadata" playsinline poster="sealed-poster.jpg">
+              <source src="sealed.mp4" type="video/mp4" />
+            </video>
+          </div>
         </section>
 
         <!-- WHY (bento) -->
         <section id="why">
           <p class="kick reveal">Why Enclave</p>
           <h2 class="reveal">One browser, many sealed lives.</h2>
-          <p class="sub reveal">Every profile is built to look like one ordinary computer, and to never cross into another.</p>
+          <p class="sub reveal">
+            Every profile is built to look like one ordinary computer, and to never cross into
+            another.
+          </p>
           <div class="bento">
             <div class="b wide reveal">
-              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div>
+              <div class="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="4" y="10" width="16" height="10" rx="2" />
+                  <path d="M8 10V7a4 4 0 018 0v3" />
+                </svg>
+              </div>
               <h3>Sealed profiles</h3>
-              <p>Each profile is one container with a device fingerprint generated once and never changed. Cookies, storage and identity stay inside it.</p>
+              <p>
+                Each profile is one container with a device fingerprint generated once and never
+                changed. Cookies, storage and identity stay inside it.
+              </p>
               <div class="layers" aria-hidden="true">
-                <div class="layer"><span class="lk"></span>Berlin<span class="fl">🇩🇪 fixed</span></div>
-                <div class="layer"><span class="lk"></span>Chicago<span class="fl">🇺🇸 fixed</span></div>
-                <div class="layer"><span class="lk"></span>Lagos<span class="fl">🇳🇬 fixed</span></div>
+                <div class="layer">
+                  <span class="lk"></span>Berlin<span class="fl">🇩🇪 fixed</span>
+                </div>
+                <div class="layer">
+                  <span class="lk"></span>Chicago<span class="fl">🇺🇸 fixed</span>
+                </div>
+                <div class="layer">
+                  <span class="lk"></span>Lagos<span class="fl">🇳🇬 fixed</span>
+                </div>
               </div>
             </div>
             <div class="b half reveal">
-              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7l7-4z"/></svg></div>
+              <div class="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7l7-4z" />
+                </svg>
+              </div>
               <h3>Its own proxy, never leaks</h3>
-              <p>Traffic only ever leaves through the profile's own proxy. If the proxy fails, the profile fails closed.</p>
-              <div class="flow" aria-hidden="true"><span class="node">Profile</span><span class="arrow">→</span><span class="node">Proxy</span><span class="arrow">→</span><span class="node">Web</span><span class="arrow">×</span><span class="node block">Your IP</span></div>
+              <p>
+                Traffic only ever leaves through the profile's own proxy. If the proxy fails, the
+                profile fails closed.
+              </p>
+              <div class="flow" aria-hidden="true">
+                <span class="node">Profile</span><span class="arrow">→</span
+                ><span class="node">Proxy</span><span class="arrow">→</span
+                ><span class="node">Web</span><span class="arrow">×</span
+                ><span class="node block">Your IP</span>
+              </div>
             </div>
             <div class="b third reveal">
-              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+              <div class="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="7" y="2" width="10" height="20" rx="2" />
+                  <path d="M11 18h2" />
+                </svg>
+              </div>
               <h3>Continue on your phone</h3>
-              <p>Pick up the exact session on your phone: same tabs, same logins, same IP. The browser keeps running on the PC.</p>
+              <p>
+                Pick up the exact session on your phone: same tabs, same logins, same IP. The
+                browser keeps running on the PC.
+              </p>
             </div>
             <div class="b third reveal">
-              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+              <div class="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              </div>
               <h3>Consistent by design</h3>
-              <p>Time zone, language and location follow the proxy, so a profile never contradicts itself.</p>
+              <p>
+                Time zone, language and location follow the proxy, so a profile never contradicts
+                itself.
+              </p>
             </div>
             <div class="b third reveal">
-              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a2 2 0 012-2h12a2 2 0 012 2v2M4 7h16M4 7v12a2 2 0 002 2h12a2 2 0 002-2V7"/></svg></div>
+              <div class="ic">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M4 7V5a2 2 0 012-2h12a2 2 0 012 2v2M4 7h16M4 7v12a2 2 0 002 2h12a2 2 0 002-2V7"
+                  />
+                </svg>
+              </div>
               <h3>Local and private</h3>
-              <p>Everything runs on your machine. No accounts, no analytics, nothing phoned home.</p>
+              <p>
+                Everything runs on your machine. No accounts, no analytics, nothing phoned home.
+              </p>
             </div>
           </div>
         </section>
@@ -313,9 +1146,30 @@
           <p class="kick reveal">How it works</p>
           <h2 class="reveal">Three steps, then it just runs.</h2>
           <div class="steps">
-            <div class="step reveal"><div class="num">01</div><h3>Create a profile</h3><p>Give it a proxy. Enclave builds a fixed, believable device identity and checks the proxy before anything starts.</p></div>
-            <div class="step reveal"><div class="num">02</div><h3>Browse sealed</h3><p>The profile runs in its own container. Nothing crosses to another profile, and traffic only leaves through its proxy.</p></div>
-            <div class="step reveal"><div class="num">03</div><h3>Carry it to your phone</h3><p>Link your phone and continue the same live session anywhere. The PC keeps the browser running; the phone is a screen.</p></div>
+            <div class="step reveal">
+              <div class="num">01</div>
+              <h3>Create a profile</h3>
+              <p>
+                Give it a proxy. Enclave builds a fixed, believable device identity and checks the
+                proxy before anything starts.
+              </p>
+            </div>
+            <div class="step reveal">
+              <div class="num">02</div>
+              <h3>Browse sealed</h3>
+              <p>
+                The profile runs in its own container. Nothing crosses to another profile, and
+                traffic only leaves through its proxy.
+              </p>
+            </div>
+            <div class="step reveal">
+              <div class="num">03</div>
+              <h3>Carry it to your phone</h3>
+              <p>
+                Link your phone and continue the same live session anywhere. The PC keeps the
+                browser running; the phone is a screen.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -324,10 +1178,24 @@
           <div class="wrapn reveal">
             <p class="kick">Get started</p>
             <h2>Run your first sealed profile.</h2>
-            <p class="sub" style="margin: 0 auto 30px;">Free while in beta. You bring your own proxies.</p>
-            <div class="cta" style="justify-content:center;">
-              <a class="btn" href="https://github.com/johnabiotic-netizen/enclave-releases/releases/download/v0.3.14/Enclave-Setup-0.3.14.exe">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+            <p class="sub" style="margin: 0 auto 30px">
+              Free while in beta. You bring your own proxies.
+            </p>
+            <div class="cta" style="justify-content: center">
+              <a
+                class="btn"
+                href="https://github.com/johnabiotic-netizen/enclave-releases/releases/download/v0.3.14/Enclave-Setup-0.3.14.exe"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                </svg>
                 Download for Windows
               </a>
             </div>
@@ -336,8 +1204,15 @@
         </section>
 
         <footer>
-          <span class="brand" style="font-size:.95rem;"><span class="logo" aria-hidden="true"></span>Enclave</span>
-          <span>Private beta, offered as is. · <a href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest">Releases</a></span>
+          <span class="brand" style="font-size: 0.95rem"
+            ><span class="logo" aria-hidden="true"></span>Enclave</span
+          >
+          <span
+            >Private beta, offered as is. ·
+            <a href="https://github.com/johnabiotic-netizen/enclave-releases/releases/latest"
+              >Releases</a
+            ></span
+          >
         </footer>
       </div>
     </div>
@@ -346,15 +1221,33 @@
       (function () {
         try {
           var els = document.querySelectorAll('.reveal');
-          if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            els.forEach(function (e) { e.classList.add('in'); }); return;
+          if (
+            !('IntersectionObserver' in window) ||
+            matchMedia('(prefers-reduced-motion: reduce)').matches
+          ) {
+            els.forEach(function (e) {
+              e.classList.add('in');
+            });
+            return;
           }
-          var io = new IntersectionObserver(function (ents) {
-            ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
-          }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
-          els.forEach(function (e) { io.observe(e); });
+          var io = new IntersectionObserver(
+            function (ents) {
+              ents.forEach(function (en) {
+                if (en.isIntersecting) {
+                  en.target.classList.add('in');
+                  io.unobserve(en.target);
+                }
+              });
+            },
+            { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+          );
+          els.forEach(function (e) {
+            io.observe(e);
+          });
         } catch (e) {
-          document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+          document.querySelectorAll('.reveal').forEach(function (el) {
+            el.classList.add('in');
+          });
         }
       })();
     </script>
