@@ -85,7 +85,7 @@ function revoke(): void {
   k.revoked = true;
   writeFileSync(listFile, JSON.stringify(l, null, 2));
   console.log(
-    `${k.name}'s key is marked revoked here. It takes effect for the user once the relay holds the list (not built yet).`,
+    `${k.name}'s key is marked revoked here. To cut the user off, also run on the relay server: node /app/relay.mjs license-revoke ${k.id}`,
   );
 }
 

@@ -42,13 +42,35 @@ export function LicenseGate({ status }: { status: LicenseStatus }) {
     <div className="shell no-rail">
       <main className="main">
         <section className="page">
-          <div className="settings" style={{ maxWidth: 560, margin: '12vh auto 0' }}>
-            <h1>Enter your license key</h1>
-            <p>
+          <div
+            style={{
+              maxWidth: 560,
+              margin: '14vh auto 0',
+              padding: '40px 40px 36px',
+              borderRadius: 24,
+              border: '1px solid rgba(255,255,255,.1)',
+              background: 'rgba(255,255,255,.035)',
+              boxShadow: '0 30px 80px rgba(0,0,0,.45)',
+              display: 'grid',
+              gap: 20,
+            }}
+          >
+            <p
+              className="mono"
+              style={{ margin: 0, letterSpacing: '.28em', fontSize: 13, opacity: 0.7 }}
+            >
+              ENCLAVE
+            </p>
+            <h1 style={{ margin: 0 }}>Enter your license key</h1>
+            <p style={{ margin: 0, opacity: 0.8, lineHeight: 1.55 }}>
               Enclave is open to people who have been given a license. Paste the key you were sent,
               then choose Activate. Your key works on one PC.
             </p>
-            {problem && <p className="notice error">{WHY[problem]}</p>}
+            {problem && (
+              <p className="notice error" style={{ margin: 0 }}>
+                {WHY[problem]}
+              </p>
+            )}
             <textarea
               aria-label="License key"
               className="mono"
@@ -57,18 +79,19 @@ export function LicenseGate({ status }: { status: LicenseStatus }) {
               placeholder="ENC1-..."
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              style={{ width: '100%' }}
+              style={{ width: '100%', padding: 14, boxSizing: 'border-box' }}
             />
-            <p>
+            <div>
               <button
                 type="button"
-                className="btn primary"
+                className="button primary"
                 disabled={busy || key.trim().length < 10}
                 onClick={() => void activate()}
+                style={{ padding: '12px 28px' }}
               >
                 {busy ? 'Checking' : 'Activate'}
               </button>
-            </p>
+            </div>
           </div>
         </section>
       </main>
